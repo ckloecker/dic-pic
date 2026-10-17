@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>dic-pic browser system tests</title>
+    <style>
+      body { font: 16px/1.5 system-ui, sans-serif; margin: 1rem; }
+      iframe { width: 960px; max-width: 100%; height: 850px; border: 1px solid #888; }
+      .pass { color: #176b36; }
+      .fail { color: #b42318; }
+    </style>
+  </head>
+  <body>
+    <h1>Browser system tests</h1>
+    <p id="summary" role="status">Running...</p>
+    <ol id="results"></ol>
+    <iframe id="app" src="../../src/" title="Game under test"></iframe>
+    <script type="module" src="./browser-tests.js"></script>
+  </body>
+</html>

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#15242d">
+    <title>Photo Runner — dic-pic</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="site-header">
+        <a class="brand" href="./" aria-label="Photo Runner home">
+          <span class="brand-mark" aria-hidden="true">P</span>
+          <span>PHOTO RUNNER</span>
+        </a>
+        <span class="header-note">YOUR PHOTO. YOUR LEVEL.</span>
+      </header>
+
+      <section id="setup-screen" class="screen setup-screen" aria-labelledby="setup-title">
+        <div class="intro-copy">
+          <p class="eyebrow">A tiny world made from your world</p>
+          <h1 id="setup-title">Run the edge<br><span>of adventure.</span></h1>
+          <p class="intro-description">Turn a photo into a pixel-art platform. Jump, dig, and race to the exit.</p>
+          <div class="feature-line"><span aria-hidden="true">✦</span> No tracing. Your level is generated automatically.</div>
+        </div>
+
+        <form id="setup-form" class="setup-card">
+          <div class="card-heading">
+            <span class="step-number">01</span>
+            <div>
+              <h2>Make your level</h2>
+              <p>Pick a photo and choose your runner name.</p>
+            </div>
+          </div>
+
+          <label class="field-label" for="player-name">Runner name</label>
+          <input id="player-name" name="playerName" type="text" maxlength="32"
+            autocomplete="nickname" placeholder="Letters and spaces, up to 32" required>
+          <p id="name-message" class="field-message" aria-live="polite">Letters and spaces only.</p>
+
+          <div class="field-label photo-label">Your level photo</div>
+          <div class="photo-actions">
+            <label class="file-button secondary-button">
+              <span aria-hidden="true">↥</span> Upload photo
+              <input id="upload-input" type="file" accept="image/*">
+            </label>
+            <label class="file-button secondary-button">
+              <span aria-hidden="true">◎</span> Take photo
+              <input id="camera-input" type="file" accept="image/*" capture="environment">
+            </label>
+          </div>
+          <p id="photo-name" class="photo-name" aria-live="polite">No photo selected yet.</p>
+
+          <button id="start-button" class="primary-button" type="submit" disabled>
+            Build my level <span aria-hidden="true">→</span>
+          </button>
+          <p id="setup-message" class="status-message" role="status" aria-live="polite"></p>
+          <p class="privacy-note"><span aria-hidden="true">⌑</span> Your photo and scores stay in this browser.</p>
+        </form>
+      </section>
+
+      <section id="game-screen" class="screen game-screen" aria-label="Platform game" hidden>
+        <div class="game-topbar">
+          <div>
+            <p class="eyebrow">PHOTO LEVEL</p>
+            <h1 id="level-title">Find the exit</h1>
+          </div>
+          <div class="timer-panel" aria-live="off">
+            <span class="timer-label">TIME</span>
+            <span id="timer" class="timer-value">0.00</span>
+            <span class="timer-unit">SEC</span>
+          </div>
+          <div class="run-actions">
+            <button id="reset-button" class="text-button" type="button">Reset run</button>
+            <button id="new-photo-button" class="text-button" type="button">New photo</button>
+          </div>
+        </div>
+
+        <div class="game-frame">
+          <canvas id="game-canvas" width="960" height="540" aria-label="Game scene. Reach the exit on the right."></canvas>
+          <div class="canvas-caption"><span class="caption-dot"></span> REACH THE FLAG</div>
+        </div>
+
+        <div class="controls-panel">
+          <div class="control-instructions">
+            <span class="control-title">CONTROLS</span>
+            <span class="desktop-instructions"><kbd>A</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd> move <span class="control-divider">·</span> hold <kbd>Space</kbd> near floor/wall to charge, release to jump <span class="control-divider">·</span> hold <kbd>Enter</kbd> for drill bubble, <kbd>W</kbd><kbd>S</kbd> / <kbd>↑</kbd><kbd>↓</kbd> to hover vertically at ¼ speed</span>
+            <div class="charge-panel">
+              <label id="charge-label" for="charge-meter">Hold jump to charge · release to jump</label>
+              <meter id="charge-meter" min="0" max="3" value="0" aria-label="Jump charge, maximum three seconds"></meter>
+            </div>
+          </div>
+          <div class="touch-controls" aria-label="Touch controls">
+            <div class="movement-pad" aria-label="Move left or right">
+              <button class="control-button move-button" type="button" data-move="-1" aria-label="Move left">←</button>
+              <button class="control-button move-button" type="button" data-move="1" aria-label="Move right">→</button>
+              <button class="control-button move-button" type="button" data-move-y="-1" aria-label="Hover up">↑</button>
+              <button class="control-button move-button" type="button" data-move-y="1" aria-label="Hover down">↓</button>
+            </div>
+            <div class="action-pad">
+              <button id="drill-button" class="control-button drill-button" type="button" aria-label="Hold to drill">DRILL</button>
+              <button id="jump-button" class="control-button jump-button" type="button" aria-label="Hold to charge, release to jump">JUMP</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="complete-panel" class="complete-panel" aria-labelledby="complete-title" hidden>
+        <div class="complete-copy">
+          <p class="eyebrow">LEVEL COMPLETE</p>
+          <h2 id="complete-title">Nice run, <span id="winner-name"></span>!</h2>
+          <p>Your time: <strong id="final-time"></strong></p>
+          <p id="score-message" class="status-message" role="status" aria-live="polite"></p>
+          <button id="replay-button" class="primary-button" type="button">Reset run <span aria-hidden="true">↻</span></button>
+          <button id="again-button" class="primary-button" type="button">Build another level <span aria-hidden="true">→</span></button>
+        </div>
+        <div class="leaderboard-card">
+          <div class="leaderboard-heading">
+            <div><p class="eyebrow">THIS PHOTO · THIS BROWSER</p><h3>Fastest runs</h3></div>
+            <span class="top-ten">TOP 10</span>
+          </div>
+          <ol id="leaderboard-list" class="leaderboard-list"></ol>
+        </div>
+      </section>
+
+      <footer class="site-footer">
+        <span>PHOTO RUNNER <span aria-hidden="true">✦</span> MADE FOR YOUR IMAGINATION</span>
+        <span>NO TWO LEVELS ALIKE</span>
+      </footer>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

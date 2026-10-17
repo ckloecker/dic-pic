@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>dic-pic unit tests</title>
+    <style>
+      body { font: 16px/1.5 system-ui, sans-serif; margin: 2rem; }
+      .pass { color: #176b36; }
+      .fail { color: #b42318; }
+      #summary { font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <h1>dic-pic unit tests</h1>
+    <p id="summary" role="status">Running…</p>
+    <ol id="results"></ol>
+    <script type="module">
+      import(`./unit-tests.js?run=${Date.now()}`);
+    </script>
+  </body>
+</html>

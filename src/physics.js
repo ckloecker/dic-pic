@@ -1,0 +1,270 @@
+const NORMAL_SPEED = 80;
+const DRILL_SPEED = NORMAL_SPEED / 4;
+export const GRAVITY = 420;
+const JUMP_VELOCITY = -180;
+const PLAYER_WIDTH = 6;
+const PLAYER_HEIGHT = 9;
+const CONTACT_DISTANCE = 3;
+const CONTACT_GRACE = 0.15;
+export const DRILL_RADIUS = 10;
+
+export function createPlayer(x, y) {
+  return {
+    x,
+    y,
+    width: PLAYER_WIDTH,
+    height: PLAYER_HEIGHT,
+    vx: 0,
+    vy: 0,
+    grounded: false,
+    facing: 1,
+    charging: false,
+    chargeSeconds: 0,
+    drilling: false,
+    contactLostSeconds: 0,
+    jumpBufferSeconds: -1,
+  };
+}
+
+export function jumpSpeedForCharge(seconds, worldHeight, dt) {
+  const fraction = Math.max(0, Math.min(1, seconds / 3));
+  const normalHeight = JUMP_VELOCITY ** 2 / (2 * GRAVITY);
+  const height = normalHeight + (Math.max(normalHeight, worldHeight) - normalHeight) * fraction;
+  return Math.sqrt(2 * GRAVITY * height) + GRAVITY * dt / 2;
+}
+
+export function cancelCharge(player) {
+  player.charging = false;
+  player.chargeSeconds = 0;
+  player.jumpBufferSeconds = -1;
+  player.contactLostSeconds = 0;
+}
+
+export function findSpawnY(terrain, x, playerWidth = PLAYER_WIDTH, playerHeight = PLAYER_HEIGHT) {
+  const firstColumn = Math.max(0, Math.floor(x));
+  const lastColumn = Math.min(terrain.width, Math.ceil(x + playerWidth));
+  let highestSurface = terrain.height;
+  for (let column = firstColumn; column < lastColumn; column += 1) {
+    highestSurface = Math.min(highestSurface, terrain.surfaceY[column]);
+  }
+  return highestSurface - playerHeight;
+}
+
+function isSolid(terrain, x, y) {
+  const cellX = Math.floor(x);
+  const cellY = Math.floor(y);
+  if (cellX < 0 || cellX >= terrain.width || cellY < 0 || cellY >= terrain.height) {
+    return false;
+  }
+  return terrain.solid[cellY * terrain.width + cellX] === 1;
+}
+
+function overlapsSolid(player, terrain) {
+  const left = Math.floor(player.x);
+  const right = Math.ceil(player.x + player.width) - 1;
+  const top = Math.floor(player.y);
+  const bottom = Math.ceil(player.y + player.height) - 1;
+  for (let y = top; y <= bottom; y += 1) {
+    for (let x = left; x <= right; x += 1) {
+      if (isSolid(terrain, x, y)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function surfaceContact(player, terrain) {
+  let floorDistance = null;
+  const bottom = player.y + player.height;
+  const left = Math.floor(player.x);
+  const right = Math.ceil(player.x + player.width);
+  if (player.vy >= 0) {
+    for (let y = Math.ceil(bottom - 1e-9); y <= bottom + CONTACT_DISTANCE + 1e-9; y += 1) {
+      for (let x = left; x < right; x += 1) {
+        if (isSolid(terrain, x + 0.5, y)) {
+          floorDistance = Math.max(0, y - bottom);
+          break;
+        }
+      }
+      if (floorDistance !== null) break;
+    }
+  }
+  let wall = 0;
+  let nearest = Infinity;
+  for (const side of [-1, 1]) {
+    const edge = side < 0 ? player.x : player.x + player.width;
+    const first = side < 0 ? Math.floor(edge) - 1 : Math.ceil(edge);
+    for (let offset = 0; offset <= CONTACT_DISTANCE; offset += 1) {
+      const x = first + side * offset;
+      const distance = side < 0 ? edge - x - 1 : x - edge;
+      if (distance > CONTACT_DISTANCE + 1e-9) break;
+      for (let y = Math.ceil(player.y + 1); y < bottom - 1; y += 1) {
+        if (distance < nearest && isSolid(terrain, x, y)) {
+          nearest = distance;
+          wall = side;
+        }
+      }
+    }
+  }
+  return { floorDistance, wall };
+}
+
+function snapToFloor(player, terrain) {
+  const { floorDistance } = surfaceContact(player, terrain);
+  if (floorDistance === null) return false;
+  player.y += floorDistance;
+  player.vy = 0;
+  return true;
+}
+
+function moveAxis(player, distance, axis, terrain) {
+  const steps = Math.max(1, Math.ceil(Math.abs(distance) / 0.5));
+  const step = distance / steps;
+  for (let index = 0; index < steps; index += 1) {
+    player[axis] += step;
+    if (overlapsSolid(player, terrain)) {
+      player[axis] -= step;
+      if (axis === "x" && player.grounded) {
+        const previousY = player.y;
+        let climbed = false;
+        for (let lift = 1; lift <= 3; lift += 1) {
+          player.y = previousY - lift;
+          player.x += step;
+          if (!overlapsSolid(player, terrain)) {
+            climbed = true;
+            break;
+          }
+          player.x -= step;
+        }
+        if (climbed) {
+          snapToFloor(player, terrain);
+          continue;
+        }
+        player.y = previousY;
+      }
+      return false;
+    }
+    if (axis === "x" && player.grounded && player.vy >= 0) {
+      player.grounded = snapToFloor(player, terrain);
+    }
+  }
+  return true;
+}
+
+function drillBubble(player, terrain) {
+  const centerX = player.x + player.width / 2;
+  const centerY = player.y + player.height / 2;
+  let changed = false;
+  for (let y = Math.floor(centerY - DRILL_RADIUS); y <= Math.ceil(centerY + DRILL_RADIUS); y += 1) {
+    for (let x = Math.floor(centerX - DRILL_RADIUS); x <= Math.ceil(centerX + DRILL_RADIUS); x += 1) {
+      if (Math.hypot(x + 0.5 - centerX, y + 0.5 - centerY) > DRILL_RADIUS) continue;
+      if (x >= 0 && x < terrain.width && y >= 0 && y < terrain.height) {
+        const index = y * terrain.width + x;
+        if (terrain.solid[index] === 1) {
+          terrain.solid[index] = 0;
+          changed = true;
+        }
+      }
+    }
+  }
+  if (changed) {
+    terrain.version = (terrain.version || 0) + 1;
+  }
+}
+
+export function stepPlayer(player, input, terrain, dt) {
+  if (!Number.isFinite(dt) || dt < 0) {
+    throw new RangeError("Frame duration must be a non-negative number.");
+  }
+  const elapsed = Math.min(dt, 0.05);
+  const direction = Math.sign(input.move || 0);
+  if (input.drill) {
+    cancelCharge(player);
+    player.drilling = true;
+    player.grounded = false;
+    const vertical = Math.sign(input.moveY || 0);
+    const magnitude = Math.max(1, Math.hypot(direction, vertical));
+    player.vx = direction * DRILL_SPEED / magnitude;
+    player.vy = vertical * DRILL_SPEED / magnitude;
+    if (direction) player.facing = direction;
+    const steps = Math.max(1, Math.ceil(DRILL_SPEED * elapsed / 0.5));
+    drillBubble(player, terrain);
+    for (let step = 0; step < steps; step += 1) {
+      player.x = Math.max(0, Math.min(terrain.width - player.width, player.x + player.vx * elapsed / steps));
+      player.y = Math.max(0, Math.min(terrain.height - player.height, player.y + player.vy * elapsed / steps));
+      drillBubble(player, terrain);
+    }
+    return;
+  }
+  if (player.drilling) {
+    player.vy = 0;
+    cancelCharge(player);
+  }
+  player.drilling = false;
+  const contact = surfaceContact(player, terrain);
+  const nearSurface = contact.floorDistance !== null || contact.wall !== 0;
+  player.grounded = contact.floorDistance !== null;
+  if (player.grounded) snapToFloor(player, terrain);
+  player.contactLostSeconds = nearSurface ? 0 : player.contactLostSeconds + elapsed;
+
+  if (player.charging && player.contactLostSeconds > CONTACT_GRACE + 1e-9) cancelCharge(player);
+  player.jumpBufferSeconds = input.jumpPressed
+    ? CONTACT_GRACE
+    : Math.max(-1, player.jumpBufferSeconds - elapsed);
+  if (player.jumpBufferSeconds >= -1e-9 && nearSurface && (input.jumpHeld || input.jumpReleased)) {
+    player.charging = true;
+    player.chargeSeconds = 0;
+    player.jumpBufferSeconds = -1;
+  }
+  if (player.charging && input.jumpHeld && !input.jumpPressed) {
+    player.chargeSeconds = Math.min(3, player.chargeSeconds + elapsed);
+    if (player.chargeSeconds > 3 - 1e-9) player.chargeSeconds = 3;
+  }
+  let wallLaunch = 0;
+  if (input.jumpReleased) {
+    if (player.charging && nearSurface) {
+      player.vy = -jumpSpeedForCharge(player.chargeSeconds, terrain.height, elapsed);
+      if (!player.grounded) wallLaunch = -contact.wall;
+      player.grounded = false;
+    }
+    cancelCharge(player);
+  }
+
+  if (direction !== 0) {
+    player.facing = direction;
+  }
+
+  const horizontalDistance = (wallLaunch || direction) * NORMAL_SPEED * elapsed;
+  player.vx = (wallLaunch || direction) * NORMAL_SPEED;
+  if (wallLaunch) player.facing = wallLaunch;
+  if (!moveAxis(player, horizontalDistance, "x", terrain)) {
+    player.vx = 0;
+  }
+
+  player.x = Math.max(0, Math.min(terrain.width - player.width, player.x));
+  player.vy += GRAVITY * elapsed;
+  const verticalDistance = player.vy * elapsed;
+  const previousY = player.y;
+  if (!moveAxis(player, verticalDistance, "y", terrain)) {
+    if (verticalDistance > 0) {
+      player.grounded = true;
+      player.vy = 0;
+    } else {
+      player.vy = 0;
+    }
+  } else {
+    player.grounded = false;
+  }
+
+  if (player.grounded && verticalDistance > 0 && overlapsSolid(player, terrain)) {
+    player.y = previousY;
+  }
+  if (player.vy >= 0) {
+    player.grounded = snapToFloor(player, terrain);
+  }
+  if (player.y < 0) {
+    player.y = 0;
+    player.vy = 0;
+  }
+}

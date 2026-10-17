@@ -2,6 +2,7 @@
 
 - Treat approved artifacts in `requirements/` as the source of truth. Do not
   invent or silently broaden product behavior.
+- In all documents, one sentence per line for easier revision management.
 - If requirements are missing, ambiguous, or contradictory, stop and request
   clarification instead of making assumptions.
 - Before implementation, identify the requirement IDs, affected design
