@@ -10,5 +10,11 @@ the protected designs of existing characters.
 
 The character's rendered footprint and collision box shall be six terrain
 cells wide and nine cells high, 25% smaller than the former 8-by-12 character.
-Normal movement speed, jump heights, and the drilling-bubble radius shall
-remain unchanged.
+Normal movement speed and jump heights shall remain unchanged.
+The former drilling-bubble radius is superseded by the directional tunnel drill in REQ-MOV-03.
+
+## REQ-CHR-03: Player Character Favicon
+
+The game page shall declare a favicon depicting the original playable pixel-art adventurer.
+The favicon shall retain the character's recognizable silhouette, hat, teal outfit, orange scarf, and colors.
+The favicon shall be available when the page first loads, without requiring a photo selection or a running game.

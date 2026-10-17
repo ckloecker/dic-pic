@@ -3,7 +3,7 @@
 ## Requirements covered
 
 This design elaborates REQ-SYS-01 through REQ-SYS-06, REQ-SYS-08/09, REQ-LVL-01 through
-REQ-LVL-09, REQ-CHR-01/02, and REQ-MOV-01 through REQ-MOV-07.
+REQ-LVL-09, REQ-CHR-01/02/03, and REQ-MOV-01 through REQ-MOV-10.
 
 ## Terrain (`src/terrain.js`)
 
@@ -41,7 +41,7 @@ the highest point across their footprint. `createPlayer(x, y)` creates the
 player state. `stepPlayer(player, input, terrain, dt)` applies horizontal
 movement, gravity, charged floor/wall jump input, collision resolution, and drilling.
 `input` has `move` (-1, 0, or 1), `jumpPressed`, `jumpReleased`, `jumpHeld`,
-and `drill`, plus vertical bubble input `moveY`. The player footprint shall
+and `drill`, plus vertical directional input `moveY`. The player footprint shall
 be 6 by 9 cells. A shared contact probe shall find floor/wall terrain up to
 3 cells away. Floor probes and downward snapping shall run only when not
 rising. Side probes shall exclude the foot boundary to avoid treating floor
@@ -61,23 +61,33 @@ press may start charging upon contact, but an invalid release never queues
 a later launch. A negative remaining-buffer value represents no pending press;
 zero is the inclusive 150-ms boundary, with a numerical epsilon to avoid
 frame-partition rounding differences. Surface/input timers are reset on
-drilling, blur, and reset.
+blur and reset.
 The ceiling clamps the player's top
 to zero and stops upward velocity. The fixed camera never follows a jump.
-Normal movement speed is 80 cells/second. The drilling bubble moves at 20
-cells/second in any direction with normalized diagonals, no gravity, and no
-momentum. A radius-10 bubble centered on the character clears its circular
-footprint at each half-cell movement substep, including while stationary.
-It respects image boundaries but cuts all terrain, including flag supports.
-Entering/leaving cancels charge and discards vertical momentum; leaving
-restores gravity without jumping. Air movement outside the bubble remains at
-normal speed. Ground movement can step up small terrain edges; higher
+Normal movement speed is 80 cells/second.
+A fresh negative `moveY` edge enters persistent background climbing at 20 cells/second with normalized diagonals and no gravity.
+Player state retains the previous Up input, climbing mode, drill direction, and climbing animation phase.
+Directional release holds position; downward foot contact exits climbing, but Up can depart from a floor.
+Climbing supplies charge contact, using the existing charged-jump calculation.
+Jump release detaches and restores gravity; another Up edge is required to reattach.
+Climbing respects mask collisions, the ceiling, and the solid image bottom.
+The bottom participates in floor probes and snapping but never in wall probes or the terrain mask.
+The drill direction is normalized from directional input, defaulting to horizontal facing.
+A rectangular cutter extends 10 cells from the player center along that direction.
+Its transverse half-width covers the projected player footprint plus half a cell, producing a passable tunnel rather than a surrounding excavation.
+The cutter runs before collision checks at each half-cell movement substep and while stationary.
+Excavation increments terrain version only when cells change and never changes movement or charging state.
+The renderer draws an oriented drill tip and alternates climbing hands and feet based on distance traveled.
+Air movement outside climbing remains at normal speed.
+Ground movement can step up small terrain edges; higher
 obstacles require a jump. Ground contact at any point below the player's
 footprint counts as support.
 
 The browser game maps D/A, arrow keys, Space, and held Return to this input
-shape. W/S and up/down arrows move vertically in bubble mode; outside it
-Space charges a jump and W/up does not. Touch controls provide four directions, a jump button,
+shape.
+W/up enters background climbing; W/S and up/down arrows control vertical climbing and drill aim.
+Space charges a jump and W/up does not jump.
+Touch controls provide four directions, a jump button,
 and a dedicated held drill button.
 
 The charge meter shows progress and a distinct MAX READY label at three
@@ -88,6 +98,13 @@ shall scale from 8 by 12 to 6 by 9 cells with the collision footprint.
 Keyboard and pointer press/release transitions are queued so a quick
 tap between animation frames is not lost. Blur, pointer cancellation,
 visibility changes, and restart clear charge without launching.
+
+## Favicon (`src/favicon.svg`, `src/index.html`)
+
+REQ-CHR-03 uses a local SVG favicon declared by a `rel="icon"` link with `type="image/svg+xml"` and `sizes="any"`.
+The square 16-by-16 view box centers the existing right-facing 8-by-12 player artwork at offset (4, 2), retaining its rectangle geometry and palette.
+SVG crisp-edge rendering preserves the pixel-art appearance at browser-tab sizes without needing the game renderer or setup state.
+The browser test loads and decodes the declared icon before setup, then compares its rasterized pixels against the existing character palette and geometry.
 
 ## Run lifecycle (`src/run.js`, `src/app.js`)
 
@@ -103,8 +120,9 @@ terrain and elapsed time survive.
 Reset during play or after completion creates a fresh run from the unmodified
 original terrain, retains photo/name/scores, clears controls, and resets timer
 and charge display. One cancellable animation-frame handle prevents parallel
-loops after resetting. Charging starts race time; falling and respawning do
-not reset it. Existing per-image leaderboard entries are retained.
+loops after resetting. Charging and background-climbing movement start race time.
+The solid bottom prevents bottom-edge respawns.
+Existing per-image leaderboard entries are retained.
 
 ## Score store (`src/leaderboard.js`)
 

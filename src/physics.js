@@ -1,12 +1,12 @@
 const NORMAL_SPEED = 80;
-const DRILL_SPEED = NORMAL_SPEED / 4;
+const CLIMB_SPEED = NORMAL_SPEED / 4;
 export const GRAVITY = 420;
 const JUMP_VELOCITY = -180;
 const PLAYER_WIDTH = 6;
 const PLAYER_HEIGHT = 9;
 const CONTACT_DISTANCE = 3;
 const CONTACT_GRACE = 0.15;
-export const DRILL_RADIUS = 10;
+export const DRILL_REACH = 10;
 
 export function createPlayer(x, y) {
   return {
@@ -21,6 +21,11 @@ export function createPlayer(x, y) {
     charging: false,
     chargeSeconds: 0,
     drilling: false,
+    drillX: 1,
+    drillY: 0,
+    climbing: false,
+    climbPhase: 0,
+    upHeld: false,
     contactLostSeconds: 0,
     jumpBufferSeconds: -1,
   };
@@ -89,6 +94,9 @@ function surfaceContact(player, terrain) {
       }
       if (floorDistance !== null) break;
     }
+    if (floorDistance === null && bottom <= terrain.height && terrain.height - bottom <= CONTACT_DISTANCE) {
+      floorDistance = terrain.height - bottom;
+    }
   }
   let wall = 0;
   let nearest = Infinity;
@@ -123,6 +131,7 @@ function moveAxis(player, distance, axis, terrain) {
   const step = distance / steps;
   for (let index = 0; index < steps; index += 1) {
     player[axis] += step;
+    if (player.drilling) drillTunnel(player, terrain);
     if (overlapsSolid(player, terrain)) {
       player[axis] -= step;
       if (axis === "x" && player.grounded) {
@@ -152,13 +161,19 @@ function moveAxis(player, distance, axis, terrain) {
   return true;
 }
 
-function drillBubble(player, terrain) {
+function drillTunnel(player, terrain) {
   const centerX = player.x + player.width / 2;
   const centerY = player.y + player.height / 2;
+  const halfWidth = (Math.abs(player.drillY) * player.width + Math.abs(player.drillX) * player.height) / 2 + 0.5;
+  const extent = DRILL_REACH + halfWidth;
   let changed = false;
-  for (let y = Math.floor(centerY - DRILL_RADIUS); y <= Math.ceil(centerY + DRILL_RADIUS); y += 1) {
-    for (let x = Math.floor(centerX - DRILL_RADIUS); x <= Math.ceil(centerX + DRILL_RADIUS); x += 1) {
-      if (Math.hypot(x + 0.5 - centerX, y + 0.5 - centerY) > DRILL_RADIUS) continue;
+  for (let y = Math.max(0, Math.floor(centerY - extent)); y < Math.min(terrain.height, Math.ceil(centerY + extent)); y += 1) {
+    for (let x = Math.max(0, Math.floor(centerX - extent)); x < Math.min(terrain.width, Math.ceil(centerX + extent)); x += 1) {
+      const dx = x + 0.5 - centerX;
+      const dy = y + 0.5 - centerY;
+      const along = dx * player.drillX + dy * player.drillY;
+      const across = -dx * player.drillY + dy * player.drillX;
+      if (along < 0 || along > DRILL_REACH || Math.abs(across) > halfWidth) continue;
       if (x >= 0 && x < terrain.width && y >= 0 && y < terrain.height) {
         const index = y * terrain.width + x;
         if (terrain.solid[index] === 1) {
@@ -179,32 +194,24 @@ export function stepPlayer(player, input, terrain, dt) {
   }
   const elapsed = Math.min(dt, 0.05);
   const direction = Math.sign(input.move || 0);
-  if (input.drill) {
-    cancelCharge(player);
-    player.drilling = true;
-    player.grounded = false;
-    const vertical = Math.sign(input.moveY || 0);
-    const magnitude = Math.max(1, Math.hypot(direction, vertical));
-    player.vx = direction * DRILL_SPEED / magnitude;
-    player.vy = vertical * DRILL_SPEED / magnitude;
-    if (direction) player.facing = direction;
-    const steps = Math.max(1, Math.ceil(DRILL_SPEED * elapsed / 0.5));
-    drillBubble(player, terrain);
-    for (let step = 0; step < steps; step += 1) {
-      player.x = Math.max(0, Math.min(terrain.width - player.width, player.x + player.vx * elapsed / steps));
-      player.y = Math.max(0, Math.min(terrain.height - player.height, player.y + player.vy * elapsed / steps));
-      drillBubble(player, terrain);
-    }
-    return;
-  }
-  if (player.drilling) {
+  const vertical = Math.sign(input.moveY || 0);
+  if (direction) player.facing = direction;
+  if (vertical < 0 && !player.upHeld) {
+    player.climbing = true;
     player.vy = 0;
-    cancelCharge(player);
   }
-  player.drilling = false;
+  player.upHeld = vertical < 0;
+  player.drilling = Boolean(input.drill);
+  const drillMagnitude = Math.hypot(direction, vertical);
+  player.drillX = drillMagnitude ? direction / drillMagnitude : player.facing;
+  player.drillY = drillMagnitude ? vertical / drillMagnitude : 0;
+  if (player.drilling) drillTunnel(player, terrain);
   const contact = surfaceContact(player, terrain);
-  const nearSurface = contact.floorDistance !== null || contact.wall !== 0;
-  player.grounded = contact.floorDistance !== null;
+  if (player.climbing && vertical >= 0 && contact.floorDistance === 0) {
+    player.climbing = false;
+  }
+  const nearSurface = player.climbing || contact.floorDistance !== null || contact.wall !== 0;
+  player.grounded = !player.climbing && contact.floorDistance !== null;
   if (player.grounded) snapToFloor(player, terrain);
   player.contactLostSeconds = nearSurface ? 0 : player.contactLostSeconds + elapsed;
 
@@ -225,10 +232,41 @@ export function stepPlayer(player, input, terrain, dt) {
   if (input.jumpReleased) {
     if (player.charging && nearSurface) {
       player.vy = -jumpSpeedForCharge(player.chargeSeconds, terrain.height, elapsed);
-      if (!player.grounded) wallLaunch = -contact.wall;
+      if (!player.grounded && !player.climbing) wallLaunch = -contact.wall;
+      player.climbing = false;
       player.grounded = false;
     }
     cancelCharge(player);
+  }
+
+  if (player.climbing) {
+    const magnitude = Math.max(1, Math.hypot(direction, vertical));
+    player.vx = direction * CLIMB_SPEED / magnitude;
+    player.vy = vertical * CLIMB_SPEED / magnitude;
+    const beforeX = player.x;
+    const beforeY = player.y;
+    if (!moveAxis(player, player.vx * elapsed, "x", terrain)) player.vx = 0;
+    if (!moveAxis(player, player.vy * elapsed, "y", terrain)) {
+      if (vertical > 0) {
+        player.climbing = false;
+        player.grounded = true;
+      }
+      player.vy = 0;
+    }
+    player.x = Math.max(0, Math.min(terrain.width - player.width, player.x));
+    player.y = Math.max(0, Math.min(terrain.height - player.height, player.y));
+    if ((player.x === 0 && player.vx < 0) || (player.x === terrain.width - player.width && player.vx > 0)) {
+      player.vx = 0;
+    }
+    if ((player.y === 0 && player.vy < 0) || (player.y === terrain.height - player.height && player.vy > 0)) {
+      player.vy = 0;
+    }
+    if (vertical > 0 && snapToFloor(player, terrain)) {
+      player.climbing = false;
+      player.grounded = true;
+    }
+    player.climbPhase += Math.hypot(player.x - beforeX, player.y - beforeY) / 3;
+    return;
   }
 
   if (direction !== 0) {
@@ -266,5 +304,10 @@ export function stepPlayer(player, input, terrain, dt) {
   if (player.y < 0) {
     player.y = 0;
     player.vy = 0;
+  }
+  if (player.y + player.height >= terrain.height) {
+    player.y = terrain.height - player.height;
+    player.vy = 0;
+    player.grounded = true;
   }
 }

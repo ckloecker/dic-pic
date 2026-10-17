@@ -48,7 +48,8 @@ available as a fallback.
 
 - Move with **A/D** or **left/right arrows**.
 - Hold **Space** near a floor or wall to charge; release to jump. **W/up no
-  longer jumps.** Three seconds reaches maximum charge, shown by **MAX READY**
+  longer jumps.** Jump charging also works while gripping the background.
+  Three seconds reaches maximum charge, shown by **MAX READY**
   and a gold bar above the character. A full charge can cover the level's
   height, but terrain and the image's solid ceiling can stop it.
 - Wall jumps launch upward and away; you keep falling while wall-charging.
@@ -56,17 +57,24 @@ available as a fallback.
   but release must still be within three cells of a surface. Still-held presses
   buffer contact for 150 ms. Walking follows small inclines and declines;
   rising jumps are never snapped back onto the floor.
-- Hold **Return/Enter** for the drilling bubble. Use **WASD** or the arrow keys
-  to hover in all directions and cut terrain. Total speed is **one quarter**
-  of normal speed, including diagonal movement. Release drill to restore gravity.
+- Press **W/up** to grip and climb the background wall.
+  Use directions to climb at **one quarter** of walking speed, including diagonals.
+  Release directions to hold position; landing feet-first restores walking.
+  Charge/release **Space** to jump off and fall; press Up again to reattach.
+- Hold **Return/Enter** to cut a narrow tunnel in the pressed direction.
+  Without directional input, drill toward the character's facing direction.
+  Drill upward while climbing or downward while standing.
+  Drilling preserves walking/climbing speed, gravity, and charged jumps.
 - On touch devices use the directional pad, hold/release **JUMP**, and hold
-  **DRILL**. Up/down directions move vertically only in bubble mode.
+  **DRILL**.
+  UP enters background climbing; directions also aim the drill.
 - **Reset run** restores the same photo's original terrain, spawn, and timer;
-  saved leaderboard entries remain. Falling out respawns you but keeps your
-  elapsed time and tunnels. The flag remains fixed if its support is drilled.
+  saved leaderboard entries remain.
+  The solid image bottom supports walking and jumping even after drilling.
+  The flag remains fixed if its support is drilled.
 
 The runner is 25% smaller (6-by-9 terrain cells), without changing movement
-speed, jump height, or drilling radius.
+speed or jump height.
 
 Terrain follows detected horizontal/slanted and vertical photo edges as
 separate platforms and walls with 80% opacity and at least 80% open space.
@@ -86,7 +94,7 @@ rejection, without installing packages.
 
 Open <http://localhost:8000/tests/system/runner.html> for automated browser
 checks of setup, opacity, Space-only jumping, the on-character charge bar,
-charge/release, timer, reset, and bubble controls.
+charge/release, timer, reset, background climbing, directional drilling, and the solid bottom.
 Keep the test tab visible until its summary appears.
 
 Integrated browser checks are listed in

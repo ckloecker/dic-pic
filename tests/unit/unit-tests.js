@@ -247,7 +247,6 @@ if (physicsApi) {
   test("REQ-CHR-02: player collision footprint is 6 by 9 cells", () => {
     const player = physicsApi.createPlayer(4, 4);
     assert(player.width === 6 && player.height === 9, `footprint was ${player.width}x${player.height}`);
-    assert(physicsApi.DRILL_RADIUS === 10, "bubble radius changed with player size");
   });
 
   test("spawn position clears the full width of an uneven starting surface", () => {
@@ -272,7 +271,7 @@ if (physicsApi) {
     assert(player.grounded, "support at the footprint edge was missed");
   });
 
-  test("REQ-MOV-03: bubble speed is one quarter of normal speed", () => {
+  test("REQ-MOV-03: drilling preserves normal movement and gravity", () => {
     const regularTerrain = flatTerrain();
     const drillTerrain = flatTerrain();
     const regular = physicsApi.createPlayer(4, 10);
@@ -282,50 +281,155 @@ if (physicsApi) {
     const regularDistance = regular.x - 4;
     const drillDistance = drilling.x - 4;
     assert(Math.abs(regularDistance - 4) < 0.1, `normal distance was ${regularDistance}`);
-    assert(Math.abs(drillDistance - regularDistance / 4) < 0.001, `drill distance was ${drillDistance}`);
+    assert(Math.abs(drillDistance - regularDistance) < 0.001, `drill distance was ${drillDistance}`);
+    assert(drilling.vy === regular.vy && drilling.vy > 0, "drill changed gravity");
   });
 
-  test("REQ-MOV-03: bubble hovers and moves in all directions at a normalized speed", () => {
+  test("REQ-MOV-10: background climbing holds and moves at normalized quarter speed", () => {
     const terrain = flatTerrain(100, 100, 90);
     const cases = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1]];
     for (const [move, moveY] of cases) {
       const player = physicsApi.createPlayer(40, 40);
+      physicsApi.stepPlayer(player, { moveY: -1 }, terrain, 0);
+      assert(player.climbing, "Up did not attach to background");
       player.vy = 100;
-      physicsApi.stepPlayer(player, { drill: true, move, moveY }, terrain, 0.05);
+      physicsApi.stepPlayer(player, { move, moveY }, terrain, 0.05);
       const distance = Math.hypot(player.x - 40, player.y - 40);
       assert(Math.abs(distance - 80 / 4 * 0.05) < 0.001, `wrong speed for ${move},${moveY}: ${distance}`);
       assert(Math.sign(player.x - 40) === Math.sign(move), "wrong horizontal direction");
       assert(Math.sign(player.y - 40) === Math.sign(moveY), "wrong vertical direction");
     }
     const player = physicsApi.createPlayer(40, 40);
-    player.vy = -100;
-    physicsApi.stepPlayer(player, { drill: true }, terrain, 0.05);
-    assert(player.x === 40 && player.y === 40, "idle bubble did not hover");
+    physicsApi.stepPlayer(player, { moveY: -1 }, terrain, 0);
+    physicsApi.stepPlayer(player, {}, terrain, 0.05);
+    assert(player.x === 40 && player.y === 40 && player.climbing, "released controls did not hold the wall");
   });
 
-  test("REQ-MOV-03: bubble cuts above, below, left and right even while idle", () => {
-    const terrain = flatTerrain(60, 60, 10);
-    const player = physicsApi.createPlayer(20, 20);
-    physicsApi.stepPlayer(player, { drill: true }, terrain, 0.05);
-    for (const [x, y] of [[14, 24], [31, 24], [23, 16], [23, 33]]) {
-      assert(terrain.solid[y * 60 + x] === 0, `bubble left terrain at ${x},${y}`);
+  test("REQ-MOV-03: directional drill cuts only the aimed tunnel and persists", () => {
+    for (const [move, moveY] of [[1, 0], [-1, 0], [0, -1], [0, 1], [1, -1], [-1, 1], [1, 1], [-1, -1]]) {
+      const terrain = flatTerrain(60, 60, 0);
+      const player = physicsApi.createPlayer(25, 25);
+      physicsApi.stepPlayer(player, { drill: true, move, moveY }, terrain, 0);
+      const magnitude = Math.hypot(move, moveY);
+      const x = Math.floor(28 + move / magnitude * 8);
+      const y = Math.floor(29.5 + moveY / magnitude * 8);
+      const oppositeX = Math.floor(28 - move / magnitude * 8);
+      const oppositeY = Math.floor(29.5 - moveY / magnitude * 8);
+      assert(terrain.solid[y * 60 + x] === 0, `uncut direction ${move},${moveY}`);
+      assert(terrain.solid[oppositeY * 60 + oppositeX] === 1, "drill excavated behind player");
+      assert(terrain.version >= 1, "excavation did not invalidate terrain rendering");
+      const drilled = terrain.solid.slice();
+      physicsApi.stepPlayer(player, {}, terrain, 0);
+      assert(drilled.every((cell, index) => cell === terrain.solid[index]), "excavation did not persist");
     }
-    assert(terrain.solid[10 * 60 + 2] === 1, "bubble removed distant terrain");
-    const drilled = terrain.solid.slice();
-    physicsApi.stepPlayer(player, {}, terrain, 0);
-    assert(drilled.every((cell, index) => cell === terrain.solid[index]), "excavation did not persist");
   });
 
-  test("REQ-MOV-03/05: bubble cancels charge and restores gravity without queued jumps", () => {
+  test("REQ-MOV-03/05: drilling preserves jump charge", () => {
     const terrain = flatTerrain(60, 60, 40);
     const player = physicsApi.createPlayer(4, 31);
     player.charging = true;
     player.chargeSeconds = 2;
-    physicsApi.stepPlayer(player, { drill: true, jumpHeld: true, moveY: -1 }, terrain, 0.05);
-    assert(!player.charging && player.chargeSeconds === 0, "bubble retained jump charge");
-    const y = player.y;
+    physicsApi.stepPlayer(player, { drill: true, jumpHeld: true }, terrain, 0.05);
+    assert(player.charging && player.chargeSeconds > 2, "drill cancelled jump charge");
     physicsApi.stepPlayer(player, { jumpReleased: true }, terrain, 0.05);
-    assert(player.y > y && player.vy > 0, "leaving bubble did not restore gravity, or launched a jump");
+    assert(player.vy < 0, "drill prevented charged jump");
+  });
+
+  test("REQ-MOV-10: background jump detaches until a fresh Up press", () => {
+    const terrain = flatTerrain(100, 100, 100);
+    const player = physicsApi.createPlayer(40, 60);
+    physicsApi.stepPlayer(player, { moveY: -1, jumpPressed: true, jumpHeld: true }, terrain, 0.05);
+    assert(player.charging, "background did not support charging");
+    physicsApi.stepPlayer(player, { moveY: -1, jumpHeld: true }, terrain, 0.05);
+    physicsApi.stepPlayer(player, { moveY: -1, jumpReleased: true }, terrain, 0.05);
+    assert(!player.climbing && player.vy < 0, "background jump did not launch");
+    let falling = false;
+    for (let frame = 0; frame < 25; frame += 1) {
+      physicsApi.stepPlayer(player, { moveY: -1 }, terrain, 0.05);
+      assert(!player.climbing, "held Up reattached after jump");
+      falling ||= player.vy > 0;
+    }
+    assert(falling, "detached jump did not fall");
+    physicsApi.stepPlayer(player, {}, terrain, 0);
+    physicsApi.stepPlayer(player, { moveY: -1 }, terrain, 0);
+    assert(player.climbing, "fresh Up did not reattach");
+  });
+
+  test("REQ-MOV-08: solid bottom supports landing, walking, charging and jumping without terrain", () => {
+    const terrain = flatTerrain(100, 60, 60);
+    const player = physicsApi.createPlayer(20, 49);
+    for (let frame = 0; frame < 30; frame += 1) physicsApi.stepPlayer(player, {}, terrain, 0.05);
+    assert(player.y === 51 && player.grounded && player.vy === 0, "bottom did not stop feet");
+    physicsApi.stepPlayer(player, { move: 1, jumpPressed: true, jumpHeld: true }, terrain, 0.05);
+    assert(player.x === 24 && player.charging, "bottom did not allow walking/charging");
+    physicsApi.stepPlayer(player, { jumpReleased: true }, terrain, 0.05);
+    assert(player.vy < 0 && player.y < 51, "bottom did not allow jumping");
+    assert(!terrain.solid.some(Boolean), "boundary added generated terrain");
+  });
+
+  test("REQ-MOV-07/08: terrain just above the bottom remains the nearest floor", () => {
+    const terrain = flatTerrain(100, 60, 59);
+    const player = physicsApi.createPlayer(20, 49);
+    physicsApi.stepPlayer(player, {}, terrain, 0);
+    assert(player.y === 50 && player.grounded, "bottom snapping bypassed photo terrain");
+    const climber = physicsApi.createPlayer(20, 49);
+    physicsApi.stepPlayer(climber, { moveY: -1 }, terrain, 0);
+    physicsApi.stepPlayer(climber, { moveY: 1 }, terrain, 0);
+    assert(climber.y === 50 && climber.grounded && !climber.climbing, "climbing snap bypassed bottom-adjacent terrain");
+  });
+
+  test("REQ-MOV-10: descending feet land, walking resumes, and Up leaves the floor", () => {
+    for (const floor of [40, 60]) {
+      const terrain = flatTerrain(100, 60, floor);
+      const player = physicsApi.createPlayer(20, floor - 14);
+      physicsApi.stepPlayer(player, { moveY: -1 }, terrain, 0);
+      for (let frame = 0; frame < 10; frame += 1) physicsApi.stepPlayer(player, { moveY: 1 }, terrain, 0.05);
+      assert(!player.climbing && player.grounded, "feet did not end climbing");
+      const x = player.x;
+      physicsApi.stepPlayer(player, { move: 1 }, terrain, 0.05);
+      assert(player.x === x + 4, "landing did not restore walking speed");
+      physicsApi.stepPlayer(player, { moveY: -1 }, terrain, 0.05);
+      assert(player.climbing && player.y < floor - player.height, "Up did not climb away from ground");
+    }
+  });
+
+  test("REQ-MOV-03/10: climbing collides without drill and tunnels upward with drill", () => {
+    const terrain = flatTerrain(100, 100, 100);
+    for (let y = 20; y < 35; y += 1) terrain.solid.fill(1, y * 100, (y + 1) * 100);
+    const player = physicsApi.createPlayer(40, 40);
+    for (let frame = 0; frame < 20; frame += 1) physicsApi.stepPlayer(player, { moveY: -1 }, terrain, 0.05);
+    assert(player.y >= 35, "climber passed through terrain without drilling");
+    for (let frame = 0; frame < 25; frame += 1) physicsApi.stepPlayer(player, { moveY: -1, drill: true }, terrain, 0.05);
+    assert(player.y < 20 && player.climbing, "upward drill did not make passable tunnel");
+    assert(terrain.solid[25 * 100 + 20] === 1, "tunnel removed distant terrain");
+  });
+
+  test("REQ-MOV-03/08: drilling down from standing reaches but cannot remove the bottom", () => {
+    const terrain = flatTerrain(100, 60, 30);
+    const player = physicsApi.createPlayer(40, 21);
+    for (let frame = 0; frame < 100; frame += 1) physicsApi.stepPlayer(player, { moveY: 1, drill: true }, terrain, 0.05);
+    assert(player.y === 51 && player.grounded, "downward drill did not reach solid bottom");
+    assert(terrain.solid[40 * 100 + 43] === 0 && terrain.solid[40 * 100 + 20] === 1, "downward tunnel shape incorrect");
+  });
+
+  test("REQ-MOV-03: idle drill uses facing and unchanged terrain does not change version", () => {
+    const terrain = flatTerrain(100, 100, 0);
+    const player = physicsApi.createPlayer(40, 40);
+    player.facing = -1;
+    physicsApi.stepPlayer(player, { drill: true }, terrain, 0);
+    assert(terrain.solid[44 * 100 + 35] === 0, "idle drill ignored facing");
+    assert(terrain.solid[44 * 100 + 51] === 1, "idle drill excavated opposite side");
+    const version = terrain.version;
+    physicsApi.stepPlayer(player, { drill: true }, terrain, 0);
+    assert(terrain.version === version, "unchanged terrain invalidated rendering");
+  });
+
+  test("REQ-MOV-06/10: climbing stops at ceiling and image sides", () => {
+    const terrain = flatTerrain(100, 100, 100);
+    const player = physicsApi.createPlayer(0, 0);
+    physicsApi.stepPlayer(player, { move: -1, moveY: -1 }, terrain, 0.05);
+    assert(player.x === 0 && player.y === 0, "climber escaped image");
+    assert(player.vx === 0 && player.vy === 0, "boundary did not stop climbing velocity");
   });
 
   test("REQ-MOV-02/05: jump launches on release on a surface but not in air", () => {
@@ -461,7 +565,7 @@ if (physicsApi) {
     assert(player.x > 30, `player was blocked at x=${player.x}`);
   });
 
-  test("REQ-MOV-03: bubble carves a character-height tunnel and enables penetration", () => {
+  test("REQ-MOV-03: drill carves a character-height tunnel and enables penetration", () => {
     const terrain = flatTerrain();
     for (let y = 0; y < terrain.height; y += 1) {
       for (let x = 12; x < terrain.width; x += 1) {
@@ -473,7 +577,8 @@ if (physicsApi) {
     const tunnelIndex = 12 * terrain.width + 12;
     assert(terrain.solid[tunnelIndex] === 0, "drill did not clear its tunnel");
     assert(terrain.solid[8 * terrain.width + 12] === 0, "tunnel did not clear the player's headroom");
-    assert(terrain.solid[19 * terrain.width + 12] === 0, "tunnel did not clear the player's foot space");
+    assert(terrain.solid[16 * terrain.width + 12] === 0, "tunnel did not clear the player's foot space");
+    assert(terrain.solid[22 * terrain.width + 12] === 1, "tunnel was wider than needed");
     assert(player.x > 4, "player did not penetrate the drilled wall");
     physicsApi.stepPlayer(player, {}, terrain, 0.1);
     assert(terrain.solid[tunnelIndex] === 0, "tunnel did not persist");
@@ -643,16 +748,17 @@ if (runApi) {
     run.player.y = run.flag.y - run.player.height;
     assert(runApi.reachedFlag(run), "touching flag did not complete");
   });
-  test("REQ-MOV-03 / REQ-SYS-04: bubble can traverse solid terrain to the fixed flag", () => {
+  test("REQ-MOV-03 / REQ-SYS-04: directional drill traversal can reach the fixed flag", () => {
     const run = runApi.createRun(flatTerrain(100, 80, 30));
+    physicsApi.stepPlayer(run.player, { moveY: -1 }, run.terrain, 0.05);
     let frames = 0;
     while (!runApi.reachedFlag(run) && frames < 1000) {
       physicsApi.stepPlayer(run.player, { drill: true, move: 1 }, run.terrain, 1 / 60);
       frames += 1;
     }
-    assert(runApi.reachedFlag(run), "hovering runner never reached the flag");
+    assert(runApi.reachedFlag(run), "drilling runner never reached the flag");
     const distance = run.flag.x - run.spawn.x - run.player.width;
-    assert(frames / 60 >= distance / 20, "bubble reached flag faster than quarter speed permits");
+    assert(frames / 60 >= distance / 80, "runner reached flag faster than normal speed permits");
   });
 }
 

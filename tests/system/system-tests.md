@@ -16,14 +16,16 @@ tests run; background tabs can throttle animation frames. These tests use
 | ST-02b | REQ-LVL-05 | Upload a uniform image without visible edges. | Contrast normalization cannot invent a contour; the game rejects the image and asks for another. |
 | ST-03 | REQ-SYS-04 | Leave the player idle, move or charge, then touch the exit flag. | The timer stays at zero until player-driven movement or charging, and stops on actual contact with the flag, not a horizontal crossing at another height. |
 | ST-04 | REQ-SYS-05, REQ-SYS-06 | Try invalid and valid names, complete two runs of the same image, then inspect results. | Invalid names cannot start; valid names are saved with sorted per-image scores in this browser. |
-| ST-05 | REQ-MOV-01 through REQ-MOV-04 | Use Space and touch JUMP; verify W/up does not jump; test ground/air movement, wall release, and held bubble drilling in four directions. | Space charges/releases jumps, walls launch upward/away, normal airborne movement is full speed; the bubble moves at quarter speed with normalized diagonals, hovers, and excavates terrain permanently. |
+| ST-05 | REQ-MOV-01 through REQ-MOV-04, REQ-MOV-10 | Use Space and touch JUMP; use W/up to climb without drilling; aim held drill in all directions. | Space charges/releases jumps; normal airborne movement is full speed. Background climbing is quarter speed with normalized diagonals and idle grip; directional drilling preserves movement physics and excavates permanent tunnels. |
 | ST-06 | REQ-CHR-01, REQ-LVL-02 | Inspect the rendered character and level overlay. | Visuals use original character art and a general retro pixel-art style. |
 | ST-07 | REQ-LVL-06 | Sample rendered terrain colors against the source photo. | Composited color is 80% terrain and 20% source image, within one channel rounding unit. |
 | ST-08 | REQ-MOV-05/06, REQ-SYS-04 | Hold Space to maximum, then release; cancel another charge with blur; jump into the ceiling. | Both bars fill; three seconds reaches MAX READY and a gold character bar, counting as race time. Launch clears both bars; blur cancels without launch; the ceiling blocks upward travel. |
-| ST-09 | REQ-SYS-08/09 | Reset a modified run and respawn after a fall. | Reset restores all run state without changing saved scores; respawn restores only the player. |
+| ST-09 | REQ-SYS-08/09, REQ-MOV-08 | Reset a modified run; drill down to the bottom, walk and jump there. | Reset restores all run state without changing saved scores; the solid bottom prevents falling out or respawning and supports walking and jumping. |
 | ST-10 | REQ-LVL-07/08 | Drill under the flag and inspect a multi-height photo. | Flag remains fixed without protected support; multiple separate platforms follow image edges. |
 | ST-11 | REQ-LVL-09, REQ-CHR-02 | Inspect sparse terrain and runner scale. | 6-by-9 character; at most 48-cell horizontal platform sections with 12-cell gaps; detected vertical walls; at least 80% open space. |
 | ST-12 | REQ-MOV-02/07 | Charge while walking on inclines/declines and while falling beside walls. Test three-cell/150-ms limits and buffered presses. | Slopes retain charge; walls do not stop gravity; release requires current three-cell contact. Charge grace and press buffering expire at 150 ms. |
+| ST-13 | REQ-MOV-10 | Climb without drilling, stop directional input, drill and release drill, jump from the background, and descend onto terrain. | Animated hands/feet grip the back wall; idle and drill release retain grip; jump detaches without held-Up reattachment; landing restores walking. |
+| ST-14 | REQ-CHR-03 | Load the game before setup; fetch and decode its declared favicon and compare rasterized pixels with player artwork. | The local SVG loads successfully and matches the original character geometry and colors without starting a game. |
 
 ## Execution record
 
@@ -75,3 +77,19 @@ The earlier completion/score-saving and original classroom-photo inspections
 above predate this revision. A new full browser completion and fresh
 classroom-photo play-through have not been performed. Physical mobile,
 camera permissions, and simultaneous touch controls remain unverified.
+
+### Background-climbing and tunnel-drill revision
+
+The current ST-05/09/13 and AT-07/09/12/14/19/20 procedures supersede the historical bubble and bottom-respawn expectations above.
+The revised unit tests initially passed 37/46 against the previous implementation, reproducing all nine expected movement/drill/bottom failures.
+The revised browser suite initially passed 6/9, reproducing missing background climbing, drill-release grip, and solid-bottom behavior.
+Additional regressions cover climbing boundary velocities and nearest-floor snapping just above the image bottom.
+Final execution on 2026-10-17: **49/49 unit checks and 10/10 browser system checks passed** in Chromium with caching disabled.
+The climbing pose and revised controls were visually inspected on the integrated canvas.
+Physical Android/iOS, camera permissions, simultaneous touch input, and a renewed classroom-photo play-through remain unverified.
+
+### Player-character favicon
+
+ST-14 initially failed because no favicon was declared.
+After implementation, **11/11 browser system checks passed** in Chromium on 2026-10-17 with caching disabled.
+The new check fetches and decodes the favicon before setup, then compares every rasterized pixel against the player character's geometry and palette.

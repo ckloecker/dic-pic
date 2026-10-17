@@ -49,6 +49,45 @@ function playerTop() {
   throw new Error("Player was not rendered.");
 }
 
+test("REQ-CHR-03: favicon loads before setup and depicts the player character", async () => {
+  const link = find('link[rel="icon"]');
+  assert(link, "game page does not declare a favicon");
+  assert(link.type === "image/svg+xml", "favicon does not declare its SVG type");
+  const response = await fetch(link.href, { cache: "no-store" });
+  assert(response.ok, "declared favicon could not be loaded");
+  const image = new app.Image();
+  image.src = link.href;
+  await image.decode();
+  const canvas = doc.createElement("canvas");
+  canvas.width = 16;
+  canvas.height = 16;
+  const context = canvas.getContext("2d");
+  context.drawImage(image, 0, 0, 16, 16);
+  const pixels = context.getImageData(0, 0, 16, 16).data;
+  const palette = new Map([
+    ["#23353a", [35, 53, 58]], ["#16262d", [22, 38, 45]],
+    ["#e9bd91", [233, 189, 145]], ["#173b42", [23, 59, 66]],
+    ["#247f7b", [36, 127, 123]], ["#f5a15f", [245, 161, 95]],
+    ["#d6e8c3", [214, 232, 195]], ["#344b52", [52, 75, 82]],
+  ]);
+  const expected = new Uint8ClampedArray(16 * 16 * 4);
+  for (const [color, x, y, width, height] of [
+    ["#23353a", 1, 10, 6, 2], ["#16262d", 1, 10, 3, 2],
+    ["#e9bd91", 2, 1, 5, 4], ["#173b42", 1, 0, 6, 3],
+    ["#173b42", 0, 2, 2, 2], ["#247f7b", 1, 4, 6, 5],
+    ["#f5a15f", 1, 5, 7, 2], ["#d6e8c3", 6, 2, 1, 1],
+    ["#344b52", 2, 8, 2, 3], ["#344b52", 5, 8, 2, 3],
+  ]) {
+    for (let row = y + 2; row < y + 2 + height; row += 1) {
+      for (let column = x + 4; column < x + 4 + width; column += 1) {
+        expected.set([...palette.get(color), 255], (row * 16 + column) * 4);
+      }
+    }
+  }
+  assert(pixels.every((value, index) => value === expected[index]), "favicon does not match player artwork");
+  assert(!find("#setup-screen").hidden, "favicon check requires game setup");
+});
+
 test("REQ-SYS-05 / REQ-LVL-05: invalid names and edgeless images cannot start", async () => {
   name("Ada 2");
   assert(find("#start-button").disabled, "invalid name was accepted");
@@ -83,17 +122,21 @@ test("REQ-LVL-06/08: render photo-aligned separate platforms at 80% opacity", as
     }
   }
 });
-test("REQ-MOV-01: W and up no longer charge or jump outside bubble mode", async () => {
-  const top = playerTop();
+test("REQ-MOV-01/10: W and up climb without drilling, charging or jumping", async () => {
   for (const value of ["w", "ArrowUp"]) {
+    find("#reset-button").click();
+    const top = playerTop();
     key("keydown", value);
-    await delay(100);
+    await until(() => playerTop() < top - 3);
     assert(find("#charge-meter").value === 0, `${value} charged a jump`);
     key("keyup", value);
-    await delay(100);
-    assert(Math.abs(playerTop() - top) < 1, `${value} launched a jump`);
+    await delay(50);
+    const heldTop = playerTop();
+    await delay(150);
+    assert(Math.abs(playerTop() - heldTop) < 1, `${value} did not hold the background`);
   }
-  assert(find("#timer").textContent === "0.00", "unused jump keys started timer");
+  assert(Number(find("#timer").textContent) > 0, "climbing did not start timer");
+  find("#reset-button").click();
 });
 test("REQ-MOV-01/05 / REQ-SYS-04: Space charges, character bar fills, release launches", async () => {
   const top = playerTop();
@@ -144,22 +187,77 @@ test("REQ-MOV-05: blur cancels charge without launching", async () => {
   assert(Math.abs(playerTop() - top) < 1, "cancelled charge launched");
   assert(errors.length === 0, `browser errors: ${errors.join(", ")}`);
 });
-test("REQ-MOV-01/03: keyboard bubble climbs, hovers, then restores gravity", async () => {
+test("REQ-MOV-03/10: background holds after drill release, then jump detaches", async () => {
   find("#reset-button").click();
   const originalTop = playerTop();
   key("keydown", "Enter");
   key("keydown", "w");
   await until(() => playerTop() < originalTop - 5);
   key("keyup", "w");
+  key("keyup", "Enter");
   await delay(100);
   const hoverTop = playerTop();
   await delay(200);
-  assert(Math.abs(playerTop() - hoverTop) < 1, "stationary bubble did not hover");
-  assert(find("#charge-meter").value === 0, "vertical bubble input charged a jump");
-  key("keyup", "Enter");
+  assert(Math.abs(playerTop() - hoverTop) < 1, "releasing drill detached background grip");
+  assert(find("#charge-meter").value === 0, "climbing input charged a jump");
+  key("keydown", " ");
+  await until(() => find("#charge-meter").value > 0);
+  key("keyup", " ");
+  await until(() => playerTop() < hoverTop - 5);
   await until(() => playerTop() > hoverTop + 2);
   assert(Number(find("#timer").textContent) > 0, "vertical movement did not start timer");
   assert(errors.length === 0, `browser errors: ${errors.join(", ")}`);
+});
+
+test("REQ-MOV-03/08: drill down lands at solid bottom without respawn", async () => {
+  find("#reset-button").click();
+  key("keydown", "ArrowDown");
+  key("keydown", "Enter");
+  await until(() => playerTop() >= 170);
+  key("keyup", "ArrowDown");
+  key("keyup", "Enter");
+  const top = playerTop();
+  await delay(200);
+  assert(top >= 170 && Math.abs(playerTop() - top) < 1, "bottom contact respawned or fell out");
+  assert(Number(find("#timer").textContent) > 0, "drilling down did not start timer");
+  key("keydown", " ");
+  await until(() => find("#charge-meter").value > 0);
+  key("keyup", " ");
+  await until(() => playerTop() < top - 5);
+  assert(errors.length === 0, `browser errors: ${errors.join(", ")}`);
+});
+
+test("REQ-MOV-10: climbing animates alternating hands and feet", async () => {
+  find("#reset-button").click();
+  const limbPose = () => {
+    const pixels = canvasPixels();
+    const skin = [];
+    let left = 960;
+    let top = 540;
+    for (let y = 0; y < 540; y += 1) {
+      for (let x = 0; x < 960; x += 1) {
+        const i = (y * 960 + x) * 4;
+        if (pixels[i] === 233 && pixels[i + 1] === 189 && pixels[i + 2] === 145) {
+          skin.push([x, y]);
+          left = Math.min(left, x);
+          top = Math.min(top, y);
+        }
+      }
+    }
+    assert(skin.length > 0, "climbing hands are not rendered");
+    return skin.map(([x, y]) => `${x - left},${y - top}`).join(";");
+  };
+  key("keydown", "ArrowUp");
+  await delay(100);
+  key("keyup", "ArrowUp");
+  await delay(50);
+  const pose = limbPose();
+  key("keydown", "ArrowUp");
+  await delay(350);
+  key("keyup", "ArrowUp");
+  await delay(50);
+  assert(limbPose() !== pose, "climbing did not animate hand positions");
+  find("#reset-button").click();
 });
 
 test("REQ-CHR-02 / REQ-MOV-05: smaller sprite and charge bar move together", async () => {

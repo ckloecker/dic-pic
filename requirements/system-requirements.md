@@ -47,8 +47,7 @@ zero. An abandoned run shall not record a score.
 
 ## REQ-SYS-09: Falling Out of the Level
 
-Status: Superseded for bottom-edge falls by approved REQ-MOV-08; that change
-is not implemented yet. The existing game still uses the behavior below.
+Status: Superseded for bottom-edge falls by REQ-MOV-08.
 
-If the player falls out of the world, they shall respawn at the starting
-position. The timer shall keep running and drilled tunnels shall remain.
+The solid image bottom shall prevent falling out of the level, including after excavation.
+Bottom-edge contact shall not respawn the character or reset the timer or tunnels.

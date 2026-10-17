@@ -1,5 +1,5 @@
-import { cancelCharge, DRILL_RADIUS, stepPlayer } from "./physics.js";
-import { createRun, reachedFlag, respawnPlayer } from "./run.js";
+import { cancelCharge, DRILL_REACH, stepPlayer } from "./physics.js";
+import { createRun, reachedFlag } from "./run.js";
 import { getLeaderboard, isValidPlayerName, submitScore } from "./leaderboard.js";
 import {
   generateTerrain,
@@ -266,6 +266,21 @@ function drawExit() {
 
 function drawPlayer() {
   const { x, y, facing } = state.player;
+  if (state.player.climbing) {
+    const stride = Math.sin(state.player.climbPhase) * 1.5;
+    context.fillStyle = "#344b52";
+    context.fillRect(x + 1, y + 5 + stride, 1.5, 2.5);
+    context.fillRect(x + 3.5, y + 5 - stride, 1.5, 2.5);
+    context.fillStyle = "#247f7b";
+    context.fillRect(x + 1, y + 3, 4, 4);
+    context.fillStyle = "#e9bd91";
+    context.fillRect(x, y + 1.5 + stride, 1.5, 2.5);
+    context.fillRect(x + 4.5, y + 1.5 - stride, 1.5, 2.5);
+    context.fillRect(x + 1.5, y + 1, 3, 2);
+    context.fillStyle = "#173b42";
+    context.fillRect(x + 1, y, 4, 2);
+    return;
+  }
   context.save();
   context.translate(x, y);
   context.scale(state.player.width / 8, state.player.height / 12);
@@ -306,17 +321,22 @@ function drawPlayerCharge() {
   context.fillRect(x + 1, y + 1, 10 * player.chargeSeconds / 3, 1);
 }
 
-function drawDrillBubble() {
-  const { x, y } = state.player;
-  if (state.player.drilling) {
-    context.beginPath();
-    context.arc(x + state.player.width / 2, y + state.player.height / 2, DRILL_RADIUS, 0, Math.PI * 2);
-    context.fillStyle = "rgba(159, 228, 193, 0.15)";
-    context.fill();
-    context.strokeStyle = "#9fe4c1";
-    context.lineWidth = 1;
-    context.stroke();
-  }
+function drawDrill() {
+  const player = state.player;
+  if (!player.drilling) return;
+  context.save();
+  context.translate(player.x + player.width / 2, player.y + player.height / 2);
+  context.rotate(Math.atan2(player.drillY, player.drillX));
+  context.fillStyle = "#344b52";
+  context.fillRect(2, -2, 3, 4);
+  context.beginPath();
+  context.moveTo(5, -2.5);
+  context.lineTo(DRILL_REACH, 0);
+  context.lineTo(5, 2.5);
+  context.closePath();
+  context.fillStyle = "#d6e8c3";
+  context.fill();
+  context.restore();
 }
 
 function drawScene() {
@@ -325,8 +345,8 @@ function drawScene() {
   clearTerrainLayer();
   context.drawImage(state.terrainLayer, 0, 0);
   drawExit();
-  drawDrillBubble();
   drawPlayer();
+  drawDrill();
   drawPlayerCharge();
 }
 
@@ -426,7 +446,7 @@ function gameFrame(timestamp) {
   const movedByPlayer = (input.move !== 0 && state.player.x !== beforeX)
     || (input.jumpReleased && state.player.y !== beforeY)
     || state.player.charging
-    || (input.drill && input.moveY !== 0 && state.player.y !== beforeY);
+    || (input.moveY !== 0 && state.player.y !== beforeY);
   if (state.startedAt === null && movedByPlayer) {
     state.startedAt = timestamp;
   }
@@ -435,7 +455,6 @@ function gameFrame(timestamp) {
     timerValue.textContent = elapsedLabel(state.elapsedMs);
   }
 
-  if (state.player.y >= WORLD_HEIGHT) respawnPlayer(state);
   updateChargeIndicator();
   drawScene();
   if (reachedFlag(state)) {
@@ -455,7 +474,10 @@ function clearControls() {
   touchState.jump = false;
   state.jumpPressed = false;
   state.jumpReleased = false;
-  if (state.player) cancelCharge(state.player);
+  if (state.player) {
+    cancelCharge(state.player);
+    state.player.upHeld = false;
+  }
   document.querySelectorAll(".control-button.pressed").forEach((button) => button.classList.remove("pressed"));
 }
 

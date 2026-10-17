@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#15242d">
     <title>Photo Runner — dic-pic</title>
+    <link rel="icon" type="image/svg+xml" sizes="any" href="./favicon.svg">
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
@@ -85,18 +86,18 @@
         <div class="controls-panel">
           <div class="control-instructions">
             <span class="control-title">CONTROLS</span>
-            <span class="desktop-instructions"><kbd>A</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd> move <span class="control-divider">·</span> hold <kbd>Space</kbd> near floor/wall to charge, release to jump <span class="control-divider">·</span> hold <kbd>Enter</kbd> for drill bubble, <kbd>W</kbd><kbd>S</kbd> / <kbd>↑</kbd><kbd>↓</kbd> to hover vertically at ¼ speed</span>
+            <span class="desktop-instructions"><kbd>A</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd> move <span class="control-divider">·</span> <kbd>W</kbd> / <kbd>↑</kbd> grips the background; directions climb at ¼ speed <span class="control-divider">·</span> hold <kbd>Space</kbd> on floor/wall/background to charge, release to jump and detach <span class="control-divider">·</span> hold <kbd>Enter</kbd> to drill a tunnel in the pressed direction, including <kbd>↓</kbd> while standing</span>
             <div class="charge-panel">
               <label id="charge-label" for="charge-meter">Hold jump to charge · release to jump</label>
               <meter id="charge-meter" min="0" max="3" value="0" aria-label="Jump charge, maximum three seconds"></meter>
             </div>
           </div>
           <div class="touch-controls" aria-label="Touch controls">
-            <div class="movement-pad" aria-label="Move left or right">
+            <div class="movement-pad" aria-label="Move, climb, or aim drill">
               <button class="control-button move-button" type="button" data-move="-1" aria-label="Move left">←</button>
               <button class="control-button move-button" type="button" data-move="1" aria-label="Move right">→</button>
-              <button class="control-button move-button" type="button" data-move-y="-1" aria-label="Hover up">↑</button>
-              <button class="control-button move-button" type="button" data-move-y="1" aria-label="Hover down">↓</button>
+              <button class="control-button move-button" type="button" data-move-y="-1" aria-label="Climb up or drill up">↑</button>
+              <button class="control-button move-button" type="button" data-move-y="1" aria-label="Climb down or drill down">↓</button>
             </div>
             <div class="action-pad">
               <button id="drill-button" class="control-button drill-button" type="button" aria-label="Hold to drill">DRILL</button>
