@@ -1,12 +1,11 @@
 import { cancelCharge, DRILL_REACH, stepPlayer } from "./physics.js";
-import { createRun, reachedFlag } from "./run.js";
-import { getLeaderboard, isValidPlayerName, submitScore } from "./leaderboard.js";
-import {
-  generateTerrain,
-  NoUsableEdgeError,
-  openSpaceRatio,
-  TERRAIN_OPACITY,
-} from "./terrain.js";
+import { createRun, reachedFlag, respawnPlayer } from "./run.js";
+import { enemyContact, stepEnemies } from "./enemies.js";
+import { getLeaderboard, isValidPlayerName, leaderboardRows, submitScore } from "./leaderboard.js";
+import { NoUsableEdgeError } from "./terrain.js";
+import { BIOMES, LAYOUTS, createSuggestions, levelIdentity } from "./level.js";
+import { drawBiomeEffects, drawEnemies, drawGate, drawHeadwear, drawPhoto, drawPreview,
+  paintTerrain, paintTerrainShadow } from "./scene.js";
 
 const WORLD_WIDTH = 320;
 const WORLD_HEIGHT = 180;
@@ -23,6 +22,8 @@ const startButton = document.querySelector("#start-button");
 const uploadInput = document.querySelector("#upload-input");
 const cameraInput = document.querySelector("#camera-input");
 const photoName = document.querySelector("#photo-name");
+const suggestions = document.querySelector("#suggestions");
+const choices = document.querySelector("#level-choices");
 const timerValue = document.querySelector("#timer");
 const scoreMessage = document.querySelector("#score-message");
 const keyState = new Set();
@@ -30,6 +31,9 @@ const touchState = { left: false, right: false, up: false, down: false, drill: f
 
 const state = {
   image: null,
+  photoId: null,
+  options: [],
+  imageRequest: 0,
   levelId: null,
   playerName: "",
   terrain: null,
@@ -38,12 +42,14 @@ const state = {
   flag: null,
   startedAt: null,
   elapsedMs: 0,
+  effectSeconds: 0,
   running: false,
   jumpPressed: false,
   jumpReleased: false,
   frameHandle: null,
   previousFrame: 0,
   terrainLayer: null,
+  effectLayer: null,
   terrainLayerVersion: -1,
 };
 
@@ -62,7 +68,7 @@ function updateNameValidity() {
     ? "Letters and spaces only."
     : "Use letters and spaces only (maximum 32 characters).";
   nameMessage.classList.toggle("invalid", !valid && nameInput.value.length > 0);
-  startButton.disabled = !valid || !state.image || !state.levelId;
+  startButton.disabled = !valid || !state.image || !state.photoId;
   return valid;
 }
 
@@ -95,6 +101,15 @@ async function selectImage(file) {
   if (!file) {
     return;
   }
+  const request = ++state.imageRequest;
+  state.image = null;
+  state.photoId = null;
+  state.levelId = null;
+  state.originalTerrain = null;
+  state.options = [];
+  suggestions.hidden = true;
+  choices.replaceChildren();
+  updateNameValidity();
   setMessage(setupMessage, "");
   if (!file.type.startsWith("image/")) {
     state.image = null;
@@ -110,12 +125,14 @@ async function selectImage(file) {
       decodeImage(file),
       file.arrayBuffer().then(hashBytes),
     ]);
+    if (request !== state.imageRequest) return;
     state.image = image;
-    state.levelId = levelId;
+    state.photoId = levelId;
     state.originalTerrain = null;
     photoName.textContent = `${file.name} · ${image.naturalWidth} × ${image.naturalHeight}`;
     setMessage(setupMessage, "");
   } catch (error) {
+    if (request !== state.imageRequest) return;
     state.image = null;
     state.levelId = null;
     photoName.textContent = "No photo selected yet.";
@@ -134,37 +151,41 @@ cameraInput.addEventListener("change", () => {
   cameraInput.value = "";
 });
 
-function makeTerrainFromImage(image) {
+function makeOptionsFromImage(image) {
   const sourceCanvas = document.createElement("canvas");
   sourceCanvas.width = WORLD_WIDTH;
   sourceCanvas.height = WORLD_HEIGHT;
   const sourceContext = sourceCanvas.getContext("2d", { willReadFrequently: true });
   sourceContext.drawImage(image, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
   const pixels = sourceContext.getImageData(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-  return generateTerrain(pixels.data, WORLD_WIDTH, WORLD_HEIGHT);
+  return createSuggestions(pixels.data, WORLD_WIDTH, WORLD_HEIGHT);
 }
 
 function setUpGame() {
-  const terrain = state.originalTerrain || makeTerrainFromImage(state.image);
-  if (openSpaceRatio(terrain) < 0.8) {
-    throw new Error("This photo did not produce enough open space. Choose a different image.");
-  }
+  const terrain = state.originalTerrain;
+  if (!terrain) throw new Error("Choose a level preview before playing.");
   const run = createRun(terrain);
   stopAnimation();
   clearControls();
   state.originalTerrain = terrain;
   Object.assign(state, run);
   state.previousFrame = 0;
+  state.effectSeconds = 0;
   state.terrainLayer = document.createElement("canvas");
   state.terrainLayer.width = WORLD_WIDTH;
   state.terrainLayer.height = WORLD_HEIGHT;
+  state.effectLayer = document.createElement("canvas");
+  state.effectLayer.width = WORLD_WIDTH;
+  state.effectLayer.height = WORLD_HEIGHT;
   state.terrainLayerVersion = -1;
   state.running = true;
   setupScreen.hidden = true;
+  suggestions.hidden = true;
   completePanel.hidden = true;
   gameScreen.hidden = false;
-  document.querySelector("#level-title").textContent = `Find the exit, ${state.playerName}`;
+  document.querySelector("#level-title").textContent = `${BIOMES[terrain.biome].label} finish, ${state.playerName}`;
   timerValue.textContent = "0.00";
+  document.querySelector("#contact-message").textContent = "";
   updateChargeIndicator();
   drawScene();
   state.frameHandle = requestAnimationFrame(gameFrame);
@@ -181,7 +202,7 @@ function updateChargeIndicator() {
   const full = seconds >= 3;
   document.querySelector("#charge-meter").value = seconds;
   const label = document.querySelector("#charge-label");
-  label.textContent = full ? "MAX READY — release to jump" : (
+  label.textContent = state.player?.climbing ? "Press jump to drop" : full ? "MAX READY — release to jump" : (
     state.player?.charging ? `CHARGING ${Math.round(seconds / 3 * 100)}%` : "Hold jump to charge · release to jump"
   );
   label.classList.toggle("charge-full", full);
@@ -196,20 +217,66 @@ function restartRun() {
   }
 }
 
+async function chooseOption(option, button) {
+  const request = state.imageRequest;
+  const photoId = state.photoId;
+  choices.querySelectorAll("button").forEach((choice) => { choice.disabled = true; });
+  try {
+    const levelId = await hashBytes(new TextEncoder().encode(`${photoId}:${levelIdentity(option)}`));
+    if (request !== state.imageRequest || !state.options.includes(option)) return;
+    state.originalTerrain = option;
+    state.levelId = levelId;
+    state.playerName = nameInput.value.trim();
+    if (!updateNameValidity()) throw new Error("Enter a valid runner name before playing.");
+    setUpGame();
+  } catch (error) {
+    setMessage(setupMessage, error.message, true);
+  } finally {
+    choices.querySelectorAll("button").forEach((choice) => { choice.disabled = false; });
+    if (!setupScreen.hidden) button.focus();
+  }
+}
+
 setupForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  if (!updateNameValidity() || !state.image || !state.levelId) {
+  if (!updateNameValidity() || !state.image || !state.photoId) {
     setMessage(setupMessage, "Enter a valid name and select a photo to start.", true);
     return;
   }
   state.playerName = nameInput.value.trim();
+  state.options = [];
+  suggestions.hidden = true;
+  choices.replaceChildren();
   try {
-    setUpGame();
+    state.options = makeOptionsFromImage(state.image);
+    choices.replaceChildren();
+    for (const option of state.options) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "level-choice";
+      button.dataset.biome = option.biome;
+      button.dataset.layout = option.layout;
+      button.dataset.edge = option.edge;
+      const preview = document.createElement("canvas");
+      preview.width = WORLD_WIDTH;
+      preview.height = WORLD_HEIGHT;
+      preview.setAttribute("aria-hidden", "true");
+      drawPreview(preview.getContext("2d"), state.image, option);
+      const label = document.createElement("span");
+      label.textContent = `${option.biome} / ${LAYOUTS[option.layout]} - Play`;
+      button.append(preview, label);
+      button.addEventListener("click", () => chooseOption(option, button));
+      choices.append(button);
+    }
+    suggestions.hidden = false;
+    setMessage(setupMessage, "Choose your preferred level below. The timer starts only when you play.");
+    choices.querySelector("button").focus();
   } catch (error) {
     setMessage(setupMessage, error.message, true);
     if (error instanceof NoUsableEdgeError) {
       state.image = null;
       state.levelId = null;
+      state.photoId = null;
       photoName.textContent = "Photo rejected. Choose another image.";
       updateNameValidity();
     }
@@ -221,47 +288,14 @@ function clearTerrainLayer() {
     return;
   }
   const layerContext = state.terrainLayer.getContext("2d");
-  const pixels = layerContext.createImageData(WORLD_WIDTH, WORLD_HEIGHT);
   const { terrain } = state;
-  for (let y = 0; y < WORLD_HEIGHT; y += 1) {
-    for (let x = 0; x < WORLD_WIDTH; x += 1) {
-      const cellIndex = y * WORLD_WIDTH + x;
-      if (terrain.solid[cellIndex] === 0) {
-        continue;
-      }
-      const colorOffset = cellIndex * 4;
-      const hasOpenTop = y === 0 || terrain.solid[(y - 1) * WORLD_WIDTH + x] === 0;
-      if (hasOpenTop) {
-        pixels.data[colorOffset] = 123;
-        pixels.data[colorOffset + 1] = 190;
-        pixels.data[colorOffset + 2] = 113;
-      } else if ((Math.floor(x / 5) + Math.floor(y / 4)) % 2 === 0) {
-        pixels.data[colorOffset] = 139;
-        pixels.data[colorOffset + 1] = 91;
-        pixels.data[colorOffset + 2] = 64;
-      } else {
-        pixels.data[colorOffset] = 105;
-        pixels.data[colorOffset + 1] = 69;
-        pixels.data[colorOffset + 2] = 54;
-      }
-      pixels.data[colorOffset + 3] = Math.round(TERRAIN_OPACITY * 255);
-    }
-  }
-  layerContext.putImageData(pixels, 0, 0);
+  paintTerrain(layerContext, terrain);
+  paintTerrainShadow(layerContext, terrain);
   state.terrainLayerVersion = terrain.version;
 }
 
 function drawExit() {
-  const x = state.flag.x;
-  const floorY = state.flag.y;
-  context.fillStyle = "#e9ead5";
-  context.fillRect(x + 1, floorY - 25, 2, 25);
-  context.fillStyle = "#ff9a65";
-  context.fillRect(x + 3, floorY - 24, 10, 6);
-  context.fillStyle = "#f4f2e9";
-  context.fillRect(x + 3, floorY - 18, 7, 3);
-  context.fillStyle = "#32473e";
-  context.fillRect(x, floorY - 2, state.flag.width, 2);
+  drawGate(context, state.flag);
 }
 
 function drawPlayer() {
@@ -279,6 +313,7 @@ function drawPlayer() {
     context.fillRect(x + 1.5, y + 1, 3, 2);
     context.fillStyle = "#173b42";
     context.fillRect(x + 1, y, 4, 2);
+    drawHeadwear(context, state.player, state.terrain.biome);
     return;
   }
   context.save();
@@ -308,6 +343,7 @@ function drawPlayer() {
   context.fillRect(px + 2, 8, 2, 3);
   context.fillRect(px + 5, 8, 2, 3);
   context.restore();
+  drawHeadwear(context, state.player, state.terrain.biome);
 }
 
 function drawPlayerCharge() {
@@ -341,9 +377,15 @@ function drawDrill() {
 
 function drawScene() {
   context.clearRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-  context.drawImage(state.image, 0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+  drawPhoto(context, state.image, WORLD_WIDTH, WORLD_HEIGHT);
+  const effectContext = state.effectLayer.getContext("2d");
+  effectContext.clearRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+  drawBiomeEffects(effectContext, WORLD_WIDTH, WORLD_HEIGHT, state.terrain.biome, state.effectSeconds,
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  context.drawImage(state.effectLayer, 0, 0);
   clearTerrainLayer();
   context.drawImage(state.terrainLayer, 0, 0);
+  drawEnemies(context, state.enemies, state.terrain.biome);
   drawExit();
   drawPlayer();
   drawDrill();
@@ -370,17 +412,17 @@ function elapsedLabel(milliseconds) {
   return (milliseconds / 1000).toFixed(2);
 }
 
-function showLeaderboard(scores) {
+function showLeaderboard(scores, current) {
   const list = document.querySelector("#leaderboard-list");
   list.replaceChildren();
-  if (scores.length === 0) {
+  if (scores.length === 0 && !current) {
     const empty = document.createElement("li");
     empty.className = "empty-leaderboard";
     empty.textContent = "No saved runs for this photo yet.";
     list.append(empty);
     return;
   }
-  scores.forEach((score, index) => {
+  leaderboardRows(scores, current).forEach((score) => {
     const row = document.createElement("li");
     const rank = document.createElement("span");
     const name = document.createElement("span");
@@ -388,8 +430,16 @@ function showLeaderboard(scores) {
     rank.className = "leaderboard-rank";
     name.className = "leaderboard-name";
     time.className = "leaderboard-time";
-    rank.textContent = String(index + 1).padStart(2, "0");
+    rank.textContent = score.rank === null ? "" : String(score.rank).padStart(2, "0");
     name.textContent = score.name;
+    if (score.current) {
+      row.classList.add("current-run");
+      row.setAttribute("aria-current", "true");
+      const label = document.createElement("strong");
+      label.className = "current-run-label";
+      label.textContent = "Your run";
+      name.append(" · ", label);
+    }
     time.textContent = `${elapsedLabel(score.timeMs)}s`;
     row.append(rank, name, time);
     list.append(row);
@@ -402,25 +452,22 @@ function finishLevel() {
   }
   stopAnimation();
   clearControls();
-  state.elapsedMs = state.startedAt === null ? 0 : performance.now() - state.startedAt;
   timerValue.textContent = elapsedLabel(state.elapsedMs);
   document.querySelector("#winner-name").textContent = state.playerName;
   document.querySelector("#final-time").textContent = `${elapsedLabel(state.elapsedMs)} seconds`;
   gameScreen.hidden = true;
   completePanel.hidden = false;
+  const current = { id: crypto.randomUUID(), name: state.playerName, timeMs: state.elapsedMs };
   try {
-    const scores = submitScore(state.levelId, {
-      name: state.playerName,
-      timeMs: state.elapsedMs,
-    });
-    showLeaderboard(scores);
+    const scores = submitScore(state.levelId, current);
+    showLeaderboard(scores, current);
     setMessage(scoreMessage, "Saved in this browser.");
   } catch (error) {
     setMessage(scoreMessage, `Your time is shown, but it could not be saved: ${error.message}`, true);
     try {
-      showLeaderboard(getLeaderboard(state.levelId));
+      showLeaderboard(getLeaderboard(state.levelId), current);
     } catch (readError) {
-      showLeaderboard([]);
+      showLeaderboard([], current);
       setMessage(scoreMessage, `Leaderboard unavailable: ${readError.message}`, true);
     }
   }
@@ -433,8 +480,11 @@ function gameFrame(timestamp) {
   const frameDelta = state.previousFrame === 0 ? 1 / 60 : (timestamp - state.previousFrame) / 1000;
   const dt = Math.max(0, Math.min(frameDelta, 0.05));
   state.previousFrame = timestamp;
+  state.effectSeconds += dt;
   const beforeX = state.player.x;
   const beforeY = state.player.y;
+  const previousPlayer = { ...state.player };
+  const wasClimbing = state.player.climbing;
   const input = getInput();
   if (state.startedAt === null && input.jumpPressed && state.player.grounded) {
     state.startedAt = timestamp;
@@ -446,6 +496,7 @@ function gameFrame(timestamp) {
   const movedByPlayer = (input.move !== 0 && state.player.x !== beforeX)
     || (input.jumpReleased && state.player.y !== beforeY)
     || state.player.charging
+    || (wasClimbing && input.jumpPressed)
     || (input.moveY !== 0 && state.player.y !== beforeY);
   if (state.startedAt === null && movedByPlayer) {
     state.startedAt = timestamp;
@@ -453,11 +504,18 @@ function gameFrame(timestamp) {
   if (state.startedAt !== null) {
     state.elapsedMs = timestamp - state.startedAt;
     timerValue.textContent = elapsedLabel(state.elapsedMs);
+    stepEnemies(state.enemies, dt);
   }
 
+  const hitEnemy = enemyContact(state.player, state.enemies, previousPlayer);
+  if (hitEnemy) {
+    respawnPlayer(state);
+    clearControls();
+    document.querySelector("#contact-message").textContent = "Enemy contact — back to start. Time and tunnels kept.";
+  }
   updateChargeIndicator();
   drawScene();
-  if (reachedFlag(state)) {
+  if (!hitEnemy && reachedFlag(state)) {
     finishLevel();
     return;
   }
@@ -477,6 +535,7 @@ function clearControls() {
   if (state.player) {
     cancelCharge(state.player);
     state.player.upHeld = false;
+    state.player.dropJumpHeld = false;
   }
   document.querySelectorAll(".control-button.pressed").forEach((button) => button.classList.remove("pressed"));
 }
@@ -487,6 +546,7 @@ function goToSetup() {
   gameScreen.hidden = true;
   completePanel.hidden = true;
   setupScreen.hidden = false;
+  suggestions.hidden = state.options.length !== 3;
   setMessage(setupMessage, "");
   updateNameValidity();
 }

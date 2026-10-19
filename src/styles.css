@@ -18,6 +18,42 @@
   box-sizing: border-box;
 }
 
+.level-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.level-choice {
+  padding: 8px;
+  border: 2px solid #516b69;
+  border-radius: 10px;
+  color: var(--paper);
+  background: var(--ink-soft);
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.level-choice:hover,
+.level-choice:focus-visible {
+  border-color: var(--mint);
+  outline: 2px solid var(--mint);
+  outline-offset: 3px;
+}
+
+.level-choice canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.level-choice span {
+  display: block;
+  padding: 12px 0 4px;
+}
+
 body {
   min-width: 320px;
   min-height: 100vh;
@@ -391,11 +427,9 @@ button,
 }
 
 .canvas-caption {
-  position: absolute;
-  right: 13px;
-  bottom: 12px;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 7px;
   padding: 7px 9px;
   color: #e9f4eb;
@@ -594,6 +628,17 @@ kbd {
   padding: 18px 0;
   color: #a7b6af;
   font-size: 11px;
+}
+
+.leaderboard-list li.current-run {
+  outline: 2px solid var(--mint);
+  outline-offset: 2px;
+  background: rgba(159, 228, 193, 0.12);
+}
+
+.current-run-label {
+  color: var(--mint);
+  white-space: nowrap;
 }
 
 .site-footer {

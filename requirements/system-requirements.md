@@ -14,8 +14,8 @@ The game shall be a 2D platformer.
 A level shall be created based on an uploaded or taken photo, i.e., an image.
 The image's visible edges will be the ground for the player character to move on.
 The image shall still be visible as background.
-The player character shall start on one arbitrary side of the level.
-A level exit shall be placed on a roughly opposite side of the level.
+The player shall choose one of three generated biome/layout previews before starting, as specified by REQ-LVL-12.
+Placement shall prioritize safe support nearest a randomly selected edge and a distant start, rejecting walking-only pairs and trying alternatives as specified by REQ-LVL-07.
 
 ## REQ-SYS-04: Gameplay
 
@@ -36,6 +36,10 @@ After successfully reaching the exit, the player shall see their time.
 Along the time, a leaderboard with the top 10 lowest times for this level shall be shown with the respective player name.
 Leaderboard entries shall be stored in the browser and shall not be shared
 with other devices or browsers.
+The exact just-completed attempt shall have a clearly outlined row labeled "Your run".
+If that attempt does not enter the top ten, it shall appear beneath the ranked entries with no rank, without persisting an eleventh score.
+Identical names and times shall not cause another attempt to be highlighted.
+Existing attempts shall precede new attempts with equal times.
 
 ## REQ-SYS-08: Restart Run
 
@@ -51,3 +55,13 @@ Status: Superseded for bottom-edge falls by REQ-MOV-08.
 
 The solid image bottom shall prevent falling out of the level, including after excavation.
 Bottom-edge contact shall not respawn the character or reset the timer or tunnels.
+
+## REQ-SYS-10: Enemy Contact
+
+Status: Approved.
+
+Contact with any flying patrol enemy shall immediately return the character to the selected starting position.
+Enemy contact shall preserve the running timer, drilled terrain, selected option, and enemy patrol progress.
+The returned character shall have fresh movement state and held controls shall be cleared.
+Enemy contact shall take priority over simultaneous finish contact and shall not record a score.
+Manual reset shall continue to restore terrain, enemy starting positions, controls, and the timer under REQ-SYS-08.

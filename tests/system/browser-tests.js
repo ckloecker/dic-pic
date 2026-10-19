@@ -4,6 +4,14 @@ if (!frame.contentDocument.querySelector("#setup-form") || frame.contentDocument
 }
 const app = frame.contentWindow;
 const doc = frame.contentDocument;
+const nativeRandom = app.Math.random;
+const nativeMatchMedia = app.matchMedia.bind(app);
+app.matchMedia = (query) => query === "(prefers-reduced-motion: reduce)"
+  ? { matches: true } : nativeMatchMedia(query);
+const sceneApi = await import(`../../src/scene.js?test=${Date.now()}`);
+const levelApi = await import(`../../src/level.js?test=${Date.now()}`);
+const routeApi = await import(`../../src/route.js?test=${Date.now()}`);
+let fixtureOptions;
 const find = (selector) => doc.querySelector(selector);
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
@@ -18,14 +26,16 @@ function name(value) {
   find("#player-name").value = value;
   find("#player-name").dispatchEvent(new app.Event("input", { bubbles: true }));
 }
-async function until(predicate) {
-  const deadline = performance.now() + 5000;
+async function until(predicate, timeoutMs = 5000) {
+  const deadline = performance.now() + timeoutMs;
   while (!predicate()) {
     if (performance.now() > deadline) throw new Error("Timed out waiting for application state.");
     await delay(20);
   }
 }
 async function upload(fileName) {
+  let seed=123;
+  app.Math.random = () => ((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
   const response = await fetch(`../fixtures/${fileName}`);
   assert(response.ok, `Could not load fixture: ${fileName}`);
   const transfer = new app.DataTransfer();
@@ -97,22 +107,64 @@ test("REQ-SYS-05 / REQ-LVL-05: invalid names and edgeless images cannot start", 
   assert(find("#start-button").disabled, "edgeless image was accepted");
   assert(find("#setup-message").textContent.includes("another photo"), "rejection lacks guidance");
 });
-test("REQ-LVL-06/08: render photo-aligned separate platforms at 80% opacity", async () => {
+test("REQ-LVL-01/05/12/16: sparse photos offer three repaired playable previews", async () => {
   await upload("platform-photo.svg");
   find("#start-button").click();
+  const choices=[...doc.querySelectorAll(".level-choice")];
+  assert(choices.length===3&&!find("#suggestions").hidden,
+    `sparse photo rejected: ${find("#setup-message").textContent}`);
+  choices[0].click();
+  await until(()=>!find("#game-screen").hidden);
+  const before=canvasPixels().slice();
+  find("#reset-button").click();
+  assert(canvasPixels().every((cell,index)=>cell===before[index]),"reset changed repaired preview geometry");
+  assert(find("#timer").textContent==="0.00","repair or reset started the timer");
+  find("#new-photo-button").click();
+});
+test("REQ-LVL-06/08: render photo-aligned platform interiors at 80% opacity", async () => {
+  await upload("route-photo.svg");
+  find("#start-button").click();
+  assert(!find("#suggestions").hidden && find("#game-screen").hidden, "play started before choosing");
+  const choices = [...doc.querySelectorAll(".level-choice")];
+  assert(choices.length === 3, "three thumbnail choices were not shown");
+  assert(new Set(choices.map((choice) => choice.dataset.biome + choice.dataset.layout)).size === 3, "duplicate variants");
+  for (const choice of choices) {
+    assert(choice.querySelector("canvas").width === 320, "thumbnail missing");
+    assert(choice.textContent.includes(choice.dataset.biome), "biome label missing");
+  }
+  const jungle=choices.find(choice=>choice.dataset.biome==="jungle");
+  jungle.click();
+  await until(() => !find("#game-screen").hidden);
   assert(!find("#game-screen").hidden, "game did not start");
   await delay(100);
-  assert(find("#timer").textContent === "0.00", "idle timer started");
+  assert(find("#timer").textContent === "0.00", `idle timer started: ${find("#timer").textContent}`);
   const image = new app.Image();
-  image.src = "../tests/fixtures/platform-photo.svg";
+  image.src = "../tests/fixtures/route-photo.svg";
   await image.decode();
   const source = doc.createElement("canvas");
   source.width = 320;
   source.height = 180;
   const sourceContext = source.getContext("2d");
-  sourceContext.drawImage(image, 0, 0, 320, 180);
+  sourceContext.drawImage(image,0,0,320,180);
+  let seed=123;
+  fixtureOptions=levelApi.createSuggestions(sourceContext.getImageData(0,0,320,180).data,320,180,
+    ()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296));
+  sceneApi.drawPhoto(sourceContext, image, 320, 180);
+  sceneApi.drawBiomeEffects(sourceContext, 320, 180, "jungle", 0, true);
   const pixels = canvasPixels();
-  for (const [x, y] of [[40, 145], [135, 95], [235, 45]]) {
+  const option=fixtureOptions.find(option=>option.biome==="jungle");
+  const terrainLayer=doc.createElement("canvas");
+  terrainLayer.width=320;terrainLayer.height=180;
+  const layerContext=terrainLayer.getContext("2d");
+  sceneApi.paintTerrain(layerContext,option);
+  const layerPixels=layerContext.getImageData(0,0,320,180).data;
+  const samples=[];
+  for(let y=4;y<176;y+=1)for(let x=4;x<316;x+=1){
+    if(layerPixels[(y*320+x)*4+3]===204&&!option.details[y*320+x]
+      &&!samples.some(point=>Math.hypot(point[0]-x,point[1]-y)<30))samples.push([x,y]);
+  }
+  assert(samples.length>=3,"not enough substantial interiors to sample");
+  for (const [x, y] of samples.slice(0,3)) {
     const original = sourceContext.getImageData(x, y, 1, 1).data;
     const offset = (y * 3 * 960 + x * 3) * 4;
     const tile = (Math.floor(x / 5) + Math.floor(y / 4)) % 2 === 0 ? [139, 91, 64] : [105, 69, 54];
@@ -187,7 +239,7 @@ test("REQ-MOV-05: blur cancels charge without launching", async () => {
   assert(Math.abs(playerTop() - top) < 1, "cancelled charge launched");
   assert(errors.length === 0, `browser errors: ${errors.join(", ")}`);
 });
-test("REQ-MOV-03/10: background holds after drill release, then jump detaches", async () => {
+test("REQ-MOV-03/10: background holds after drill release, then jump press drops", async () => {
   find("#reset-button").click();
   const originalTop = playerTop();
   key("keydown", "Enter");
@@ -201,25 +253,31 @@ test("REQ-MOV-03/10: background holds after drill release, then jump detaches", 
   assert(Math.abs(playerTop() - hoverTop) < 1, "releasing drill detached background grip");
   assert(find("#charge-meter").value === 0, "climbing input charged a jump");
   key("keydown", " ");
-  await until(() => find("#charge-meter").value > 0);
-  key("keyup", " ");
-  await until(() => playerTop() < hoverTop - 5);
   await until(() => playerTop() > hoverTop + 2);
+  assert(find("#charge-meter").value === 0, "drop charged a jump");
+  key("keyup", " ");
+  await delay(50);
+  assert(playerTop() >= hoverTop, "drop release launched upward");
   assert(Number(find("#timer").textContent) > 0, "vertical movement did not start timer");
   assert(errors.length === 0, `browser errors: ${errors.join(", ")}`);
 });
 
 test("REQ-MOV-03/08: drill down lands at solid bottom without respawn", async () => {
   find("#reset-button").click();
-  key("keydown", "ArrowDown");
+  const initialTop = playerTop();
+  key("keydown", "ArrowUp");
   key("keydown", "Enter");
-  await until(() => playerTop() >= 170);
+  await until(() => playerTop() < initialTop - 15);
+  key("keyup", "ArrowUp");
+  const beforeDown = Number(find("#timer").textContent);
+  key("keydown", "ArrowDown");
+  await until(() => playerTop() >= 170, 10000);
   key("keyup", "ArrowDown");
   key("keyup", "Enter");
   const top = playerTop();
   await delay(200);
   assert(top >= 170 && Math.abs(playerTop() - top) < 1, "bottom contact respawned or fell out");
-  assert(Number(find("#timer").textContent) > 0, "drilling down did not start timer");
+  assert(Number(find("#timer").textContent) >= beforeDown && beforeDown > 0, "bottom contact reset the running timer");
   key("keydown", " ");
   await until(() => find("#charge-meter").value > 0);
   key("keyup", " ");
@@ -262,6 +320,11 @@ test("REQ-MOV-10: climbing animates alternating hands and feet", async () => {
 
 test("REQ-CHR-02 / REQ-MOV-05: smaller sprite and charge bar move together", async () => {
   find("#reset-button").click();
+  key("keydown","Enter");
+  key("keydown","ArrowDown");
+  await until(()=>playerTop()>=170);
+  key("keyup","Enter");
+  key("keyup","ArrowDown");
   const spriteColors = new Set(["35,53,58", "22,38,45", "233,189,145", "23,59,66",
     "36,127,123", "245,161,95", "214,232,195", "52,75,82"]);
   const bounds = (matches) => {
@@ -295,13 +358,19 @@ test("REQ-CHR-02 / REQ-MOV-05: smaller sprite and charge bar move together", asy
   assert(before.right - before.left < 18 && before.bottom - before.top < 27,
     "rendered sprite exceeds 6-by-9 world cells");
   assert(beforeBar.bottom < before.top && before.top - beforeBar.bottom < 18, "bar is not immediately above player");
-  key("keydown", "d");
-  await until(() => sprite().left >= before.left + 18);
-  key("keyup", "d");
+  const direction=before.left>480?"a":"d";
+  key("keydown", "Enter");
+  key("keydown", direction);
+  await until(() => Math.abs(sprite().left-before.left)>=18);
+  key("keyup", direction);
+  key("keyup", "Enter");
+  await delay(30);
   const after = sprite();
   const afterBar = bar();
-  assert(Math.abs((afterBar.left - beforeBar.left) - (after.left - before.left)) <= 2,
-    "charge bar did not follow the character");
+  for (const [body, meter] of [[before, beforeBar], [after, afterBar]]) {
+    assert(Math.abs(meter.left - (Math.max(0, body.left - 11) + 3)) <= 2,
+      "charge bar did not follow the character within the image-edge clamp");
+  }
   app.dispatchEvent(new app.Event("blur"));
   key("keyup", " ");
   await delay(100);
@@ -312,6 +381,278 @@ test("REQ-CHR-02 / REQ-MOV-05: smaller sprite and charge bar move together", asy
     if (pixels[i] === 159 && pixels[i + 1] === 228 && pixels[i + 2] === 193) remains = true;
   }
   assert(!remains, "cancellation left the character bar visible");
+});
+
+test("REQ-MOV-03 / REQ-SYS-08: repeated resets retain exactly one native animation loop", async () => {
+  const nativeRequest=app.requestAnimationFrame,nativeCancel=app.cancelAnimationFrame;
+  const pending=new Set(),timestamps=new Set();
+  let duplicate=false;
+  app.requestAnimationFrame=callback=>{
+    const handle=nativeRequest(timestamp=>{
+      pending.delete(handle);
+      if(timestamps.has(timestamp))duplicate=true;
+      timestamps.add(timestamp);
+      callback(timestamp);
+    });
+    pending.add(handle);
+    return handle;
+  };
+  app.cancelAnimationFrame=handle=>{pending.delete(handle);nativeCancel(handle);};
+  try{
+    for(let reset=0;reset<5;reset+=1){
+      find("#reset-button").click();
+      assert(pending.size===1,"reset scheduled parallel animation loops");
+      await delay(70);
+      assert(pending.size===1&&!duplicate,"native frames advanced parallel game loops");
+    }
+    assert(timestamps.size>=5,"native animation did not run");
+  }finally{
+    app.requestAnimationFrame=nativeRequest;
+    app.cancelAnimationFrame=nativeCancel;
+  }
+});
+
+test("REQ-LVL-10/12 / REQ-CHR-04: all previews match play and reset retains each biome", async () => {
+  const checksum = (pixels) => pixels.reduce((sum, value, index) => (sum + value * (index % 97)) >>> 0, 0);
+  for (const biome of ["jungle", "desert", "underwater"]) {
+    find("#new-photo-button").click();
+    find("#start-button").click();
+    const choice = find(`.level-choice[data-biome="${biome}"]`);
+    assert(choice, `missing ${biome} choice`);
+    const preview = choice.querySelector("canvas").getContext("2d").getImageData(0, 0, 320, 180).data;
+    choice.click();
+    await until(() => !find("#game-screen").hidden);
+    await delay(50);
+    assert(find("#level-title").textContent.toLowerCase().includes(biome), "selected biome changed");
+    assert(find(".canvas-caption").getBoundingClientRect().top >= find("#game-canvas").getBoundingClientRect().bottom,
+      "HUD caption can obscure an edge finish gate");
+    const live = canvasPixels();
+    let different = 0;
+    for (let y = 0; y < 180; y += 1) {
+      for (let x = 0; x < 320; x += 1) {
+        const a = (y * 320 + x) * 4;
+        const b = (y * 3 * 960 + x * 3) * 4;
+        if ([0, 1, 2].some((channel) => preview[a + channel] !== live[b + channel])) different += 1;
+      }
+    }
+    assert(different <= 54, `preview/live geometry mismatch: ${different} cells`);
+    find("#reset-button").click();
+    const original = checksum(canvasPixels());
+    key("keydown", "Enter");
+    key("keydown", "ArrowDown");
+    await delay(150);
+    key("keyup", "Enter");
+    key("keyup", "ArrowDown");
+    find("#reset-button").click();
+    assert(checksum(canvasPixels()) === original, `reset failed to restore the initial ${biome} scene`);
+    await delay(50);
+    assert(find("#timer").textContent === "0.00", "reset retained held input or race time");
+  }
+  assert(errors.length === 0, `browser errors: ${errors.join(", ")}`);
+});
+
+test("REQ-LVL-13: live bubbles animate without starting race time and reduced motion freezes them", async () => {
+  const checksum = () => canvasPixels().reduce((sum, value, index) => (sum + value * (index % 97)) >>> 0, 0);
+  app.matchMedia = (query) => query === "(prefers-reduced-motion: reduce)"
+    ? { matches: false } : nativeMatchMedia(query);
+  find("#reset-button").click();
+  const before = checksum();
+  await delay(250);
+  assert(checksum() !== before, "live background effect did not animate");
+  assert(find("#timer").textContent === "0.00", "cosmetic animation started race time");
+  app.matchMedia = (query) => query === "(prefers-reduced-motion: reduce)"
+    ? { matches: true } : nativeMatchMedia(query);
+  find("#reset-button").click();
+  const frozen = checksum();
+  await delay(250);
+  assert(checksum() === frozen, "reduced-motion effect did not stay static");
+});
+
+test("REQ-LVL-06/11/12: validated photo previews expose all three layout choices", async () => {
+  find("#new-photo-button").click();
+  await upload("route-photo.svg");
+  find("#start-button").click();
+  const options = [...doc.querySelectorAll(".level-choice")];
+  assert(options.length === 3, "mixed fixture did not generate three options");
+  assert(new Set(options.map((option) => option.dataset.layout)).size === 3, "missing layout choice");
+  for (const choice of options) {
+    choice.click();
+    await until(() => !find("#game-screen").hidden);
+    assert(find("#timer").textContent === "0.00", "generation started the timer");
+    find("#new-photo-button").click();
+  }
+  assert(errors.length === 0, `browser errors: ${errors.join(", ")}`);
+});
+
+test("REQ-LVL-15 / REQ-SYS-10: live enemy contact keeps time and tunnels, clears controls, and manual reset restores all", async () => {
+  const nativeRequest = app.requestAnimationFrame;
+  const nativeCancel = app.cancelAnimationFrame;
+  let pending;
+  let timestamp = performance.now();
+  app.requestAnimationFrame = (callback) => { pending = callback; return 1; };
+  app.cancelAnimationFrame = () => { pending = null; };
+  const tick = () => {
+    const callback = pending;
+    pending = null;
+    assert(callback, "game loop did not schedule a frame");
+    timestamp += 1000 / 60;
+    callback(timestamp);
+  };
+  const checksum = () => canvasPixels().reduce((sum, value, index) => (sum + value * (index % 97)) >>> 0, 0);
+  const savedScores = JSON.stringify(app.localStorage);
+  try {
+    find('.level-choice[data-biome="underwater"]').click();
+    await until(() => !find("#game-screen").hidden);
+    const initial = checksum();
+    const initialTop = playerTop();
+    for (let i = 0; i < 20; i += 1) tick();
+    assert(checksum() === initial && find("#timer").textContent === "0.00", "idle enemies moved or started time");
+    const option=fixtureOptions.find(option=>option.biome==="underwater");
+    const enemy=option.enemies[0];
+    const sampleX=Math.round(option.spawn.x+3);
+    let sampleY=Math.round(option.spawn.y+10);
+    while(sampleY<179&&!option.solid[sampleY*320+sampleX])sampleY+=1;
+    assert(sampleY<179,"spawn has no underlying ground to excavate");
+    const tunnelSample = () => {
+      const pixels = canvasPixels();
+      const offset = (sampleY * 3 * 960 + sampleX * 3) * 4;
+      return Array.from(pixels.slice(offset, offset + 3)).join(",");
+    };
+    const undrilled=tunnelSample();
+    key("keydown","Enter");
+    key("keydown","ArrowDown");
+    for(let i=0;i<240;i+=1)tick();
+    key("keyup","ArrowDown");
+    const drilled=tunnelSample();
+    assert(drilled!==undrilled,"test did not excavate a real terrain cell");
+    key("keydown", "ArrowUp");
+    tick();
+    key("keyup", "ArrowUp");
+    key("keydown", "Enter");
+    const playerLeft = () => {
+      const pixels=canvasPixels();
+      let left=960;
+      for(let i=0;i<pixels.length;i+=4){
+        if(pixels[i]===36&&pixels[i+1]===127&&pixels[i+2]===123)left=Math.min(left,(i/4)%960);
+      }
+      return left/3-1;
+    };
+    const aimX=(enemy.left+enemy.right)/2+2;
+    const aimY=enemy.y-5;
+    for(let i=0;i<2000&&!find("#contact-message").textContent;i+=1){
+      const dx=aimX-playerLeft(),dy=aimY-playerTop();
+      for(const [value,held] of [["ArrowLeft",dx<-0.5],["ArrowRight",dx>0.5],
+        ["ArrowUp",dy<-0.5],["ArrowDown",dy>0.5]]){
+        key(held?"keydown":"keyup",value);
+      }
+      tick();
+    }
+    for(const value of ["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"])key("keyup",value);
+    assert(find("#contact-message").textContent.includes("Time and tunnels kept"),
+      `enemy contact did not respawn at ${playerLeft()},${playerTop()} toward ${aimX},${aimY}`);
+    assert(find("#complete-panel").hidden, "enemy contact completed or saved a run");
+    assert(JSON.stringify(app.localStorage) === savedScores, "enemy contact wrote a score");
+    const elapsed = Number(find("#timer").textContent);
+    assert(elapsed > 4, "contact reset the timer");
+    assert(tunnelSample() === drilled, "contact restored excavated terrain");
+    const returnedTop = playerTop();
+    assert(Math.abs(returnedTop - initialTop) < 1, `contact did not return to selected spawn: ${returnedTop}`);
+    const returnedLeft = playerLeft();
+    for (let i = 0; i < 10; i += 1) tick();
+    assert(Math.abs(playerLeft() - returnedLeft) < 1 && find("#charge-meter").value === 0,
+      "held movement/drill controls survived contact");
+    assert(Number(find("#timer").textContent) > elapsed, "contact stopped race timing");
+    find("#reset-button").click();
+    assert(checksum() === initial, "manual reset did not restore terrain and enemies");
+    assert(find("#timer").textContent === "0.00" && !find("#contact-message").textContent, "manual reset retained contact state");
+    assert(tunnelSample() !== drilled, "test did not excavate a real terrain cell");
+    find("#new-photo-button").click();
+  } finally {
+    if (!find("#game-screen").hidden) find("#new-photo-button").click();
+    app.requestAnimationFrame = nativeRequest;
+    app.cancelAnimationFrame = nativeCancel;
+    key("keyup", "ArrowLeft");
+    key("keyup", "Enter");
+  }
+});
+
+test("REQ-LVL-16 / REQ-SYS-06: no-drill replay finishes and outlines the exact ranked or unranked attempt", async () => {
+  const option=fixtureOptions.find(option=>option.biome==="jungle");
+  assert(routeApi.verifyReferenceRoute(option).valid,"fixture reference replay is not valid");
+  const bytes=await(await fetch("../fixtures/route-photo.svg")).arrayBuffer();
+  const hash=async buffer=>Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",buffer)),
+    byte=>byte.toString(16).padStart(2,"0")).join("");
+  const photoId=await hash(bytes);
+  const levelId=await hash(new TextEncoder().encode(`${photoId}:${levelApi.levelIdentity(option)}`));
+  const storageKey=`dic-pic:leaderboard:${levelId}`;
+  const original=app.localStorage.getItem(storageKey);
+  const nativeRequest=app.requestAnimationFrame,nativeCancel=app.cancelAnimationFrame;
+  const nativeSet=app.Storage.prototype.setItem;
+  let pending,timestamp=performance.now();
+  app.requestAnimationFrame=callback=>{pending=callback;return 1;};
+  app.cancelAnimationFrame=()=>{pending=null;};
+  const tick=dt=>{
+    const callback=pending;pending=null;
+    assert(callback,"replay lost its animation frame");
+    timestamp+=dt*1000;callback(timestamp);
+  };
+  const replay=()=>{
+    tick(1/60);
+    let previous={};
+    for(const action of option.route.actions){
+      for(const [value,held] of [["ArrowLeft",action.input.move<0],["ArrowRight",action.input.move>0],
+        ["ArrowUp",action.input.moveY<0],["ArrowDown",action.input.moveY>0]]){
+        if(Boolean(previous[value])!==held)key(held?"keydown":"keyup",value);
+        previous[value]=held;
+      }
+      tick(action.dt);
+      if(!find("#complete-panel").hidden)break;
+    }
+    for(const value of ["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"])key("keyup",value);
+    assert(!find("#complete-panel").hidden,"actual application did not finish the reference route");
+    assert(!find("#contact-message").textContent,"reference route touched an enemy");
+    const rows=[...doc.querySelectorAll("#leaderboard-list li")];
+    const marked=rows.filter(row=>row.classList.contains("current-run"));
+    assert(marked.length===1&&marked[0].getAttribute("aria-current")==="true"
+      &&marked[0].textContent.includes("Your run"),"exact attempt was not marked accessibly");
+    const style=app.getComputedStyle(marked[0]);
+    assert(style.outlineStyle==="solid"&&parseFloat(style.outlineWidth)>=2,"current run lacks a clear outline");
+    return {rows,current:marked[0]};
+  };
+  try{
+    app.localStorage.removeItem(storageKey);
+    find('.level-choice[data-biome="jungle"]').click();
+    await until(()=>!find("#game-screen").hidden);
+    const ranked=replay();
+    assert(ranked.current.querySelector(".leaderboard-rank").textContent==="01","ranked attempt has no place");
+    const saved=JSON.parse(app.localStorage.getItem(storageKey));
+    assert(saved.length===1&&saved[0].id,"ranked attempt was not persisted with an identity");
+    app.localStorage.setItem(storageKey,JSON.stringify(saved));
+    find("#replay-button").click();
+    const tied=replay();
+    assert(tied.rows.length===2&&tied.current===tied.rows[1],"equal name/time highlighted the older attempt");
+    assert(JSON.parse(app.localStorage.getItem(storageKey))[0].id===saved[0].id,"ties lost their stable order");
+    const fast=Array.from({length:10},(_,index)=>({id:`browser-fast-${index}`,name:"Test Runner",timeMs:index+1}));
+    app.localStorage.setItem(storageKey,JSON.stringify(fast));
+    find("#replay-button").click();
+    const slow=replay();
+    assert(slow.rows.length===11&&slow.current===slow.rows[10]
+      &&slow.current.querySelector(".leaderboard-rank").textContent==="","unranked attempt lacks its placeless footer");
+    assert(app.localStorage.getItem(storageKey)===JSON.stringify(fast),"unranked footer persisted an eleventh entry");
+    app.Storage.prototype.setItem=function(key,value){
+      if(key===storageKey)throw new app.DOMException("Test storage unavailable","QuotaExceededError");
+      return nativeSet.call(this,key,value);
+    };
+    find("#replay-button").click();
+    replay();
+    assert(find("#score-message").textContent.includes("could not be saved"),"storage failure was hidden");
+  }finally{
+    find("#new-photo-button").click();
+    app.requestAnimationFrame=nativeRequest;app.cancelAnimationFrame=nativeCancel;
+    app.Storage.prototype.setItem=nativeSet;
+    if(original===null)app.localStorage.removeItem(storageKey);
+    else app.localStorage.setItem(storageKey,original);
+  }
 });
 
 let passed = 0;
@@ -329,3 +670,6 @@ for (const check of tests) {
   document.querySelector("#results").append(item);
 }
 document.querySelector("#summary").textContent = `${passed}/${tests.length} tests passed`;
+app.Math.random = nativeRandom;
+app.matchMedia = nativeMatchMedia;
+if (!find("#game-screen").hidden) find("#new-photo-button").click();

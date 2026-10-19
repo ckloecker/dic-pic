@@ -39,16 +39,18 @@ local server with Python:
 python -m http.server 8000
 ```
 
-Open <http://localhost:8000/src/> in a browser. Select a photo, enter a name,
-and choose **Build my level**. The camera option is available on devices and
+Open <http://localhost:8000/src/> in a browser.
+Select a photo, enter a name, choose **Suggest three levels**, then select a thumbnail to play.
+The camera option is available on devices and
 browsers that support file-input photo capture; **Upload photo** remains
 available as a fallback.
 
 ## Play
 
 - Move with **A/D** or **left/right arrows**.
-- Hold **Space** near a floor or wall to charge; release to jump. **W/up no
-  longer jumps.** Jump charging also works while gripping the background.
+- Hold **Space** near a floor or wall to charge; release to jump.
+  **W/up does not jump.**
+  Press **Space** while climbing to drop immediately, without charging or launching on release.
   Three seconds reaches maximum charge, shown by **MAX READY**
   and a gold bar above the character. A full charge can cover the level's
   height, but terrain and the image's solid ceiling can stop it.
@@ -60,29 +62,77 @@ available as a fallback.
 - Press **W/up** to grip and climb the background wall.
   Use directions to climb at **one quarter** of walking speed, including diagonals.
   Release directions to hold position; landing feet-first restores walking.
-  Charge/release **Space** to jump off and fall; press Up again to reattach.
+  Press **Space** to drop; press Up again to reattach.
 - Hold **Return/Enter** to cut a narrow tunnel in the pressed direction.
   Without directional input, drill toward the character's facing direction.
   Drill upward while climbing or downward while standing.
-  Drilling preserves walking/climbing speed, gravity, and charged jumps.
+  Excavating intact ground limits horizontal travel to **20 cells/second**, the same speed as climbing.
+  Walking or drilling through open space stays at **80 cells/second**.
+  Gravity and charged jumps are unchanged.
 - On touch devices use the directional pad, hold/release **JUMP**, and hold
   **DRILL**.
   UP enters background climbing; directions also aim the drill.
 - **Reset run** restores the same photo's original terrain, spawn, and timer;
   saved leaderboard entries remain.
   The solid image bottom supports walking and jumping even after drilling.
-  The flag remains fixed if its support is drilled.
+  The checkered finish gate remains fixed if its support is drilled.
+- Avoid flying patrols: wasps in jungle, hovering scarabs in desert, and jellyfish underwater.
+  Enemy contact returns you to the selected spawn and clears held controls, but keeps the running timer, drilled tunnels, and enemy progress.
+  Manual reset also restores the enemies to their original positions.
 
 The runner is 25% smaller (6-by-9 terrain cells), without changing movement
 speed or jump height.
 
-Terrain follows detected horizontal/slanted and vertical photo edges as
-separate platforms and walls with 80% opacity and at least 80% open space.
-Long platforms use sections up to 48 cells wide with 12-cell jump gaps.
+Terrain follows detected horizontal/slanted and vertical photo contours as platforms, walls, and complete enclosed solid regions.
+Exposed outlines are fully opaque, including sides, undersides, and drilled tunnel boundaries.
+Only interior filling is 80% opaque.
+The displayed photo is darkened and desaturated, with a narrow dark border around terrain to improve separation from busy images.
+Photo analysis still uses the unfiltered original image.
+Terrain no longer receives automatic rectangular cuts that invent vertical wall faces.
 Edge detection is geometric, not semantic object recognition;
 some textures can become platforms and some photo features may be omitted.
-No unrelated helper platforms or walls are added. A photo without vertical
-edges may not supply walls for wall jumping.
+Visible, collidable, drillable bridges may connect separated photo edges.
+Where natural supports are missing, the generator can add longer bridges and horizontal stepping platforms, including freestanding platforms.
+No freestanding vertical walls are invented.
+A photo without vertical edges may not supply walls for wall jumping.
+
+Each batch offers jungle, desert, and underwater biomes with shuffled horizontal, vertical, and balanced layouts.
+Biomes change terrain surfaces, filling, drillable roots/cacti/coral and rocks, and the runner's cosmetic explorer hat/fedora/diving bell.
+Jungle scenery includes large layered trees three to five runner heights tall, grass, climbing plants, and hanging vines.
+Desert adds branching cacti, layered rocks, and bone clusters; underwater adds branching coral, kelp, and layered rocks.
+Substantial scenery follows its visible drillable collision silhouette; thin grass and leaf accents are cosmetic.
+Desert sunshine and shimmering rays, underwater bubbles and light shafts, and jungle dappled light and leaf motes animate behind gameplay.
+The photo and checkered finish remain visible, and the reduced-motion preference freezes the effects without changing physics or race timing.
+Horizontal and vertical layouts prioritize locally detected horizontal/sloped or vertical-ish edges, while balanced layouts consider both.
+Photos with only one usable orientation do not gain invented walls.
+One-cell morphological closing bridges tiny contour gaps before provisional enclosed-region filling.
+Eight-neighbor grouping preserves diagonal contours such as shoulders instead of discarding their fragments.
+Generation reserves a contiguous photo-edge-aligned main corridor before final filling and scenery.
+**55–70% open space**, **4–6 traversal sections**, and a **20–40-second reference route** are quality targets, not reasons to reject your photo.
+Every offered option still has an executable no-drill route with safe in-bounds endpoints and no walking-only finish.
+The recorded route mixes supported walking and background climbing and is replayed against the final terrain and enemy simulation.
+There is no waiting added to reach the duration target.
+Free climbing, full-height charged jumps, and optional drilling still allow skilled shortcuts; the reference duration is not a minimum finishing time.
+Deep optional filling is removed without inventing filler, and substantial photo features are preferred over tiny fragments.
+Generation first tries photo-derived geometry, then widens route connectivity and supplies missing horizontal supports.
+If clutter prevents a safe option, it prioritizes the strongest layout-relevant edges and retries with repaired platforms.
+Strong sparse edges survive even when they occupy less than five percent of the image.
+No photo is rejected merely for missing a density, route-duration, or section-count target.
+Truly featureless images still clearly ask for another photo; safety failures remain explicit rather than offering an unverified option.
+Use [the route fixture](./tests/fixtures/route-photo.svg) for repeatable playable options.
+The sparser [platform](./tests/fixtures/platform-photo.svg) and [mixed-orientation](./tests/fixtures/mixed-orientation-photo.svg) fixtures also exercise acceptance and route repair.
+Each thumbnail shows the exact chosen terrain, starting position, and finish gate.
+The two-pole checkered gate is twice the runner's width and height, stays inside the image, and uses safe support nearest a randomly selected edge.
+The starting position is distant from the gate rather than always on the left.
+Walking-only routes are rejected, including automatic small steps and falling onto the picture bottom.
+Generation tries alternative starts, gates, and edges and repairs support geometry before reporting an inability to build a safe option.
+The conservative route check also rejects questionable gap-crossing routes rather than risk accepting a trivial walk.
+Two flying enemies patrol checked clear corridors away from the start and finish, reversing without pathfinding or passing through terrain.
+Patrols appear in thumbnails and begin moving only when the race starts.
+Reset restores the selected variant without rerandomizing, and leaderboards are separated by exact photo/variant identity.
+The result list outlines the exact current attempt and labels it **Your run**, even when another entry has the same name and time.
+An attempt outside the top ten appears underneath with no place and is not stored as an eleventh score.
+Equal-time entries retain their existing order.
 
 ## Run tests
 
@@ -94,7 +144,7 @@ rejection, without installing packages.
 
 Open <http://localhost:8000/tests/system/runner.html> for automated browser
 checks of setup, opacity, Space-only jumping, the on-character charge bar,
-charge/release, timer, reset, background climbing, directional drilling, and the solid bottom.
+charge/release, timer, reset, press-to-drop climbing, biome previews, scenery, background effects, reduced motion, directional drilling, the solid bottom, enemy-contact respawning, no-drill route completion, and exact current-run scoreboard highlighting.
 Keep the test tab visible until its summary appears.
 
 Integrated browser checks are listed in

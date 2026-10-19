@@ -54,11 +54,18 @@
           <p id="photo-name" class="photo-name" aria-live="polite">No photo selected yet.</p>
 
           <button id="start-button" class="primary-button" type="submit" disabled>
-            Build my level <span aria-hidden="true">→</span>
+            Suggest three levels <span aria-hidden="true">→</span>
           </button>
           <p id="setup-message" class="status-message" role="status" aria-live="polite"></p>
           <p class="privacy-note"><span aria-hidden="true">⌑</span> Your photo and scores stay in this browser.</p>
         </form>
+      </section>
+
+      <section id="suggestions" aria-labelledby="suggestions-title" hidden>
+        <p class="eyebrow">THREE WAYS TO PLAY YOUR PHOTO</p>
+        <h2 id="suggestions-title">Choose your adventure</h2>
+        <p>Different biomes, terrain layouts, and finish positions. Pick a thumbnail to play.</p>
+        <div id="level-choices" class="level-choices"></div>
       </section>
 
       <section id="game-screen" class="screen game-screen" aria-label="Platform game" hidden>
@@ -79,14 +86,16 @@
         </div>
 
         <div class="game-frame">
-          <canvas id="game-canvas" width="960" height="540" aria-label="Game scene. Reach the exit on the right."></canvas>
-          <div class="canvas-caption"><span class="caption-dot"></span> REACH THE FLAG</div>
+          <canvas id="game-canvas" width="960" height="540" aria-label="Game scene. Reach the checkered finish gate."></canvas>
+          <div class="canvas-caption"><span class="caption-dot"></span> REACH THE CHECKERED GATE</div>
         </div>
+        <p id="contact-message" class="status-message" role="status" aria-live="polite"></p>
 
         <div class="controls-panel">
           <div class="control-instructions">
             <span class="control-title">CONTROLS</span>
-            <span class="desktop-instructions"><kbd>A</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd> move <span class="control-divider">·</span> <kbd>W</kbd> / <kbd>↑</kbd> grips the background; directions climb at ¼ speed <span class="control-divider">·</span> hold <kbd>Space</kbd> on floor/wall/background to charge, release to jump and detach <span class="control-divider">·</span> hold <kbd>Enter</kbd> to drill a tunnel in the pressed direction, including <kbd>↓</kbd> while standing</span>
+            <span>Avoid flying patrols: contact returns you to the start, keeping your time and tunnels.</span>
+            <span class="desktop-instructions"><kbd>A</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd> move <span class="control-divider">·</span> <kbd>W</kbd> / <kbd>↑</kbd> grips the background; directions climb at ¼ speed <span class="control-divider">·</span> hold <kbd>Space</kbd> on floor/wall to charge, release to jump; press while climbing to drop immediately <span class="control-divider">·</span> hold <kbd>Enter</kbd> to drill a tunnel in the pressed direction, including <kbd>↓</kbd> while standing</span>
             <div class="charge-panel">
               <label id="charge-label" for="charge-meter">Hold jump to charge · release to jump</label>
               <meter id="charge-meter" min="0" max="3" value="0" aria-label="Jump charge, maximum three seconds"></meter>
@@ -101,7 +110,7 @@
             </div>
             <div class="action-pad">
               <button id="drill-button" class="control-button drill-button" type="button" aria-label="Hold to drill">DRILL</button>
-              <button id="jump-button" class="control-button jump-button" type="button" aria-label="Hold to charge, release to jump">JUMP</button>
+              <button id="jump-button" class="control-button jump-button" type="button" aria-label="Hold to charge, release to jump; press while climbing to drop">JUMP</button>
             </div>
           </div>
         </div>
@@ -118,7 +127,7 @@
         </div>
         <div class="leaderboard-card">
           <div class="leaderboard-heading">
-            <div><p class="eyebrow">THIS PHOTO · THIS BROWSER</p><h3>Fastest runs</h3></div>
+            <div><p class="eyebrow">THIS VARIANT · THIS BROWSER</p><h3>Fastest runs</h3></div>
             <span class="top-ten">TOP 10</span>
           </div>
           <ol id="leaderboard-list" class="leaderboard-list"></ol>

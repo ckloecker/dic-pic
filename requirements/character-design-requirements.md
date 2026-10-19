@@ -18,3 +18,10 @@ The former drilling-bubble radius is superseded by the directional tunnel drill 
 The game page shall declare a favicon depicting the original playable pixel-art adventurer.
 The favicon shall retain the character's recognizable silhouette, hat, teal outfit, orange scarf, and colors.
 The favicon shall be available when the page first loads, without requiring a photo selection or a running game.
+
+## REQ-CHR-04: Biome Headwear
+
+Status: Approved.
+
+The runner shall wear the current biome's explorer hat, original fedora, or diving bell in both walking and climbing poses.
+Headwear shall remain within the six-by-nine-cell rendered footprint and shall not change collision or movement.

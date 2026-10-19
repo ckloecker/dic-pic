@@ -21,11 +21,13 @@ export function createPlayer(x, y) {
     charging: false,
     chargeSeconds: 0,
     drilling: false,
+    excavating: false,
     drillX: 1,
     drillY: 0,
     climbing: false,
     climbPhase: 0,
     upHeld: false,
+    dropJumpHeld: false,
     contactLostSeconds: 0,
     jumpBufferSeconds: -1,
   };
@@ -161,8 +163,8 @@ function moveAxis(player, distance, axis, terrain) {
   return true;
 }
 
-function drillTunnel(player, terrain) {
-  const centerX = player.x + player.width / 2;
+function drillTunnel(player, terrain, lookAhead = 0, probe = false) {
+  const centerX = player.x + player.width / 2 + lookAhead * player.drillX;
   const centerY = player.y + player.height / 2;
   const halfWidth = (Math.abs(player.drillY) * player.width + Math.abs(player.drillX) * player.height) / 2 + 0.5;
   const extent = DRILL_REACH + halfWidth;
@@ -177,6 +179,7 @@ function drillTunnel(player, terrain) {
       if (x >= 0 && x < terrain.width && y >= 0 && y < terrain.height) {
         const index = y * terrain.width + x;
         if (terrain.solid[index] === 1) {
+          if (probe) return true;
           terrain.solid[index] = 0;
           changed = true;
         }
@@ -186,6 +189,7 @@ function drillTunnel(player, terrain) {
   if (changed) {
     terrain.version = (terrain.version || 0) + 1;
   }
+  return changed;
 }
 
 export function stepPlayer(player, input, terrain, dt) {
@@ -199,27 +203,38 @@ export function stepPlayer(player, input, terrain, dt) {
   if (vertical < 0 && !player.upHeld) {
     player.climbing = true;
     player.vy = 0;
+    cancelCharge(player);
   }
   player.upHeld = vertical < 0;
+  if (player.climbing && input.jumpPressed) {
+    player.climbing = false;
+    player.vy = 0;
+    player.dropJumpHeld = true;
+    cancelCharge(player);
+  }
+  const dropJump = player.dropJumpHeld;
+  if (!input.jumpHeld) player.dropJumpHeld = false;
   player.drilling = Boolean(input.drill);
   const drillMagnitude = Math.hypot(direction, vertical);
   player.drillX = drillMagnitude ? direction / drillMagnitude : player.facing;
   player.drillY = drillMagnitude ? vertical / drillMagnitude : 0;
+  player.excavating = player.drilling && (drillTunnel(player, terrain, 0, true)
+    || drillTunnel(player, terrain, NORMAL_SPEED * elapsed + 1, true));
   if (player.drilling) drillTunnel(player, terrain);
   const contact = surfaceContact(player, terrain);
   if (player.climbing && vertical >= 0 && contact.floorDistance === 0) {
     player.climbing = false;
   }
-  const nearSurface = player.climbing || contact.floorDistance !== null || contact.wall !== 0;
+  const nearSurface = !player.climbing && (contact.floorDistance !== null || contact.wall !== 0);
   player.grounded = !player.climbing && contact.floorDistance !== null;
   if (player.grounded) snapToFloor(player, terrain);
   player.contactLostSeconds = nearSurface ? 0 : player.contactLostSeconds + elapsed;
 
   if (player.charging && player.contactLostSeconds > CONTACT_GRACE + 1e-9) cancelCharge(player);
-  player.jumpBufferSeconds = input.jumpPressed
+  player.jumpBufferSeconds = input.jumpPressed && !dropJump
     ? CONTACT_GRACE
     : Math.max(-1, player.jumpBufferSeconds - elapsed);
-  if (player.jumpBufferSeconds >= -1e-9 && nearSurface && (input.jumpHeld || input.jumpReleased)) {
+  if (!dropJump && player.jumpBufferSeconds >= -1e-9 && nearSurface && (input.jumpHeld || input.jumpReleased)) {
     player.charging = true;
     player.chargeSeconds = 0;
     player.jumpBufferSeconds = -1;
@@ -230,7 +245,7 @@ export function stepPlayer(player, input, terrain, dt) {
   }
   let wallLaunch = 0;
   if (input.jumpReleased) {
-    if (player.charging && nearSurface) {
+    if (!dropJump && player.charging && nearSurface) {
       player.vy = -jumpSpeedForCharge(player.chargeSeconds, terrain.height, elapsed);
       if (!player.grounded && !player.climbing) wallLaunch = -contact.wall;
       player.climbing = false;
@@ -273,8 +288,9 @@ export function stepPlayer(player, input, terrain, dt) {
     player.facing = direction;
   }
 
-  const horizontalDistance = (wallLaunch || direction) * NORMAL_SPEED * elapsed;
-  player.vx = (wallLaunch || direction) * NORMAL_SPEED;
+  const speed = player.excavating ? CLIMB_SPEED : NORMAL_SPEED;
+  const horizontalDistance = (wallLaunch || direction) * speed * elapsed;
+  player.vx = (wallLaunch || direction) * speed;
   if (wallLaunch) player.facing = wallLaunch;
   if (!moveAxis(player, horizontalDistance, "x", terrain)) {
     player.vx = 0;

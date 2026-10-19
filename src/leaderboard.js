@@ -32,6 +32,7 @@ function readScores(levelId, storage) {
     || !isValidPlayerName(score.name)
     || !Number.isFinite(score.timeMs)
     || score.timeMs < 0
+    || (score.id !== undefined && (typeof score.id !== "string" || !score.id))
   ))) {
     throw new Error("Saved leaderboard data has an invalid format.");
   }
@@ -55,9 +56,20 @@ export function submitScore(levelId, entry, storage = globalThis.localStorage) {
   }
 
   const scores = readScores(levelId, storage);
-  scores.push({ name, timeMs });
+  const id = entry.id ?? globalThis.crypto.randomUUID();
+  if (typeof id !== "string" || !id) throw new TypeError("A valid attempt identifier is required.");
+  if (scores.some((score) => score.id === id)) throw new Error("This attempt has already been saved.");
+  scores.push({ id, name, timeMs });
   scores.sort((first, second) => first.timeMs - second.timeMs);
   const topScores = scores.slice(0, MAX_ENTRIES);
   storage.setItem(keyForLevel(levelId), JSON.stringify(topScores));
   return topScores;
+}
+
+export function leaderboardRows(scores, current) {
+  const rows = scores.map((score, index) => ({
+    ...score, rank: index + 1, current: Boolean(current?.id && score.id === current.id),
+  }));
+  if (current && !rows.some((row) => row.current)) rows.push({ ...current, rank: null, current: true });
+  return rows;
 }

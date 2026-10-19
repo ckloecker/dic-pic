@@ -2,32 +2,153 @@
 
 Run the app from the repository root using `python -m http.server 8000`, then
 open `http://localhost:8000/src/`. Use
-`tests/fixtures/edge-photo.svg` as the repeatable image input.
+`tests/fixtures/route-photo.svg` as the repeatable playable image input.
 
 Automated browser procedures are available at
 `http://localhost:8000/tests/system/runner.html`. Keep that tab visible while
 tests run; background tabs can throttle animation frames. These tests use
-`platform-photo.svg` and `uniform-photo.svg` and do not write test scores.
+`route-photo.svg`, sparse `platform-photo.svg`, and `uniform-photo.svg`.
+Completion checks temporarily write only their exact fixture score key and restore its original value in `finally`.
 
 | ID | Requirements | Procedure | Expected result |
 |---|---|---|---|
 | ST-01 | REQ-SYS-01 | Open the app in a current browser and at desktop and narrow/mobile viewport sizes. | Setup and play screens render without dependencies and remain usable at both sizes. |
-| ST-02 | REQ-SYS-03, REQ-LVL-01, REQ-LVL-03, REQ-LVL-04 | Upload the fixture, start a level, and inspect the scene and generated collision mask. | Upload starts a level, the photo remains visible, edge-shaped terrain is automatic, and at least 80% of the map remains open. |
+| ST-02 | REQ-SYS-03, REQ-LVL-01/03/04/16 | Upload route-capable and sparse fixtures, start a level, and inspect the collision mask. | Both provide three playable choices; photo edges remain visible; density is a preference rather than a rejection gate. |
 | ST-02b | REQ-LVL-05 | Upload a uniform image without visible edges. | Contrast normalization cannot invent a contour; the game rejects the image and asks for another. |
 | ST-03 | REQ-SYS-04 | Leave the player idle, move or charge, then touch the exit flag. | The timer stays at zero until player-driven movement or charging, and stops on actual contact with the flag, not a horizontal crossing at another height. |
 | ST-04 | REQ-SYS-05, REQ-SYS-06 | Try invalid and valid names, complete two runs of the same image, then inspect results. | Invalid names cannot start; valid names are saved with sorted per-image scores in this browser. |
-| ST-05 | REQ-MOV-01 through REQ-MOV-04, REQ-MOV-10 | Use Space and touch JUMP; use W/up to climb without drilling; aim held drill in all directions. | Space charges/releases jumps; normal airborne movement is full speed. Background climbing is quarter speed with normalized diagonals and idle grip; directional drilling preserves movement physics and excavates permanent tunnels. |
+| ST-05 | REQ-MOV-01 through REQ-MOV-04, REQ-MOV-10 | Use Space and touch JUMP; climb without drilling; aim drill in all directions and measure horizontal excavation at 30/60/120 Hz. | Active horizontal excavation is 20 cells/s; open walking/drilling is 80; climbing is 20 with normalized diagonals; gravity and charge remain unchanged. |
 | ST-06 | REQ-CHR-01, REQ-LVL-02 | Inspect the rendered character and level overlay. | Visuals use original character art and a general retro pixel-art style. |
-| ST-07 | REQ-LVL-06 | Sample rendered terrain colors against the source photo. | Composited color is 80% terrain and 20% source image, within one channel rounding unit. |
+| ST-07 | REQ-LVL-06 | Sample tops, sides, undersides, tunnel boundaries, and interiors against the photo. | Exposed outlines are fully opaque; interiors blend 80% terrain and 20% background within one rounding unit. |
 | ST-08 | REQ-MOV-05/06, REQ-SYS-04 | Hold Space to maximum, then release; cancel another charge with blur; jump into the ceiling. | Both bars fill; three seconds reaches MAX READY and a gold character bar, counting as race time. Launch clears both bars; blur cancels without launch; the ceiling blocks upward travel. |
 | ST-09 | REQ-SYS-08/09, REQ-MOV-08 | Reset a modified run; drill down to the bottom, walk and jump there. | Reset restores all run state without changing saved scores; the solid bottom prevents falling out or respawning and supports walking and jumping. |
 | ST-10 | REQ-LVL-07/08 | Drill under the flag and inspect a multi-height photo. | Flag remains fixed without protected support; multiple separate platforms follow image edges. |
-| ST-11 | REQ-LVL-09, REQ-CHR-02 | Inspect sparse terrain and runner scale. | 6-by-9 character; at most 48-cell horizontal platform sections with 12-cell gaps; detected vertical walls; at least 80% open space. |
+| ST-11 | REQ-LVL-09, REQ-CHR-02 | Inspect terrain and runner scale. | 6-by-9 character; no unconditional rectangular cuts or invented freestanding vertical walls; diagonal photo contours survive noise suppression. |
 | ST-12 | REQ-MOV-02/07 | Charge while walking on inclines/declines and while falling beside walls. Test three-cell/150-ms limits and buffered presses. | Slopes retain charge; walls do not stop gravity; release requires current three-cell contact. Charge grace and press buffering expire at 150 ms. |
-| ST-13 | REQ-MOV-10 | Climb without drilling, stop directional input, drill and release drill, jump from the background, and descend onto terrain. | Animated hands/feet grip the back wall; idle and drill release retain grip; jump detaches without held-Up reattachment; landing restores walking. |
+| ST-13 | REQ-MOV-10 | Climb, stop, drill and release drill, then press jump; hold through landing and release. | Animated hands/feet grip the wall; jump press drops immediately without charge or launch; held Up does not reattach; a consumed drop press cannot charge on landing or jump on release. |
 | ST-14 | REQ-CHR-03 | Load the game before setup; fetch and decode its declared favicon and compare rasterized pixels with player artwork. | The local SVG loads successfully and matches the original character geometry and colors without starting a game. |
+| ST-15 | REQ-LVL-10/11/12, REQ-CHR-04 | Generate three suggestions, compare preview/live geometry, inspect biome headwear and textures, drill elements, then reset. | Three distinct labeled options precede play; biome elements collide and drill; headwear is cosmetic; reset restores the exact selected option. |
+| ST-16 | REQ-LVL-07/11/16 | Generate seeded batches and measure local edge evidence, closing/filling, spawn distance, and gate extents. | All biome/layout/edge choices occur; layout uses real local edge directions; the 12-by-18 gate and distant start are clear and in bounds. |
+| ST-17 | REQ-LVL-10/13 | Compare effects at different times with and without reduced motion; inspect scenery scale, anchors, collision, and drilling. | Effects freeze under reduced motion; jungle trees span 27-45 cells; substantial scenery remains collidable/drillable. |
+| ST-18 | REQ-LVL-01/06/11 | Use raw mixed-orientation and large-region/noise unit fixtures; compare masks and alpha channels. | Horizontal and vertical preferred-region cell ratios exceed two; balanced retains both; tiny fragments are absent; source photo filling precedes protected route clearance; exposed outlines have alpha 255 and interiors 204. |
+| ST-19 | REQ-LVL-07 | Test flat floors, the empty solid bottom, slopes, downward walking routes, and elevated alternatives; generate seeded options. | Walk-only pairs are rejected regardless of distance, alternatives remain distant and in bounds, and unsatisfiable generation shows a clear error. |
+| ST-20 | REQ-LVL-06/14 | Sample filtered photo colors and terrain halo pixels; compare thumbnails/live scenes and excavate. | Photo darkens/desaturates without affecting image analysis or artwork, the halo has no collision, and opaque outlines/translucent interiors persist. |
+| ST-21 | REQ-LVL-12/15, REQ-SYS-08/10 | Observe each biome's enemies idle and moving; cross patrols while drilling and holding controls, then manually reset. | Two clear, bounded, separated patrols reverse safely; contact returns the player to spawn without score writes, timer/tunnel/enemy reset, or held input; manual reset restores the original scene. |
+| ST-22 | REQ-LVL-01/08/09/11/16 | Generate diverse seeded photos and replay final physics/enemies; tamper with duration evidence, clearance, and drilling. | Numeric target misses do not reject valid options; no-drill, clear endpoints/corridors, movement variety, and non-walking completion remain mandatory. |
+| ST-23 | REQ-LVL-08/16 | Test twelve/eighteen/nineteen-cell supported gaps, missing edge evidence, and sparse-source supplemental shelves. | Longer bridges are allowed; natural-edge bridges retain real anchors; supplemental horizontal platforms need not attach at both ends and remain drillable/resettable without obstructing clearance. |
+| ST-24 | REQ-SYS-06, REQ-LVL-16 | Replay the same selected route to actual completion twice; populate ten faster entries and replay; simulate storage failure. | Exact current attempt alone is outlined/labeled, stable ties retain the older entry, an unranked footer has no place and does not persist, and failed saves remain visible with an explicit error. |
+| ST-25 | REQ-LVL-01/03/05/07/08/09/11/12/16 | Generate three choices for the portrait, sparse horizontal/vertical edges, disconnected platforms, dense clutter, and older sparse fixtures; also upload a uniform image. | Edge-bearing sources use route repair and strongest-edge selection rather than density rejection; final replays remain safe and no-drill; only the uniform source rejects for missing visible edges. |
 
-## Execution record
+## Current execution: acceptance-first photo repair
+
+Execution on 2026-10-19: **77/77 unit checks and 18/18 browser system checks passed** in Chromium with HTTP caching disabled.
+The approved revision retains featureless-image rejection but replaces density, section-count, and duration rejection with quality preferences and progressive geometry repair.
+The initial revised unit baseline passed 73/76, reproducing the nineteen-cell bridge cap, sparse-photo density rejection, and percentile-normalization loss of a small strong edge.
+ST-25 now covers sparse horizontal edges, a single narrow vertical object, disconnected platforms, and dense checkerboard clutter at two deterministic seeds each.
+All twenty-four resulting synthetic options pass actual no-drill replay and conservative walking-only rejection.
+Additional checks verify strongest-trace selection without source mutation, preserved source geometry, horizontal-only supplemental shelves, clear corridors, ordinary drilling of added cells, and exact reset.
+The new browser check uploads the previously unsuitable sparse platform fixture, receives three previews, selects one, and verifies exact scene restoration without starting the timer.
+Existing opacity, preview/live consistency, climbing/drop, excavation, reset scheduling, enemy-contact preservation, actual route completion, and scoreboard checks remain passing.
+The descent test's timeout now accommodates climbing from a high spawn to the bottom at twenty cells per second instead of assuming a lower spawn.
+Final local generation and replay checks accepted every option in this sample:
+
+| Source | Seeds | Verified options |
+|---|---|---|
+| Supplied portrait | 1–6 | 18/18 |
+| Edge fixture | 1–3 | 9/9 |
+| Sparse platform fixture | 1–3 | 9/9 |
+| Mixed-orientation fixture | 1–3 | 9/9 |
+| Route fixture | 1–3 | 9/9 |
+| Four sparse/disconnected/busy synthetic cases | 123 and 456 | 24/24 |
+
+This finite sample demonstrates the acceptance improvement without claiming a universal acceptance rate for unseen photos.
+Final portrait batches, including replay validation, took approximately 1.1–1.8 seconds in this environment.
+The supplied portrait remains local, unmodified, and absent from repository fixtures.
+Its repaired biome thumbnails were visually inspected for retained photo contours, supplemental horizontal supports, clear goals, and distinct scenery.
+Uniform-image rejection, safe in-bounds endpoints, and final non-walking completion remain mandatory.
+VS Code reported no diagnostics in the changed implementation and test files.
+Browser tests restore only their own exact score key and leave gameplay stopped.
+Physical Android/iOS, camera permissions, and simultaneous real touch input remain unverified.
+
+## Historical execution: strict photo-aligned reference routes and current-run results
+
+Execution on 2026-10-19: **75/75 unit checks and 17/17 browser system checks passed** in Chromium with HTTP caching disabled.
+The initial added baseline passed 68/71, reproducing missing shoulder contours, fast excavation, and absent exact-attempt scoreboard rows.
+The route-module and strict-criteria tests then reproduced the missing planner and invalid density.
+A later explicit three-second idle-padding mutation initially failed at 74/75 and passed after final replay validation rejected idle padding.
+ST-05 measures active excavation at twenty cells per second at 30, 60, and 120 Hz while empty drilling remains eighty.
+The native animation check performs five resets and verifies exactly one scheduled frame and no duplicate frame timestamp.
+ST-22 replays final options with actual movement and enemy simulation, validates clearance and final openness, and rejects wrong duration, missing sections, drilling, idle padding, blocked clearance, and changed occupancy.
+ST-23 checks twelve/eighteen-cell bridges, rejects nineteen-cell gaps and missing support/evidence, and verifies original photo evidence is not mutated.
+Raw edge fixtures retain diagonal shoulder-like slopes and local direction metadata without artificial periodic cuts.
+A second substantial vertical-column photo verifies valid routes, photo-derived collision geometry, and room for elaborate jungle trees and vines.
+Sparse source images clearly reject instead of receiving invented filler.
+ST-24 completes the real application through recorded directional keyboard input without drilling, including ranked, equal-time, unranked, and simulated failed-save outcomes.
+It verifies the two-pixel outline, "Your run", `aria-current`, blank unranked place, stable ties, and top-ten-only persistence.
+The integrated patrol check still verifies player-only respawn, preserved time and tunnel pixels, cleared held controls, no score writes, and exact manual reset.
+Controlled-frame checks stop gameplay before restoring scheduling, and completion tests restore only their fixture's original score key.
+After verification, three precisely identified earlier test-score entries were removed without clearing unrelated storage, browser request/focus overrides were restored, and the temporary server was stopped.
+VS Code reported no diagnostics in changed production and test files.
+The supplied portrait was opened locally without modification or copying into the repository.
+It now clearly rejects because insufficient photo-derived ground survives the approved corridor and 55–70% open-space criteria; no threshold was relaxed.
+A seed-123 three-option route-fixture batch took about 610 ms:
+
+| Biome / layout | Reference seconds | Sections | Open cells |
+|---|---|---|---|
+| Desert / vertical | 36.03 | 5 | 64.34% |
+| Underwater / balanced | 25.58 | 5 | 63.74% |
+| Jungle / horizontal | 32.01 | 5 | 64.50% |
+
+Reference routes mix walking and background climbing; charged jumping and drilling remain unrestricted player-selected shortcuts.
+The source portrait rejection and route-fixture thumbnails/live geometry were inspected.
+Historical raw platform and mixed-orientation fixtures are not guaranteed to satisfy the new minimum amount of ground.
+Physical Android/iOS, camera permissions, and simultaneous real touch input remain unverified.
+
+## Historical execution: non-walking routes, readability, and enemy contact
+
+Execution on 2026-10-18: **68/68 unit checks and 15/15 browser system checks passed** in Chromium with HTTP caching disabled.
+The initial new unit baseline passed 62/66 and reproduced absent enemies, walk-only placement acceptance, missing reachability validation, and missing photo treatment.
+ST-19 checks flat floors, the image bottom, slopes, walking falls, elevated alternatives, and all seeded options against the conservative reachability graph.
+ST-20 measures photo darkening/desaturation, restored rendering context, noncolliding halo pixels, unchanged terrain alpha, and matching preview/live artwork.
+ST-21 measures protected clear patrol corridors, repeated reflection, large timesteps, swept contact including reversal endpoints, distinct biome artwork, and patrol-aware option identity.
+The integrated enemy-contact check drives keyboard climbing and drilling through a real terrain region into a patrol using controlled animation frames.
+It verifies return to the selected spawn, preserved elapsed time and tunnel pixels, cleared held controls, no completion or score writes, and exact manual reset of the initial terrain/enemies.
+Native animation checks required browser focus emulation after hidden-tab throttling caused timeouts; no production scheduling changes were needed.
+Eighteen options generated locally from the supplied portrait passed both-direction ten-second walking-only simulations without finishing.
+A measured portrait suggestion batch took 427 ms after row-group route-graph optimization.
+The filtered portrait thumbnails, dark terrain boundaries, and biome enemy artwork were visually inspected.
+The portrait attachment was not modified or stored as a repository fixture.
+VS Code reported no diagnostics in changed production and test files.
+A separate diagnosed limitation remains: four-neighbor grouping fragments diagonal shoulder contours despite successful edge tracing.
+Physical Android/iOS, camera permissions, and simultaneous real touch input remain unverified.
+
+## Historical execution: substantial layouts and opaque outlines
+
+Execution on 2026-10-18: **62/62 unit checks and 14/14 automated browser system checks passed** in Chromium with HTTP caching disabled.
+The new outline/layout tests initially passed 58/60, reproducing the reported failures before implementation.
+ST-07/18 verify opaque tops, sides, undersides, and newly exposed drilled boundaries, with only interiors at 80% opacity.
+ST-16/18 and AT-25 verify complete filling before traversal cuts, distinct orientation masks, large regions without an occupancy cap, and tiny-fragment suppression.
+On the [mixed-orientation fixture](../fixtures/mixed-orientation-photo.svg), horizontal retains 6,447 wide-object cells and no tall-object cells, vertical retains 6,789 tall-object cells and no wide-object cells, and balanced retains both at 23.0% total solid.
+The browser suite generates and plays all three fixture options, retaining the existing reset, biome, climbing, drilling, and charge checks.
+A single-orientation regression verifies that vertical preference does not invent walls when a photo contains only horizontal geometry.
+The three mixed-fixture previews were visually inspected, confirming clearly different filled platform, wall, and balanced silhouettes with opaque boundaries.
+VS Code reported no diagnostics in the changed production and test files.
+The former occupancy and whole-overlay-opacity results below are historical and superseded by this execution.
+Physical Android/iOS, camera permissions, and simultaneous real touch input remain unverified.
+
+## Historical biome, drop, finish-gate, and effects revision
+
+Execution on 2026-10-18: **58/58 unit checks and 13/13 automated browser system checks passed** in Chromium with HTTP caching disabled.
+Tests were updated before implementation, initially reproducing missing drop behavior, finish sizing, suggestion generation, elaborate scenery, and background effects.
+Browser checks verify three distinct choices before play, exact preview/live geometry, exact initial-scene restoration, unobscured edge gates, and animation/reduced-motion behavior without race-time changes.
+Seeded unit checks measure actual tree silhouettes, all biome/layout/edge choices, collision/drilling, safe starts and gates, morphological closing and bounded filling, and the 80% open-space minimum.
+A real jungle run finished in 3.64 seconds and saved one variant-keyed leaderboard entry; test score changes were then cleaned up without altering unrelated entries.
+Three biome thumbnails and the full jungle scene were visually inspected.
+A 390-pixel iframe had a 375-pixel content viewport and document width with three 341-pixel-wide choices, confirming no horizontal overflow.
+VS Code reported no diagnostics in the changed production and test files.
+Physical Android/iOS, camera permissions, and simultaneous real touch input remain unverified.
+
+## Historical execution record
 
 - ST-01: Passed in Chromium at desktop and 390 px viewport widths. Android,
   iOS, and other default browsers were not available for device-level testing.

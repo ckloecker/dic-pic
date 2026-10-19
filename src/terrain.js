@@ -1,4 +1,23 @@
+import { closeAndFill } from "./morphology.js";
+
 export const TERRAIN_OPACITY = 0.8;
+
+export function strongestTerrainEdges(terrain) {
+  const score = (feature) => feature.strength
+    * (terrain.layout === "balanced" || feature.vertical === (terrain.layout === "vertical") ? 1.5 : 1);
+  const selected = [...terrain.features].sort((first, second) => score(second) - score(first)).slice(0, 12);
+  const photoSolid = new Uint8Array(terrain.solid.length);
+  const edgeDirections = new Uint8Array(terrain.solid.length);
+  for (const feature of selected) for (const { along, across } of feature.points) {
+    const x = feature.vertical ? across : along, y = feature.vertical ? along : across;
+    edgeDirections[y * terrain.width + x] |= feature.vertical ? 2 : 1;
+    for (let offset = 0; offset < 4; offset += 1) {
+      const px = x + (feature.vertical ? offset : 0), py = y + (feature.vertical ? 0 : offset);
+      if (px < terrain.width && py < terrain.height) photoSolid[py * terrain.width + px] = 1;
+    }
+  }
+  return { ...terrain, photoSolid, solid: photoSolid.slice(), edgeDirections, connectors: [] };
+}
 
 function percentile(histogram, count, fraction) {
   let cumulative = 0;
@@ -22,9 +41,9 @@ function traceEdges(strength, width, height, vertical) {
   const alongLimit = vertical ? height : width;
   const acrossLimit = vertical ? width : height;
   const valueAt = (along, across) => strength[vertical ? along * width + across : across * width + along];
-  for (let along = vertical ? 14 : 1; along < alongLimit - 1; along += 1) {
+  for (let along = 1; along < alongLimit - 1; along += 1) {
     const candidates = [];
-    for (let across = vertical ? 1 : 14; across < acrossLimit - 2; across += 1) {
+    for (let across = 1; across < acrossLimit - 2; across += 1) {
       const value = valueAt(along, across);
       if (value >= 30 && value >= valueAt(along, across - 1) && value > valueAt(along, across + 1)) {
         candidates.push({ along, across, strength: value });
@@ -69,7 +88,7 @@ function traceEdges(strength, width, height, vertical) {
   return features;
 }
 
-export function generateTerrain(rgba, width, height) {
+export function generateTerrain(rgba, width, height, { layout = "balanced" } = {}) {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
     throw new RangeError("Image dimensions must be positive integers.");
   }
@@ -88,8 +107,12 @@ export function generateTerrain(rgba, width, height) {
     luminance[index] = value;
     histogram[value] += 1;
   }
-  const low = percentile(histogram, count, 0.05);
-  const high = percentile(histogram, count, 0.95);
+  let low = percentile(histogram, count, 0.05);
+  let high = percentile(histogram, count, 0.95);
+  if (high <= low) {
+    low = histogram.findIndex(value=>value>0);
+    high = histogram.findLastIndex(value=>value>0);
+  }
   if (high <= low) throw new NoUsableEdgeError();
   for (let index = 0; index < count; index += 1) {
     luminance[index] = Math.max(0, Math.min(255, (luminance[index] - low) * 255 / (high - low)));
@@ -117,44 +140,78 @@ export function generateTerrain(rgba, width, height) {
     ...traceEdges(strength, width, height, false),
     ...traceEdges(verticalStrength, width, height, true),
   ];
-  const solid = new Uint8Array(count);
-  const outlines = new Uint8Array(count);
-  const surfaceY = new Float32Array(width).fill(height);
-  let occupied = 0;
-  let accepted = 0;
+  if (!platforms.length) throw new NoUsableEdgeError();
+  const contours = new Uint8Array(count);
+  const edgeDirections = new Uint8Array(count);
   for (const platform of platforms) {
-    const additions = new Set();
-    const fullOutline = [];
-    const { vertical } = platform;
-    const minimumLength = Math.max(10, Math.floor((vertical ? height : width) * 0.03));
     for (const { along, across } of platform.points) {
-      let nearby = false;
-      for (let offset = -20; offset <= 20; offset += 1) {
-        const other = across + offset;
-        if (other >= 0 && other < (vertical ? width : height)
-          && outlines[vertical ? along * width + other : other * width + along]) nearby = true;
-      }
-      if (nearby) continue;
-      const gap = !vertical && (along - platform.points[0].along) % 60 >= 48;
-      for (let thickness = 0; thickness < 4 && across + thickness < (vertical ? width : height); thickness += 1) {
-        const index = vertical ? along * width + across + thickness : (across + thickness) * width + along;
-        fullOutline.push(index);
-        if (!gap && !solid[index]) additions.add(index);
-      }
+      const cell = platform.vertical ? along * width + across : across * width + along;
+      contours[cell] = 1;
+      edgeDirections[cell] |= platform.vertical ? 2 : 1;
     }
-    if (additions.size < minimumLength * 4 || occupied + additions.size > Math.floor(count * 0.2)) continue;
-    for (const index of additions) {
-      solid[index] = 1;
-      const x = index % width;
-      surfaceY[x] = Math.min(surfaceY[x], Math.floor(index / width));
-    }
-    for (const index of fullOutline) outlines[index] = 1;
-    occupied += additions.size;
-    accepted += 1;
   }
-  if (accepted === 0) throw new NoUsableEdgeError();
-
-  return { width, height, surfaceY, solid, version: 0 };
+  const filled = closeAndFill(contours, width, height);
+  const visited = new Uint8Array(count);
+  const shapes = [];
+  for (let index = 0; index < count; index += 1) {
+    if (!filled[index] || visited[index]) continue;
+    const cells = [index];
+    visited[index] = 1;
+    let left = width, right = 0, top = height, bottom = 0, horizontalEvidence = 0, verticalEvidence = 0;
+    for (let cursor = 0; cursor < cells.length; cursor += 1) {
+      const cell = cells[cursor];
+      const x = cell % width, y = Math.floor(cell / width);
+      left = Math.min(left, x);
+      right = Math.max(right, x);
+      top = Math.min(top, y);
+      bottom = Math.max(bottom, y);
+      if (edgeDirections[cell] & 1) horizontalEvidence += 1;
+      if (edgeDirections[cell] & 2) verticalEvidence += 1;
+      for (const next of [x > 0 ? cell - 1 : -1, x < width - 1 ? cell + 1 : -1,
+        y > 0 ? cell - width : -1, y < height - 1 ? cell + width : -1,
+        x > 0 && y > 0 ? cell - width - 1 : -1, x < width - 1 && y > 0 ? cell - width + 1 : -1,
+        x > 0 && y < height - 1 ? cell + width - 1 : -1,
+        x < width - 1 && y < height - 1 ? cell + width + 1 : -1]) {
+        if (next >= 0 && filled[next] && !visited[next]) {
+          visited[next] = 1;
+          cells.push(next);
+        }
+      }
+    }
+    const spanX = right - left + 1, spanY = bottom - top + 1;
+    if (Math.max(spanX, spanY) < 12 || cells.length < 12) continue;
+    const orientation = horizontalEvidence > verticalEvidence * 1.5 ? "horizontal"
+      : verticalEvidence > horizontalEvidence * 1.5 ? "vertical" : "balanced";
+    shapes.push({ cells, left, right, top, bottom, orientation });
+  }
+  if (!shapes.length) throw new NoUsableEdgeError();
+  const hasPreferred = shapes.some((shape) => shape.orientation === layout);
+  const solid = new Uint8Array(count);
+  const photoSolid = new Uint8Array(count);
+  for (const shape of shapes) for (const cell of shape.cells) photoSolid[cell] = 1;
+  const surfaceY = new Float32Array(width).fill(height);
+  for (const shape of shapes) {
+    if (layout !== "balanced" && hasPreferred && shape.orientation !== layout && shape.orientation !== "balanced") continue;
+    if (shape.orientation === "horizontal" && shape.bottom - shape.top < 3
+      && shapes.some((other) => other !== shape && other.orientation === "horizontal"
+        && other.bottom - other.top < 3 && other.top < shape.top && shape.top - other.top <= 20
+        && other.left <= shape.right && other.right >= shape.left)) continue;
+    for (const cell of shape.cells) {
+      const x = cell % width, y = Math.floor(cell / width);
+      const horizontal = shape.orientation !== "vertical";
+      // Open contours need thickness; filled regions already carry their full silhouette.
+      const thickness = shape.cells.length < Math.max(shape.right - shape.left, shape.bottom - shape.top) * 3;
+      for (let offset = 0; offset < (thickness ? 4 : 1); offset += 1) {
+        const px = x + (horizontal ? 0 : offset);
+        const py = y + (horizontal ? offset : 0);
+        if (px >= width || py >= height) continue;
+        solid[py * width + px] = 1;
+        surfaceY[px] = Math.min(surfaceY[px], py);
+      }
+    }
+  }
+  return { width, height, surfaceY, solid, version: 0, edgeDirections,
+    photoSolid, features: platforms };
 }
 
 export function openSpaceRatio(terrain) {
