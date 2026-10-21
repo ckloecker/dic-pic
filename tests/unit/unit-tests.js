@@ -846,6 +846,16 @@ if (physicsApi) {
     assert(terrain.solid[tunnelIndex] === 0, "tunnel did not persist");
   });
 
+  test("REQ-MOV-03: horizontal drilling while walking preserves the supporting floor", () => {
+    for (const [move, x, supportX] of [[-1, 40, 42], [1, 20, 24]]) {
+      const terrain = flatTerrain(80, 60, 40);
+      const player = physicsApi.createPlayer(x, 31);
+      physicsApi.stepPlayer(player, { move, drill: true }, terrain, 0.05);
+      assert(terrain.solid[40 * terrain.width + supportX] === 1, `horizontal drill ${move} removed terrain below the player's feet`);
+      assert(player.y === 31 && player.grounded, `horizontal drilling ${move} made the player sink`);
+    }
+  });
+
   test("REQ-MOV-07: charges work exactly three cells above floor but not beyond", () => {
     const terrain = flatTerrain(80, 80, 60);
     for (const [gap, allowed] of [[0, true], [2.9, true], [3, true], [3.1, false]]) {
@@ -943,7 +953,7 @@ if (physicsApi) {
     }
   });
 
-  test("REQ-MOV-02/07: rising jumps are not snapped or recharged; boundaries are not walls", () => {
+  test("REQ-MOV-02/07: rising jumps are not snapped or recharged; image side borders are jumpable", () => {
     const terrain = flatTerrain(100, 100, 70);
     const player = physicsApi.createPlayer(10, 61);
     physicsApi.stepPlayer(player, { jumpPressed: true, jumpReleased: true }, terrain, 0.01);
@@ -951,11 +961,26 @@ if (physicsApi) {
     const vy = player.vy;
     physicsApi.stepPlayer(player, { jumpPressed: true, jumpReleased: true }, terrain, 0.01);
     assert(player.y < y && player.vy > vy && !player.charging, "rising jump snapped or double-jumped");
-    for (const x of [0, 94]) {
-      const edge = physicsApi.createPlayer(x, 10);
-      physicsApi.stepPlayer(edge, { jumpPressed: true, jumpReleased: true }, terrain, 0.01);
-      assert(edge.vy >= 0 && !edge.charging, "world boundary granted a wall jump");
+    for (const [side, away] of [[-1, 1], [1, -1]]) {
+      for (const [gap, canCharge] of [[0, true], [3, true], [3.1, false]]) {
+        const x = side < 0 ? gap : terrain.width - 6 - gap;
+        const edge = physicsApi.createPlayer(x, 10);
+        physicsApi.stepPlayer(edge, { jumpPressed: true, jumpHeld: true }, terrain, 0);
+        assert(edge.charging === canCharge, `incorrect image-border tolerance on side ${side}, gap ${gap}`);
+        physicsApi.stepPlayer(edge, { move: -away, jumpReleased: true }, terrain, 0.01);
+        assert((edge.vy < 0) === canCharge, `incorrect image-border launch on side ${side}, gap ${gap}`);
+        if (canCharge) assert(edge.vx === away * 80, "image side border did not launch away");
+        else assert(edge.vx !== away * 80, "distant image border granted a wall jump");
+      }
     }
+    const noTerrain = flatTerrain(100, 100, 100);
+    const ceiling = physicsApi.createPlayer(10, 0);
+    physicsApi.stepPlayer(ceiling, { jumpPressed: true, jumpReleased: true }, noTerrain, 0.01);
+    assert(!ceiling.charging && ceiling.vy > 0, "ceiling granted a wall jump");
+    const bottom = physicsApi.createPlayer(10, 91);
+    physicsApi.stepPlayer(bottom, { jumpPressed: true, jumpHeld: true }, noTerrain, 0);
+    physicsApi.stepPlayer(bottom, { jumpReleased: true }, noTerrain, 0.01);
+    assert(bottom.vy < 0 && bottom.vx === 0, "image bottom did not remain a floor rather than a wall");
   });
 }
 

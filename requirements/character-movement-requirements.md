@@ -23,15 +23,12 @@ While background climbing, pressing either jump control shall drop immediately i
 
 ## REQ-MOV-02: Wall Jump
 
-The character shall be able to charge and jump from floors and either side
-of walls. Execution occurs when the jump control is released within three
-terrain cells of a floor or wall (REQ-MOV-07). A wall jump shall launch upward
-and away from the wall at normal horizontal movement speed, using the same
-charge duration and vertical height range as a floor jump. Gravity shall
-continue while charging beside a wall; charging shall not hold the character
-vertically. Outside the surface-distance tolerance, release shall cancel
-without launching, even during contact grace. There shall be no free
-additional airborne jumps.
+The character shall be able to charge and jump from floors, either side of terrain walls, and either vertical image side border.
+Execution occurs when the jump control is released within three terrain cells of a floor or wall (REQ-MOV-07).
+A wall jump shall launch upward and away from the wall at normal horizontal movement speed, using the same charge duration and vertical height range as a floor jump.
+Gravity shall continue while charging beside a wall; charging shall not hold the character vertically.
+Outside the surface-distance tolerance, release shall cancel without launching, even during contact grace.
+There shall be no free additional airborne jumps.
 While background climbing, the jump control drops instead, as specified by REQ-MOV-10.
 While actively excavating, horizontal travel uses the limit in REQ-MOV-03.
 
@@ -40,6 +37,7 @@ While actively excavating, horizontal travel uses the limit in REQ-MOV-03.
 Holding Return or the touch DRILL control shall operate a visible directional drill, not a surrounding bubble.
 The drill shall cut a narrow tunnel in the pressed direction, including diagonally, upward while climbing, and downward while standing.
 With no direction pressed it shall drill in the character's horizontal facing direction.
+When drilling horizontally while walking, the tunnel shall not excavate cells below the player's feet or remove the supporting floor.
 Excavated terrain shall remain removed for the current run, including terrain supporting the finish gate.
 While the drill is actively excavating intact terrain, normal horizontal movement shall be limited to background-climbing speed, twenty terrain cells per second.
 Holding the drill in already-open space shall retain normal eighty-cell-per-second horizontal movement.
@@ -94,10 +92,10 @@ the three-cell distance. Jump presses shall be buffered for 150 milliseconds
 before contact, allowing a still-held control to begin charging on arrival;
 a release outside tolerance shall cancel rather than queue a later launch.
 
-Walking shall follow inclines and declines, including descending floor
-snapping within three cells, without intermittent charge loss. Floor snapping
-shall never pull a rising jump back onto the floor. Walls must be actual
-terrain; image boundaries shall not grant wall jumps.
+Walking shall follow inclines and declines, including descending floor snapping within three cells, without intermittent charge loss.
+Floor snapping shall never pull a rising jump back onto the floor.
+Terrain walls shall be actual terrain, while the left and right image borders shall also grant wall contact and wall jumps.
+The top image boundary remains the ceiling specified by REQ-MOV-06, and the bottom remains the floor specified by REQ-MOV-08; neither shall grant wall jumps.
 
 ## REQ-MOV-08: Solid Image Bottom
 

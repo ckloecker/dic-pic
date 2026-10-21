@@ -104,6 +104,11 @@ function surfaceContact(player, terrain) {
   let nearest = Infinity;
   for (const side of [-1, 1]) {
     const edge = side < 0 ? player.x : player.x + player.width;
+    const boundaryDistance = side < 0 ? edge : terrain.width - edge;
+    if (boundaryDistance >= 0 && boundaryDistance <= CONTACT_DISTANCE && boundaryDistance < nearest) {
+      nearest = boundaryDistance;
+      wall = side;
+    }
     const first = side < 0 ? Math.floor(edge) - 1 : Math.ceil(edge);
     for (let offset = 0; offset <= CONTACT_DISTANCE; offset += 1) {
       const x = first + side * offset;
@@ -175,6 +180,7 @@ function drillTunnel(player, terrain, lookAhead = 0, probe = false) {
       const dy = y + 0.5 - centerY;
       const along = dx * player.drillX + dy * player.drillY;
       const across = -dx * player.drillY + dy * player.drillX;
+      if (Math.abs(player.drillY) < 1e-9 && y >= Math.ceil(player.y + player.height)) continue;
       if (along < 0 || along > DRILL_REACH || Math.abs(across) > halfWidth) continue;
       if (x >= 0 && x < terrain.width && y >= 0 && y < terrain.height) {
         const index = y * terrain.width + x;

@@ -132,11 +132,12 @@ player state. `stepPlayer(player, input, terrain, dt)` applies horizontal
 movement, gravity, charged floor/wall jump input, collision resolution, and drilling.
 `input` has `move` (-1, 0, or 1), `jumpPressed`, `jumpReleased`, `jumpHeld`,
 and `drill`, plus vertical directional input `moveY`. The player footprint shall
-be 6 by 9 cells. A shared contact probe shall find floor/wall terrain up to
-3 cells away. Floor probes and downward snapping shall run only when not
-rising. Side probes shall exclude the foot boundary to avoid treating floor
-steps as walls. Downward snapping and upward stepping shall run per half-cell
-horizontal substep so slopes remain supported.
+be 6 by 9 cells.
+A shared contact probe shall find floor/wall terrain up to 3 cells away.
+Floor probes and downward snapping shall run only when not rising.
+Side probes shall exclude the foot boundary to avoid treating floor steps as walls, and shall treat the left and right image borders as virtual walls without adding terrain cells.
+The top and bottom image boundaries shall remain a ceiling and floor, not wall-jump surfaces.
+Downward snapping and upward stepping shall run per half-cell horizontal substep so slopes remain supported.
 Pressing near a surface begins charging; release while currently near one
 launches. Wall release shall set horizontal velocity to 80 cells/second away
 from the wall for the launch frame; subsequent normal directional input
@@ -168,6 +169,7 @@ The bottom participates in floor probes and snapping but never in wall probes or
 The drill direction is normalized from directional input, defaulting to horizontal facing.
 A rectangular cutter extends 10 cells from the player center along that direction.
 Its transverse half-width covers the projected player footprint plus half a cell, producing a passable tunnel rather than a surrounding excavation.
+For horizontal drilling, cells wholly below the player's feet shall remain solid so walking drill travel does not remove the supporting floor.
 The cutter runs before collision checks at each half-cell movement substep and while stationary.
 Probe the current cutter and its next-frame reach before excavation so rasterization cannot alternate normal and slow speeds at high frame rates.
 Active excavation limits horizontal normal-mode movement to twenty cells per second, while an empty cutter retains eighty.
