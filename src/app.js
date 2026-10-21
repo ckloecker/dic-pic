@@ -558,13 +558,21 @@ document.querySelector("#again-button").addEventListener("click", goToSetup);
 document.querySelector("#reset-button").addEventListener("click", restartRun);
 document.querySelector("#replay-button").addEventListener("click", restartRun);
 
-feedbackSeverity.addEventListener("change", () => {
+const buildBranch = document.querySelector('meta[name="build-branch"]').content || "Not injected";
+const buildCommit = document.querySelector('meta[name="build-commit"]').content || "Not injected";
+document.querySelector("#feedback-version").textContent = `Branch: ${buildBranch}; commit: ${buildCommit}.`;
+
+function updateFeedbackLinks() {
   feedbackPanel.querySelectorAll("[data-feedback-category]").forEach((link) => {
     const url = new URL(link.href);
     url.searchParams.set("severity", feedbackSeverity.value);
+    url.searchParams.set("branch", buildBranch);
+    url.searchParams.set("commit", buildCommit);
     link.href = url.href;
   });
-});
+}
+updateFeedbackLinks();
+feedbackSeverity.addEventListener("change", updateFeedbackLinks);
 feedbackPanel.addEventListener("focusin", clearControls);
 
 function jumpIsHeld() {

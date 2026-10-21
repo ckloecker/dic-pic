@@ -29,6 +29,16 @@ body:
       description: Describe the problem, requested improvement, or general feedback.
     validations:
       required: true
+  - type: input
+    id: branch
+    attributes:
+      label: Deployed branch
+      description: Automatically supplied by the game; Not injected means the copy was not version-stamped.
+  - type: input
+    id: commit
+    attributes:
+      label: Deployed commit
+      description: Full commit SHA of the tested game, automatically supplied when deployed.
   - type: textarea
     id: reproduction
     attributes:

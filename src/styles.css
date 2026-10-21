@@ -665,11 +665,18 @@ kbd {
   font-size: 20px;
 }
 
-#feedback-help {
+#feedback-help,
+#feedback-version {
   margin: 0;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.6;
+}
+
+#feedback-version {
+  margin-top: 10px;
+  overflow-wrap: anywhere;
+  font-family: var(--mono);
 }
 
 #feedback-severity {

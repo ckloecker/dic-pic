@@ -48,6 +48,10 @@ REQ-SYS-12 assigns persistent feedback controls and category/severity URL constr
 The controls link to `.github/ISSUE_TEMPLATE/feedback.yml` through GitHub's new-issue page for `ckloecker/dic-pic`.
 GitHub authenticates the submitter, records their account as issue author, and stores the submitted feedback in repository issues.
 The app does not call GitHub's API or include credentials, photos, names, or scores in feedback URLs.
+REQ-SYS-13 assigns deployment to a GitHub Actions workflow triggered only by pushes to `develop`.
+The build stages `index.html` and `src/`, then stamps the triggering branch and commit into HTML metadata before uploading the Pages artifact.
+REQ-SYS-12 reads these values from the current document, displays them in the feedback section, and prefills matching GitHub issue-form text fields.
+Unstamped local documents visibly report that version metadata was not injected.
 
 ## Approved random-option extension
 

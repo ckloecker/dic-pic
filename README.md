@@ -47,13 +47,19 @@ available as a fallback.
 
 ## GitHub Pages and team feedback
 
-Publish the repository root to GitHub Pages, not the `src/` directory.
+In repository **Settings > Pages**, select **GitHub Actions** as the build and deployment source.
+The [Pages workflow](./.github/workflows/pages.yml) publishes automatically on pushes to `develop` only.
+Other branches do not replace the site.
+If the `github-pages` environment restricts deployment branches, allow `develop` in its protection settings.
+The workflow stages the root entry page and runtime assets, then injects the deployed branch and full commit SHA before publishing.
 The root [entry page](./index.html) uses relative asset paths, so it also works under a repository URL such as `https://ckloecker.github.io/dic-pic/`.
-No build, backend, or GitHub token is required.
+No dependency installation, backend, or personal GitHub token is required.
 
 The game's feedback section offers **Bug report**, **Feature request**, and **General feedback** buttons.
 Choose **Low**, **Medium**, **High**, or **Critical** severity for any category, then use its button to open the GitHub issue form in a new tab.
-Review the prefilled category and severity, write the feedback, and submit while signed in to GitHub.
+Review the prefilled category, severity, deployed branch, and full commit SHA, write the feedback, and submit while signed in to GitHub.
+The feedback section also displays the deployed branch and commit.
+Unstamped local copies explicitly display and submit `Not injected` instead of guessing the tested version.
 GitHub stores the feedback as an issue attributed to the submitter's GitHub account.
 The game does not automatically attach photos, runner names, or scores.
 Feedback is public in a public repository, and a private repository requires appropriate access.
@@ -62,6 +68,7 @@ Keep Issues enabled in `ckloecker/dic-pic` and merge the [feedback issue form](.
 GitHub loads issue forms from the default branch, regardless of which branch supplies the Pages site.
 Category and severity are recorded in the issue body rather than relying on label permissions.
 Maintainers can label and triage the issues for the next development iteration.
+The live GitHub form must include the branch and commit fields from the latest template to retain the new version information.
 
 ## Play
 

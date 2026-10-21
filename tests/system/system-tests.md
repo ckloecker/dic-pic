@@ -39,6 +39,20 @@ Completion checks temporarily write only their exact fixture score key and resto
 | ST-25 | REQ-LVL-01/03/05/07/08/09/11/12/16 | Generate three choices for the portrait, sparse horizontal/vertical edges, disconnected platforms, dense clutter, and older sparse fixtures; also upload a uniform image. | Edge-bearing sources use route repair and strongest-edge selection rather than density rejection; final replays remain safe and no-drill; only the uniform source rejects for missing visible edges. |
 | ST-26 | REQ-SYS-12 | Select each severity and inspect all three category links; use the controls by keyboard during a run; inspect the GitHub form. | All twelve category/severity combinations prefill the repository form, no private game data is included, feedback remains available at setup/play/completion, and keyboard input does not affect gameplay. |
 | ST-27 | REQ-SYS-12 | After merging the issue form into the default branch, open each category from the deployed site and review the form while signed in. | GitHub shows the selected category and severity, accepts written feedback, and records the signed-in GitHub user as author on submission. |
+| ST-28 | REQ-SYS-12/13 | Push to `develop` with Pages configured for GitHub Actions; inspect the published version and all feedback links, then compare with an unstamped local copy. | Only `develop` triggers deployment; the game displays and submits the exact branch and full triggering SHA, while local copies explicitly report Not injected. |
+
+## Deployed feedback version verification
+
+Execution on 2026-10-21 passed **6/6 deployment script integration tests** and **22/22 browser system checks** with HTTP caching disabled.
+The injection tests initially failed because the script did not exist, and the browser tests reproduced missing HTML metadata and version display.
+Integration tests cover exact branch/full SHA, HTML escaping including replacement-string metacharacters, unchanged source HTML, missing branch, missing or invalid SHA, and missing HTML markers.
+Browser checks cover local Not injected values and a separately stamped document across all twelve category/severity combinations.
+A staged artifact under a project-style URL prefix displayed and submitted `develop` and the synthetic full SHA `0123456789abcdef0123456789abcdef01234567`.
+The full SHA wrapped without horizontal overflow at a 320-pixel viewport.
+Workflow YAML checks confirmed the develop-only push trigger, GitHub event metadata, static artifact path, and scoped job permissions.
+The issue-form YAML includes branch and commit text inputs.
+VS Code reported no diagnostics in changed implementation, workflow, form, or test files.
+The GitHub-hosted workflow and updated form remain post-deployment checks under ST-27/28; no deployment or issue submission was performed locally.
 
 ## Root hosting and GitHub feedback verification
 

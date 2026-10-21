@@ -135,7 +135,13 @@ test("REQ-SYS-12: every category and severity opens a private-data-free GitHub f
       assert(url.searchParams.get("template") === "feedback.yml", "feedback does not select the issue form");
       assert(url.searchParams.get("category") === link.textContent.trim(), "feedback category was not prefilled");
       assert(url.searchParams.get("severity") === value, "selected severity was not prefilled");
-      assert(JSON.stringify([...url.searchParams.keys()].sort()) === JSON.stringify(["category", "severity", "template"]),
+      const branch = find('meta[name="build-branch"]').content || "Not injected";
+      const commit = find('meta[name="build-commit"]').content || "Not injected";
+      assert(url.searchParams.get("branch") === branch && url.searchParams.get("commit") === commit,
+        "feedback does not identify its deployed branch and commit");
+      assert(find("#feedback-version").textContent.includes(branch)
+        && find("#feedback-version").textContent.includes(commit), "feedback version is not visible");
+      assert(JSON.stringify([...url.searchParams.keys()].sort()) === JSON.stringify(["branch", "category", "commit", "severity", "template"]),
         "feedback includes unexpected data");
       assert(link.target === "_blank" && link.relList.contains("noopener") && link.relList.contains("noreferrer"),
         "feedback does not open a separate protected tab");
@@ -146,11 +152,49 @@ test("REQ-SYS-12: every category and severity opens a private-data-free GitHub f
   const response = await fetch("../../.github/ISSUE_TEMPLATE/feedback.yml", { cache: "no-store" });
   assert(response.ok, "GitHub feedback issue form is missing");
   const form = await response.text();
-  for (const id of ["category", "severity", "feedback", "reproduction"]) {
+  for (const id of ["category", "severity", "branch", "commit", "feedback", "reproduction"]) {
     assert(form.includes(`id: ${id}`), `GitHub form is missing ${id}`);
   }
-  assert((form.match(/type: input/g) || []).length === 2, "prefilled fields must be GitHub text inputs");
+  assert((form.match(/type: input/g) || []).length === 4, "prefilled fields must be GitHub text inputs");
   assert((form.match(/required: true/g) || []).length === 3, "category, severity, and feedback must be required");
+});
+
+test("REQ-SYS-12/13: injected metadata survives every feedback category and severity", async () => {
+  const rootUrl = new URL("../../", location.href);
+  const response = await fetch(rootUrl, { cache: "no-store" });
+  const branch = 'feature/a&b"<tag>';
+  const commit = "0123456789abcdef0123456789abcdef01234567";
+  const html = (await response.text())
+    .replace(/<meta name="build-branch" content="[^"]*">/, '<meta name="build-branch" content="feature/a&amp;b&quot;&lt;tag&gt;">')
+    .replace(/<meta name="build-commit" content="[^"]*">/, `<meta name="build-commit" content="${commit}">`)
+    .replace("<head>", `<head><base href="${rootUrl.href}">`);
+  const preview = document.createElement("iframe");
+  preview.title = "Injected build metadata test";
+  try {
+    const loaded = new Promise(resolve => preview.addEventListener("load", resolve, { once: true }));
+    preview.srcdoc = html;
+    document.body.append(preview);
+    await loaded;
+    const previewDoc = preview.contentDocument;
+    const version = previewDoc.querySelector("#feedback-version");
+    assert(version && version.textContent.includes(branch) && version.textContent.includes(commit),
+      "injected version was not displayed exactly");
+    const severity = previewDoc.querySelector("#feedback-severity");
+    for (const value of ["Low", "Medium", "High", "Critical"]) {
+      severity.value = value;
+      severity.dispatchEvent(new preview.contentWindow.Event("change", { bubbles: true }));
+      for (const link of previewDoc.querySelectorAll("[data-feedback-category]")) {
+        const url = new URL(link.href);
+        assert(url.searchParams.get("branch") === branch && url.searchParams.get("commit") === commit,
+          "feedback lost or corrupted injected build metadata");
+        assert(url.searchParams.get("severity") === value
+          && url.searchParams.get("category") === link.dataset.feedbackCategory,
+          "version injection changed category or severity");
+      }
+    }
+  } finally {
+    preview.remove();
+  }
 });
 
 test("REQ-SYS-05 / REQ-LVL-05: invalid names and edgeless images cannot start", async () => {

@@ -85,3 +85,16 @@ The team member shall review and submit the issue while signed in to GitHub, whi
 The UI shall explain that submission happens on GitHub and that feedback visibility follows repository visibility.
 Feedback controls shall support keyboard interaction without triggering game movement, drilling, or jumping.
 The game shall not embed GitHub credentials or automatically include the photo, player name, or scores in feedback.
+Deployed feedback links shall also prefill the source branch and full commit SHA of the deployed game.
+The feedback UI shall display this version metadata and preserve it when category or severity changes.
+Unstamped local copies shall explicitly identify their version as not injected rather than guessing a branch or commit.
+
+## REQ-SYS-13: Versioned Pages Deployment
+
+Status: Approved.
+
+Pushes to `develop` shall deploy the game to the repository's single GitHub Pages site through GitHub Actions.
+Other branches shall not trigger this deployment.
+The deployment shall inject the triggering source branch and full commit SHA into the published entry page.
+The published artifact shall contain only the game entry page and runtime assets, without repository credentials or development files.
+Missing or invalid deployment metadata shall fail the build rather than publish an unidentified version.

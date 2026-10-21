@@ -7,6 +7,20 @@
 - [Detailed design](../design/detailed/game-components.md) specifies terrain
   detection, collision, charged jumps, background climbing, directional tunnel drilling, run lifecycle, root hosting, and GitHub feedback.
 
+## Approved deployed feedback version revision
+
+The user approved deployment-time branch/commit injection and automatic Pages deployment from `develop` only.
+REQ-SYS-12 now includes visible and prefilled deployed-version metadata, and REQ-SYS-13 specifies develop-only stamped deployment.
+The [architecture](../design/system/game-architecture.md#root-hosting-and-github-feedback) and [detailed design](../design/detailed/game-components.md#deployment-version-injection) allocate HTML stamping, browser metadata consumption, issue fields, and the Pages pipeline.
+The [workflow](../.github/workflows/pages.yml) stages runtime files and calls the [stamping script](../scripts/stamp-build.mjs).
+The [app](../src/app.js) reads the current document's metadata and adds it to all category/severity links, while the [issue form](../.github/ISSUE_TEMPLATE/feedback.yml) accepts branch and commit fields.
+Before implementation, the [integration tests](../tests/integration/build-metadata.test.mjs) failed because the stamping script was missing and the [browser tests](../tests/system/browser-tests.js) reproduced absent metadata and version display.
+Verification on 2026-10-21 passed **6/6 deployment integration tests** and **22/22 browser system checks**.
+The staged artifact displayed the exact synthetic develop/SHA pair and preserved it in all feedback categories after severity changes under a path prefix, with no horizontal overflow at 320 pixels.
+Workflow and issue-form YAML checks verified the develop-only trigger, event metadata, artifact path, job permissions, and branch/commit fields.
+VS Code reported no diagnostics in the changed implementation, workflow, form, or test files.
+Post-deployment ST-27/28 and AT-32 require Pages configuration and the updated issue template on the default branch.
+
 ## Approved root hosting and GitHub feedback revision
 
 The user approved root-level hosting and GitHub issue feedback with Bug report, Feature request, and General feedback categories and Low, Medium, High, and Critical severity for every category.
@@ -75,7 +89,8 @@ Physical mobile, camera, and simultaneous touch verification remain outstanding.
 | REQ-SYS-09 | [Solid bottom](../src/physics.js) supersedes bottom-edge respawning; [game loop](../src/app.js) no longer triggers it | Unit bottom landing/walking/jumping and excavated-bottom tests; browser drill-down test confirms no respawn. |
 | REQ-SYS-10 | [Enemy contact](../src/enemies.js), [player-only respawn](../src/run.js), [contact priority and control clearing](../src/app.js) | Unit swept/reversal contact and preservation of terrain/time/enemy state; browser real contact, no score writes, held-input clearing, and manual reset; ST-21/AT-28. |
 | REQ-SYS-11 | [Root entry page](../index.html), [root browser runner](../tests/system/runner.html); [root hosting design](../design/detailed/game-components.md#root-entry-point-and-feedback-indexhtml-srcappjs) | Browser root setup, module/style paths, live CSS, and root-runner checks; ST-01/AT-01. |
-| REQ-SYS-12 | [Feedback UI](../index.html), [severity and input isolation](../src/app.js), [issue form](../.github/ISSUE_TEMPLATE/feedback.yml); [feedback design](../design/detailed/game-components.md#root-entry-point-and-feedback-indexhtml-srcappjs) | Browser twelve category/severity URLs, form field contracts, no private parameters, keyboard isolation, and setup/play/completion availability; ST-26/27, AT-31. |
+| REQ-SYS-12 | [Feedback UI](../index.html), [severity, version metadata, and input isolation](../src/app.js), [issue form](../.github/ISSUE_TEMPLATE/feedback.yml); [feedback design](../design/detailed/game-components.md#root-entry-point-and-feedback-indexhtml-srcappjs) | Browser twelve category/severity URLs, injected and local version values, form field contracts, no private parameters, keyboard isolation, and setup/play/completion availability; ST-26/27/28, AT-31/32. |
+| REQ-SYS-13 | [Pages workflow](../.github/workflows/pages.yml), [HTML stamping](../scripts/stamp-build.mjs), [metadata consumers](../src/app.js); [deployment design](../design/detailed/game-components.md#deployment-version-injection) | Six script integration tests, injected-document browser checks, and ST-28/AT-32 version/deployment acceptance checks. |
 | REQ-LVL-01 | [Photo-shape analysis and strongest-edge selection](../src/terrain.js), [clearance and adaptive support](../src/route.js), [final option validation](../src/level.js) | Unit sparse/busy/disconnected source acceptance without density filler, safe final replay, and protected clearance; ST-02/22/25, AT-02/25/29/30. |
 | REQ-LVL-02 | [Terrain renderer](../src/app.js) | ST-06: original retro-style overlays visually inspected. |
 | REQ-LVL-03 | [Normalized Sobel detection](../src/terrain.js) | Unit strong/low-contrast edge tests. |

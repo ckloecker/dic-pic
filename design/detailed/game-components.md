@@ -13,7 +13,7 @@ Verification covers the supplied portrait and sparse, disconnected, busy, horizo
 
 ## Requirements covered
 
-This design elaborates REQ-SYS-01 through REQ-SYS-06, REQ-SYS-08/09/10/11/12, REQ-LVL-01 through REQ-LVL-16, REQ-CHR-01/02/03/04, and REQ-MOV-01 through REQ-MOV-10.
+This design elaborates REQ-SYS-01 through REQ-SYS-06, REQ-SYS-08/09/10/11/12/13, REQ-LVL-01 through REQ-LVL-16, REQ-CHR-01/02/03/04, and REQ-MOV-01 through REQ-MOV-10.
 
 ## Terrain (`src/terrain.js`)
 
@@ -248,6 +248,20 @@ Text inputs in the GitHub form support URL prefilling without relying on dropdow
 The form requires category, severity, and written feedback and offers optional reproduction steps.
 Links open a new tab with `noopener noreferrer`; the UI explains GitHub submission, author attribution, repository visibility, and the absence of automatic photo or score sharing.
 Focusing feedback controls clears held game inputs, and keydown events originating within the section do not enter the game input handler.
+
+### Deployment version injection
+
+REQ-SYS-13 uses `.github/workflows/pages.yml` for pushes to `develop` only.
+The workflow stages only `index.html` and `src/` in `_site/` and invokes `scripts/stamp-build.mjs` with the staged HTML path.
+The script requires a nonempty `GITHUB_REF_NAME` and a forty-hex-character `GITHUB_SHA`, escapes HTML attribute values, and replaces the empty `build-branch` and `build-commit` meta tags.
+Missing metadata or missing injection markers fail explicitly before writing the staged file.
+The source entry point remains unstamped.
+The Pages deployment job uses the uploaded static artifact with Pages and OIDC write permissions, while the build job has read-only repository permissions.
+REQ-SYS-12 adds `branch` and `commit` query parameters to all feedback links at startup and on severity changes, using the current document's injected metadata.
+The feedback section displays the full branch and commit; unstamped local copies display and submit `Not injected` for each missing value.
+The issue form adds optional branch and commit text inputs so existing links without version metadata remain usable.
+Deployment script integration tests exercise escaping, full commit preservation, missing or malformed metadata, and missing markers.
+Browser tests exercise the unstamped page and a separate injected document, all category/severity combinations, and visible metadata.
 
 ## Verification
 
