@@ -64,7 +64,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -651,6 +652,53 @@ kbd {
   color: var(--orange);
 }
 
+.feedback-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 28px;
+  padding: 24px 0;
+  border-top: 1px solid rgb(233 245 236 / 12%);
+}
+
+.feedback-panel h2 {
+  margin: 0 0 10px;
+  font-size: 20px;
+}
+
+#feedback-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+#feedback-severity {
+  min-height: 43px;
+  padding: 8px 13px;
+  border: 1px solid #58716c;
+  color: var(--paper);
+  background: #20363d;
+}
+
+.feedback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.feedback-actions a {
+  flex: 1 1 130px;
+  padding: 0 12px;
+  text-decoration: none;
+}
+
+.feedback-panel a:focus-visible,
+#feedback-severity:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 3px;
+}
+
 [hidden] {
   display: none !important;
 }
@@ -697,6 +745,11 @@ kbd {
 [data-move-y="1"] { grid-column: 2; grid-row: 2; }
 
 @media (max-width: 760px) {
+  .feedback-panel {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
   .app-shell {
     width: min(100% - 34px, 580px);
   }

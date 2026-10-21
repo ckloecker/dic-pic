@@ -1,0 +1,36 @@
+name: Feedback
+description: Report a bug, request a feature, or share feedback about Photo Runner.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Review the category and severity selected in the game, then describe your feedback.
+        GitHub records your signed-in account as the issue author.
+        Feedback is public if this repository is public.
+        Your photo, runner name, and scores are not included automatically.
+  - type: input
+    id: category
+    attributes:
+      label: Category
+      description: Bug report, Feature request, or General feedback.
+    validations:
+      required: true
+  - type: input
+    id: severity
+    attributes:
+      label: Severity
+      description: Low, Medium, High, or Critical.
+    validations:
+      required: true
+  - type: textarea
+    id: feedback
+    attributes:
+      label: Feedback
+      description: Describe the problem, requested improvement, or general feedback.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce (optional)
+      description: For a bug, include the steps, expected and actual behavior, and browser or device.

@@ -1,12 +1,12 @@
 # Acceptance test cases
 
-Run the game at `http://localhost:8000/src/` in a current desktop browser and, for
-touch behavior, a mobile browser or device. These checks map to the approved
-requirements and are intended to be performed on the integrated application.
+Run the game at `http://localhost:8000/` in a current desktop browser and, for touch behavior, a mobile browser or device.
+These checks map to the approved requirements and are intended to be performed on the integrated application.
 
 | ID | Requirements | Check | Expected result |
 |---|---|---|---|
-| AT-01 | REQ-SYS-01, REQ-SYS-02 | Open the app in a supported browser and resize to a narrow viewport. | Game setup is usable, then the game renders as a responsive 2D platformer. |
+| AT-01 | REQ-SYS-01/02/11 | Open the project root URL in a supported browser, including beneath a repository prefix, and resize to a narrow viewport. | Game setup is usable with working styles and modules, then the game renders as a responsive 2D platformer. |
+| AT-31 | REQ-SYS-12 | During setup, play, and completion, choose a severity and use Bug report, Feature request, or General feedback; review and submit on GitHub after the template is deployed. | Category and severity are prefilled, GitHub identifies the signed-in submitter, and no photo, runner name, or score is automatically attached. |
 | AT-02 | REQ-SYS-03, REQ-LVL-01/03/04/16 | Upload images with sparse or busy visible contours and start a level. | Three playable choices retain useful photo edges and breathing room; density targets do not reject otherwise usable photos. |
 | AT-02b | REQ-LVL-05 | Upload a uniform image without a visible edge. | The game rejects the image and clearly asks for another photo instead of creating an arbitrary floor. |
 | AT-03 | REQ-LVL-04 | Use the camera capture control on a device with a camera; separately deny/cancel camera access and upload a file. | A captured photo can start a level; upload remains usable when capture is denied or unavailable. |

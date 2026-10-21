@@ -1,8 +1,7 @@
 # System test procedures
 
-Run the app from the repository root using `python -m http.server 8000`, then
-open `http://localhost:8000/src/`. Use
-`tests/fixtures/route-photo.svg` as the repeatable playable image input.
+Run the app from the repository root using `python -m http.server 8000`, then open `http://localhost:8000/`.
+Use `tests/fixtures/route-photo.svg` as the repeatable playable image input.
 
 Automated browser procedures are available at
 `http://localhost:8000/tests/system/runner.html`. Keep that tab visible while
@@ -12,7 +11,7 @@ Completion checks temporarily write only their exact fixture score key and resto
 
 | ID | Requirements | Procedure | Expected result |
 |---|---|---|---|
-| ST-01 | REQ-SYS-01 | Open the app in a current browser and at desktop and narrow/mobile viewport sizes. | Setup and play screens render without dependencies and remain usable at both sizes. |
+| ST-01 | REQ-SYS-01/11 | Open the project root URL in a current browser at desktop and narrow/mobile viewport sizes, including a repository-path hosting prefix. | The root URL serves the setup screen with working styles, icon, and modules, and play remains usable at both sizes. |
 | ST-02 | REQ-SYS-03, REQ-LVL-01/03/04/16 | Upload route-capable and sparse fixtures, start a level, and inspect the collision mask. | Both provide three playable choices; photo edges remain visible; density is a preference rather than a rejection gate. |
 | ST-02b | REQ-LVL-05 | Upload a uniform image without visible edges. | Contrast normalization cannot invent a contour; the game rejects the image and asks for another. |
 | ST-03 | REQ-SYS-04 | Leave the player idle, move or charge, then touch the exit flag. | The timer stays at zero until player-driven movement or charging, and stops on actual contact with the flag, not a horizontal crossing at another height. |
@@ -38,6 +37,20 @@ Completion checks temporarily write only their exact fixture score key and resto
 | ST-23 | REQ-LVL-08/16 | Test twelve/eighteen/nineteen-cell supported gaps, missing edge evidence, and sparse-source supplemental shelves. | Longer bridges are allowed; natural-edge bridges retain real anchors; supplemental horizontal platforms need not attach at both ends and remain drillable/resettable without obstructing clearance. |
 | ST-24 | REQ-SYS-06, REQ-LVL-16 | Replay the same selected route to actual completion twice; populate ten faster entries and replay; simulate storage failure. | Exact current attempt alone is outlined/labeled, stable ties retain the older entry, an unranked footer has no place and does not persist, and failed saves remain visible with an explicit error. |
 | ST-25 | REQ-LVL-01/03/05/07/08/09/11/12/16 | Generate three choices for the portrait, sparse horizontal/vertical edges, disconnected platforms, dense clutter, and older sparse fixtures; also upload a uniform image. | Edge-bearing sources use route repair and strongest-edge selection rather than density rejection; final replays remain safe and no-drill; only the uniform source rejects for missing visible edges. |
+| ST-26 | REQ-SYS-12 | Select each severity and inspect all three category links; use the controls by keyboard during a run; inspect the GitHub form. | All twelve category/severity combinations prefill the repository form, no private game data is included, feedback remains available at setup/play/completion, and keyboard input does not affect gameplay. |
+| ST-27 | REQ-SYS-12 | After merging the issue form into the default branch, open each category from the deployed site and review the form while signed in. | GitHub shows the selected category and severity, accepts written feedback, and records the signed-in GitHub user as author on submission. |
+
+## Root hosting and GitHub feedback verification
+
+Execution on 2026-10-21 passed **21/21 browser system checks** at the server root and **21/21** beneath `/dic-pic/`, with HTTP caching disabled.
+The new checks initially reproduced the missing project-root setup and feedback UI before implementation.
+ST-01 verifies the root entry point, relative module/style URLs, loaded styles, and unchanged fixture upload and gameplay behavior.
+ST-26 verifies all twelve category/severity combinations, required issue-form fields, new-tab protections, no extra private query parameters, feedback availability through completion, and keyboard isolation during play.
+The issue form parsed successfully as YAML and its required fields were checked.
+Responsive checks at 1280, 390, and 320 pixels found no horizontal page overflow or feedback buttons outside the viewport.
+The changed HTML, JavaScript, CSS, issue form, and browser tests have no VS Code diagnostics.
+ST-27 remains a post-deployment acceptance check because GitHub must load the issue form from the default branch.
+No GitHub issue was submitted during verification.
 
 ## Current execution: acceptance-first photo repair
 

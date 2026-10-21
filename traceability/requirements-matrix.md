@@ -5,7 +5,20 @@
 - [System architecture](../design/system/game-architecture.md) allocates
   requirements to components.
 - [Detailed design](../design/detailed/game-components.md) specifies terrain
-  detection, collision, charged jumps, background climbing, directional tunnel drilling, and run lifecycle.
+  detection, collision, charged jumps, background climbing, directional tunnel drilling, run lifecycle, root hosting, and GitHub feedback.
+
+## Approved root hosting and GitHub feedback revision
+
+The user approved root-level hosting and GitHub issue feedback with Bug report, Feature request, and General feedback categories and Low, Medium, High, and Critical severity for every category.
+REQ-SYS-11/12 are allocated in the [architecture](../design/system/game-architecture.md#root-hosting-and-github-feedback) and [detailed design](../design/detailed/game-components.md#root-entry-point-and-feedback-indexhtml-srcappjs).
+The [root entry point](../index.html), [feedback controls](../src/app.js), and [GitHub issue form](../.github/ISSUE_TEMPLATE/feedback.yml) implement these requirements without a backend or embedded credentials.
+The [browser checks](../tests/system/browser-tests.js) and ST-01/26/27 and AT-01/31 cover root assets, all twelve category/severity combinations, keyboard isolation, feedback availability, and GitHub author attribution.
+Before implementation, browser checks reproduced the missing root setup and feedback controls.
+Verification on 2026-10-21 passed **21/21 browser system checks** at the server root and **21/21** under `/dic-pic/`, including existing gameplay regressions.
+The issue-form YAML and required fields validated, and responsive checks at 1280, 390, and 320 pixels found no horizontal page overflow.
+The changed implementation and browser tests have no VS Code diagnostics.
+Execution evidence is recorded in the [system procedures](../tests/system/system-tests.md#root-hosting-and-github-feedback-verification).
+GitHub-hosted form prefilling and author attribution require deployment to the default branch and signed-in acceptance verification; local tests do not claim to submit an issue.
 
 ## Current approved acceptance-first revision
 
@@ -52,7 +65,7 @@ Physical mobile, camera, and simultaneous touch verification remain outstanding.
 
 | Requirement | Implementation | Verification |
 |---|---|---|
-| REQ-SYS-01 | [HTML](../src/index.html), [responsive styles](../src/styles.css) | ST-01: desktop browser and narrow-viewport checks; physical Android/iOS and camera validation remain outstanding. |
+| REQ-SYS-01 | [HTML](../index.html), [responsive styles](../src/styles.css) | ST-01: desktop browser and narrow-viewport checks; physical Android/iOS and camera validation remain outstanding. |
 | REQ-SYS-02 | [Renderer](../src/app.js), [physics](../src/physics.js) | ST-01/ST-06: 2D rendering and controls. |
 | REQ-SYS-03 | [Terrain](../src/terrain.js), [reference-route planning](../src/route.js), [photo renderer](../src/app.js) | Unit multi-height/edge and strict seeded route tests; integrated browser route fixture (ST-02/22). |
 | REQ-SYS-04 | [Timer and completion](../src/app.js), [flag contact](../src/run.js) | Browser charge/timer test; unit flag overlap test rejects horizontal-only crossing. |
@@ -61,10 +74,12 @@ Physical mobile, camera, and simultaneous touch verification remain outstanding.
 | REQ-SYS-08 | [Run cloning](../src/run.js), [reset UI and animation cancellation](../src/app.js) | Unit terrain/timer restoration; browser reset checks name, timer, charge, held input, no score write, and exactly one native animation loop across five resets. |
 | REQ-SYS-09 | [Solid bottom](../src/physics.js) supersedes bottom-edge respawning; [game loop](../src/app.js) no longer triggers it | Unit bottom landing/walking/jumping and excavated-bottom tests; browser drill-down test confirms no respawn. |
 | REQ-SYS-10 | [Enemy contact](../src/enemies.js), [player-only respawn](../src/run.js), [contact priority and control clearing](../src/app.js) | Unit swept/reversal contact and preservation of terrain/time/enemy state; browser real contact, no score writes, held-input clearing, and manual reset; ST-21/AT-28. |
+| REQ-SYS-11 | [Root entry page](../index.html), [root browser runner](../tests/system/runner.html); [root hosting design](../design/detailed/game-components.md#root-entry-point-and-feedback-indexhtml-srcappjs) | Browser root setup, module/style paths, live CSS, and root-runner checks; ST-01/AT-01. |
+| REQ-SYS-12 | [Feedback UI](../index.html), [severity and input isolation](../src/app.js), [issue form](../.github/ISSUE_TEMPLATE/feedback.yml); [feedback design](../design/detailed/game-components.md#root-entry-point-and-feedback-indexhtml-srcappjs) | Browser twelve category/severity URLs, form field contracts, no private parameters, keyboard isolation, and setup/play/completion availability; ST-26/27, AT-31. |
 | REQ-LVL-01 | [Photo-shape analysis and strongest-edge selection](../src/terrain.js), [clearance and adaptive support](../src/route.js), [final option validation](../src/level.js) | Unit sparse/busy/disconnected source acceptance without density filler, safe final replay, and protected clearance; ST-02/22/25, AT-02/25/29/30. |
 | REQ-LVL-02 | [Terrain renderer](../src/app.js) | ST-06: original retro-style overlays visually inspected. |
 | REQ-LVL-03 | [Normalized Sobel detection](../src/terrain.js) | Unit strong/low-contrast edge tests. |
-| REQ-LVL-04 | [Upload/camera inputs](../src/index.html), [decoding](../src/app.js) | Automated browser upload tests; physical camera support/denial testing remains outstanding. |
+| REQ-LVL-04 | [Upload/camera inputs](../index.html), [decoding](../src/app.js) | Automated browser upload tests; physical camera support/denial testing remains outstanding. |
 | REQ-LVL-05 | [NoUsableEdgeError and sparse-edge normalization](../src/terrain.js), [progressive repair](../src/level.js), [error UI](../src/app.js) | Unit/browser uniform-image rejection while sparse, busy, horizontal, vertical, and disconnected edge sources remain accepted; ST-25/AT-30. |
 | REQ-LVL-06 | [Live-mask exposure and alpha](../src/scene.js), [compositing](../src/app.js) | Unit alpha 255 for tops, sides, undersides, and newly drilled boundaries, alpha 204 for interiors; browser verifies interior blending; ST-07/18, AT-11/25. |
 | REQ-LVL-07 | [Conservative walking reachability and cloning](../src/run.js), [edge-prioritized route endpoints](../src/route.js), [shared gate renderer](../src/scene.js) | Unit flat/bottom/sloped/falling walking-route rejection, every seeded option, clear distant placement, bounds, and fixed gate; ST-16/19, AT-23/26. |
@@ -72,16 +87,16 @@ Physical mobile, camera, and simultaneous touch verification remain outstanding.
 | REQ-LVL-09 | [Eight-neighbor contours and removal of fixed cuts](../src/terrain.js), [photo-derived route geometry](../src/route.js) | Unit diagonal shoulder retention, no periodic rectangular cuts, real-edge wall jumps, and no invented non-photo filler/walls; ST-11/22, AT-17. |
 | REQ-LVL-10 | [Biome definitions and collidable silhouettes](../src/level.js), [scenery rendering](../src/scene.js) | Seeded tests verify large trees, vines, cacti, bones, coral, kelp, drilling, and safe placement; browser preview/live/reset checks; ST-15/17, AT-22/24. |
 | REQ-LVL-11 | [Local edge-direction evidence](../src/terrain.js), [evidence-weighted route search](../src/route.js), [closing and region filling](../src/morphology.js) | Unit raw mixed-region ratios > 2, direction metadata, diagonal connectivity, single-orientation fallback, and final horizontal/vertical photo routes; ST-16/18/22, AT-17/22/25. |
-| REQ-LVL-12 | [Suggestion generation and identity](../src/level.js), [choice UI and SHA-256 keys](../src/app.js), [thumbnail controls](../src/index.html) | Unit exactly three distinct reproducible options and immutable original geometry; browser verifies pre-play choice gating, preview/live geometry, selected biome, and exact scene restoration; ST-15/AT-23. |
+| REQ-LVL-12 | [Suggestion generation and identity](../src/level.js), [choice UI and SHA-256 keys](../src/app.js), [thumbnail controls](../index.html) | Unit exactly three distinct reproducible options and immutable original geometry; browser verifies pre-play choice gating, preview/live geometry, selected biome, and exact scene restoration; ST-15/AT-23. |
 | REQ-LVL-13 | [Biome effects](../src/scene.js), [layer order and reduced motion](../src/app.js) | Unit checks distinct effects, time-varying motion, and static reduced-motion output; ST-17/AT-24. |
 | REQ-LVL-14 | [Shared filtered photo and terrain halo](../src/scene.js), [live rendering](../src/app.js) | Unit measured darkening/desaturation, context restoration, halo pixels, and unchanged collision; browser interior compositing and preview/live comparisons; ST-20/AT-27. |
 | REQ-LVL-15 | [Clear patrol generation, reflected movement, and swept contact](../src/enemies.js), [biome artwork](../src/scene.js), [option identity](../src/level.js) | Unit two bounded clear patrols, protected margins, repeated/large timesteps, reversal contact, distinct artwork, score identity, and reset; browser idle/live/reset checks; ST-21/AT-28. |
 | REQ-LVL-16 | [Photo-guided planning, horizontal support repair and replay](../src/route.js), [strongest-edge retry and protected scenery](../src/level.js), [route-safe patrols](../src/enemies.js) | Unit diverse photo acceptance, actual no-drill physics/enemy replay, clear safe endpoints, non-walking completion, idle-padding rejection, longer bridges and resettable supplemental supports; browser actual completion and sparse-photo previews/reset; ST-22/23/24/25, AT-29/30. |
 | REQ-CHR-01 | [Character renderer](../src/app.js) | ST-06: original character visually inspected. |
-| REQ-CHR-03 | [SVG player icon](../src/favicon.svg), [favicon declaration](../src/index.html); [detailed favicon design](../design/detailed/game-components.md#favicon-srcfaviconsvg-srcindexhtml) | Browser test loads and decodes the icon before setup and compares every 16-by-16 RGBA pixel with the player artwork; ST-14/AT-21. |
+| REQ-CHR-03 | [SVG player icon](../src/favicon.svg), [favicon declaration](../index.html); [detailed favicon design](../design/detailed/game-components.md#favicon-srcfaviconsvg-indexhtml) | Browser test loads and decodes the icon before setup and compares every 16-by-16 RGBA pixel with the player artwork; ST-14/AT-21. |
 | REQ-CHR-02 | [Player dimensions](../src/physics.js), [scaled renderer](../src/app.js), [flag anchoring](../src/run.js) | Unit verifies 6-by-9 collision dimensions and normal speed; browser sprite bounds and bar-following checks; ST-11/AT-19. |
 | REQ-CHR-04 | [Biome headwear renderer](../src/scene.js), [walking and climbing integration](../src/app.js) | Unit all three headwear images distinct and confined to the six-by-nine footprint; browser preview/live checks across all biomes; ST-15/AT-22. |
-| REQ-MOV-01 | [Input mapping](../src/app.js), [four-way touch controls](../src/index.html) | Browser verifies Space charge/release, W/up background climbing without drilling, and downward drill input; physical simultaneous touch-button testing remains outstanding. |
+| REQ-MOV-01 | [Input mapping](../src/app.js), [four-way touch controls](../index.html) | Browser verifies Space charge/release, W/up background climbing without drilling, and downward drill input; physical simultaneous touch-button testing remains outstanding. |
 | REQ-MOV-02 | [Floor/wall probes and release-to-jump](../src/physics.js) | Unit verifies left/right terrain-wall and image-side-border jumps up/away despite input toward the wall, continued gravity while charging, grounded release, and no surface-free air jumps; ST-12/AT-08. |
 | REQ-MOV-03 | [Active-excavation probe, speed selection, and directional cutter](../src/physics.js), [drill renderer/input](../src/app.js) | Unit verifies 20-cell/s active excavation at 30/60/120 Hz, 80-cell/s open drilling, eight-direction cuts, persistent tunnels, gravity/charge preservation, upward/downward drilling, and horizontal drilling that preserves the supporting floor; ST-05/AT-09. |
 | REQ-MOV-04 | [Normal air movement](../src/physics.js) | Unit verifies normal horizontal airborne speed with and without drilling, with quarter-speed climbing tested separately. |

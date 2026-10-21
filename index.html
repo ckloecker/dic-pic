@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#15242d">
     <title>Photo Runner — dic-pic</title>
-    <link rel="icon" type="image/svg+xml" sizes="any" href="./favicon.svg">
-    <link rel="stylesheet" href="./styles.css">
+    <link rel="icon" type="image/svg+xml" sizes="any" href="./src/favicon.svg">
+    <link rel="stylesheet" href="./src/styles.css">
   </head>
   <body>
     <main class="app-shell">
@@ -134,11 +134,39 @@
         </div>
       </section>
 
+      <section id="feedback-panel" class="feedback-panel" aria-labelledby="feedback-title">
+        <div>
+          <p class="eyebrow">HELP SHAPE THE NEXT ITERATION</p>
+          <h2 id="feedback-title">Share your feedback</h2>
+          <p id="feedback-help">Opens a GitHub form in a new tab.
+            Sign in and submit there; your GitHub username will identify the author.
+            Feedback is public if the repository is public.
+            Your photo, runner name, and scores are not included automatically.</p>
+        </div>
+        <div class="feedback-controls">
+          <label class="field-label" for="feedback-severity">Severity (all categories)</label>
+          <select id="feedback-severity" aria-describedby="feedback-help">
+            <option>Low</option>
+            <option selected>Medium</option>
+            <option>High</option>
+            <option>Critical</option>
+          </select>
+          <div class="feedback-actions" role="group" aria-label="Feedback category">
+            <a class="secondary-button" data-feedback-category="Bug report" target="_blank" rel="noopener noreferrer"
+              href="https://github.com/ckloecker/dic-pic/issues/new?template=feedback.yml&amp;category=Bug+report&amp;severity=Medium">Bug report</a>
+            <a class="secondary-button" data-feedback-category="Feature request" target="_blank" rel="noopener noreferrer"
+              href="https://github.com/ckloecker/dic-pic/issues/new?template=feedback.yml&amp;category=Feature+request&amp;severity=Medium">Feature request</a>
+            <a class="secondary-button" data-feedback-category="General feedback" target="_blank" rel="noopener noreferrer"
+              href="https://github.com/ckloecker/dic-pic/issues/new?template=feedback.yml&amp;category=General+feedback&amp;severity=Medium">General feedback</a>
+          </div>
+        </div>
+      </section>
+
       <footer class="site-footer">
         <span>PHOTO RUNNER <span aria-hidden="true">✦</span> MADE FOR YOUR IMAGINATION</span>
         <span>NO TWO LEVELS ALIKE</span>
       </footer>
     </main>
-    <script type="module" src="./app.js"></script>
+    <script type="module" src="./src/app.js"></script>
   </body>
 </html>

@@ -65,3 +65,23 @@ Enemy contact shall preserve the running timer, drilled terrain, selected option
 The returned character shall have fresh movement state and held controls shall be cleared.
 Enemy contact shall take priority over simultaneous finish contact and shall not record a score.
 Manual reset shall continue to restore terrain, enemy starting positions, controls, and the timer under REQ-SYS-08.
+
+## REQ-SYS-11: Static Root Entry Point
+
+Status: Approved.
+
+The game shall load directly at the project root URL, including when hosted beneath a GitHub Pages repository path.
+The entry page shall load local assets and ES modules using project-relative paths without requiring a build or backend.
+
+## REQ-SYS-12: GitHub Feedback
+
+Status: Approved.
+
+The game shall offer Bug report, Feature request, and General feedback buttons during setup, play, and completion.
+A severity selector shall offer Low, Medium, High, and Critical for every feedback category, initially selecting Medium.
+Each button shall open the repository's GitHub issue form in a new tab with its category and selected severity prefilled.
+The form shall collect written feedback and optional reproduction steps.
+The team member shall review and submit the issue while signed in to GitHub, which shall record their GitHub account as the author.
+The UI shall explain that submission happens on GitHub and that feedback visibility follows repository visibility.
+Feedback controls shall support keyboard interaction without triggering game movement, drilling, or jumping.
+The game shall not embed GitHub credentials or automatically include the photo, player name, or scores in feedback.

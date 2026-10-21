@@ -98,6 +98,61 @@ test("REQ-CHR-03: favicon loads before setup and depicts the player character", 
   assert(!find("#setup-screen").hidden, "favicon check requires game setup");
 });
 
+test("REQ-SYS-11: the project root serves the game with project-relative assets", async () => {
+  const rootUrl = new URL("../../", location.href);
+  const response = await fetch(rootUrl, { cache: "no-store" });
+  assert(response.ok, "project root did not load");
+  const rootDoc = new DOMParser().parseFromString(await response.text(), "text/html");
+  assert(rootDoc.querySelector("#setup-form"), "project root does not serve the game");
+  assert(rootDoc.querySelector('script[type="module"]').getAttribute("src") === "./src/app.js",
+    "root entry point does not load the app through a project-relative URL");
+  assert(rootDoc.querySelector('link[rel="stylesheet"]').getAttribute("href") === "./src/styles.css",
+    "root entry point does not load styles through a project-relative URL");
+  assert(new URL(app.location.href).pathname === rootUrl.pathname, "system runner does not exercise the root entry point");
+  assert(app.getComputedStyle(find(".app-shell")).display === "flex", "root page stylesheet did not load");
+});
+
+test("REQ-SYS-12: every category and severity opens a private-data-free GitHub form", async () => {
+  const panel = find("#feedback-panel");
+  const severity = find("#feedback-severity");
+  assert(panel && severity, "feedback panel or severity selector is missing");
+  const links = [...panel.querySelectorAll("a[data-feedback-category]")];
+  const categories = ["Bug report", "Feature request", "General feedback"];
+  assert(JSON.stringify(links.map(link => link.textContent.trim())) === JSON.stringify(categories),
+    "feedback category buttons do not match the approved categories");
+  assert(severity.value === "Medium", "feedback severity does not initially select Medium");
+  assert(JSON.stringify([...severity.options].map(option => option.value))
+    === JSON.stringify(["Low", "Medium", "High", "Critical"]), "feedback severity options are incorrect");
+  assert(panel.textContent.includes("GitHub") && panel.textContent.includes("public"),
+    "feedback does not explain its GitHub destination and visibility");
+  for (const value of ["Low", "Medium", "High", "Critical"]) {
+    severity.value = value;
+    severity.dispatchEvent(new app.Event("change", { bubbles: true }));
+    for (const link of links) {
+      const url = new URL(link.href);
+      assert(url.origin === "https://github.com" && url.pathname === "/ckloecker/dic-pic/issues/new",
+        "feedback link targets the wrong repository");
+      assert(url.searchParams.get("template") === "feedback.yml", "feedback does not select the issue form");
+      assert(url.searchParams.get("category") === link.textContent.trim(), "feedback category was not prefilled");
+      assert(url.searchParams.get("severity") === value, "selected severity was not prefilled");
+      assert(JSON.stringify([...url.searchParams.keys()].sort()) === JSON.stringify(["category", "severity", "template"]),
+        "feedback includes unexpected data");
+      assert(link.target === "_blank" && link.relList.contains("noopener") && link.relList.contains("noreferrer"),
+        "feedback does not open a separate protected tab");
+    }
+  }
+  severity.value = "Medium";
+  severity.dispatchEvent(new app.Event("change", { bubbles: true }));
+  const response = await fetch("../../.github/ISSUE_TEMPLATE/feedback.yml", { cache: "no-store" });
+  assert(response.ok, "GitHub feedback issue form is missing");
+  const form = await response.text();
+  for (const id of ["category", "severity", "feedback", "reproduction"]) {
+    assert(form.includes(`id: ${id}`), `GitHub form is missing ${id}`);
+  }
+  assert((form.match(/type: input/g) || []).length === 2, "prefilled fields must be GitHub text inputs");
+  assert((form.match(/required: true/g) || []).length === 3, "category, severity, and feedback must be required");
+});
+
 test("REQ-SYS-05 / REQ-LVL-05: invalid names and edgeless images cannot start", async () => {
   name("Ada 2");
   assert(find("#start-button").disabled, "invalid name was accepted");
@@ -139,7 +194,7 @@ test("REQ-LVL-06/08: render photo-aligned platform interiors at 80% opacity", as
   await delay(100);
   assert(find("#timer").textContent === "0.00", `idle timer started: ${find("#timer").textContent}`);
   const image = new app.Image();
-  image.src = "../tests/fixtures/route-photo.svg";
+  image.src = new URL("../fixtures/route-photo.svg", location.href).href;
   await image.decode();
   const source = doc.createElement("canvas");
   source.width = 320;
@@ -216,6 +271,7 @@ test("REQ-MOV-01/05 / REQ-SYS-04: Space charges, character bar fills, release la
   assert(find("#charge-meter").value === 0, "launch did not clear meter");
   assert(countColor(255, 209, 102) === 0, "launch did not clear character bar");
 });
+
 test("REQ-SYS-08: reset restores the scene, clears held input, and records no score", async () => {
   const before = JSON.stringify(app.localStorage);
   key("keydown", "d");
@@ -576,6 +632,52 @@ test("REQ-LVL-15 / REQ-SYS-10: live enemy contact keeps time and tunnels, clears
   }
 });
 
+test("REQ-SYS-12: keyboard feedback controls do not trigger gameplay", async () => {
+  find('.level-choice[data-biome="jungle"]').click();
+  await until(() => !find("#game-screen").hidden);
+  const severity = find("#feedback-severity");
+  const panel = find("#feedback-panel");
+  assert(severity && panel, "feedback controls are missing during play");
+  const nativeRequest = app.requestAnimationFrame;
+  const nativeCancel = app.cancelAnimationFrame;
+  let pending;
+  let timestamp = performance.now();
+  const tick = () => {
+    const callback = pending;
+    pending = null;
+    assert(callback, "feedback interaction lost the game loop");
+    timestamp += 1000 / 60;
+    callback(timestamp);
+  };
+  try {
+    app.cancelAnimationFrame = () => { pending = null; };
+    app.requestAnimationFrame = callback => { pending = callback; return 1; };
+    find("#reset-button").click();
+    tick();
+    key("keydown", "ArrowRight");
+    severity.focus();
+    assert(doc.activeElement === severity, "severity selector is not focusable during play");
+    const initial = canvasPixels().slice();
+    for (const value of ["ArrowDown", "ArrowUp", " ", "Enter", "d"]) {
+      const event = new app.KeyboardEvent("keydown", { key: value, bubbles: true, cancelable: true });
+      severity.dispatchEvent(event);
+      assert(!event.defaultPrevented, `feedback consumed native ${value} interaction`);
+    }
+    for (let index = 0; index < 5; index += 1) tick();
+    assert(find("#timer").textContent === "0.00", "feedback keyboard input started the race");
+    assert(find("#charge-meter").value === 0, "feedback keyboard input charged a jump");
+    assert(canvasPixels().every((value, index) => value === initial[index]),
+      "feedback focus did not clear held movement or feedback keys affected gameplay");
+    assert(!panel.hidden && app.getComputedStyle(panel).display !== "none", "feedback is hidden during play");
+  } finally {
+    key("keyup", "ArrowRight");
+    severity.blur();
+    find("#new-photo-button").click();
+    app.requestAnimationFrame = nativeRequest;
+    app.cancelAnimationFrame = nativeCancel;
+  }
+});
+
 test("REQ-LVL-16 / REQ-SYS-06: no-drill replay finishes and outlines the exact ranked or unranked attempt", async () => {
   const option=fixtureOptions.find(option=>option.biome==="jungle");
   assert(routeApi.verifyReferenceRoute(option).valid,"fixture reference replay is not valid");
@@ -610,6 +712,8 @@ test("REQ-LVL-16 / REQ-SYS-06: no-drill replay finishes and outlines the exact r
     }
     for(const value of ["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"])key("keyup",value);
     assert(!find("#complete-panel").hidden,"actual application did not finish the reference route");
+    assert(find("#feedback-panel") && app.getComputedStyle(find("#feedback-panel")).display !== "none",
+      "feedback is unavailable after completion");
     assert(!find("#contact-message").textContent,"reference route touched an enemy");
     const rows=[...doc.querySelectorAll("#leaderboard-list li")];
     const marked=rows.filter(row=>row.classList.contains("current-run"));

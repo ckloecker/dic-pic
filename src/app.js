@@ -26,6 +26,8 @@ const suggestions = document.querySelector("#suggestions");
 const choices = document.querySelector("#level-choices");
 const timerValue = document.querySelector("#timer");
 const scoreMessage = document.querySelector("#score-message");
+const feedbackPanel = document.querySelector("#feedback-panel");
+const feedbackSeverity = document.querySelector("#feedback-severity");
 const keyState = new Set();
 const touchState = { left: false, right: false, up: false, down: false, drill: false, jump: false };
 
@@ -556,12 +558,21 @@ document.querySelector("#again-button").addEventListener("click", goToSetup);
 document.querySelector("#reset-button").addEventListener("click", restartRun);
 document.querySelector("#replay-button").addEventListener("click", restartRun);
 
+feedbackSeverity.addEventListener("change", () => {
+  feedbackPanel.querySelectorAll("[data-feedback-category]").forEach((link) => {
+    const url = new URL(link.href);
+    url.searchParams.set("severity", feedbackSeverity.value);
+    link.href = url.href;
+  });
+});
+feedbackPanel.addEventListener("focusin", clearControls);
+
 function jumpIsHeld() {
   return touchState.jump || keyState.has(" ");
 }
 
 window.addEventListener("keydown", (event) => {
-  if (gameScreen.hidden) {
+  if (gameScreen.hidden || (event.target instanceof Element && feedbackPanel.contains(event.target))) {
     return;
   }
   if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " ", "Enter"].includes(event.key)) {

@@ -40,6 +40,15 @@ Once the player reaches the exit, the elapsed time is saved under a digest of th
 
 No image or score is sent to a server.
 
+## Root hosting and GitHub feedback
+
+REQ-SYS-11 assigns the project-root entry point to `index.html`, which loads assets and modules from `src/` through relative URLs.
+The same entry point works under a GitHub Pages repository prefix without a build or backend.
+REQ-SYS-12 assigns persistent feedback controls and category/severity URL construction to the page and app module.
+The controls link to `.github/ISSUE_TEMPLATE/feedback.yml` through GitHub's new-issue page for `ckloecker/dic-pic`.
+GitHub authenticates the submitter, records their account as issue author, and stores the submitted feedback in repository issues.
+The app does not call GitHub's API or include credentials, photos, names, or scores in feedback URLs.
+
 ## Approved random-option extension
 
 The level-options component assigns three random biome/layout combinations and plans a photo-aligned reference route before final filling, drillable biome scenery, and patrols.

@@ -39,11 +39,29 @@ local server with Python:
 python -m http.server 8000
 ```
 
-Open <http://localhost:8000/src/> in a browser.
+Open <http://localhost:8000/> in a browser.
 Select a photo, enter a name, choose **Suggest three levels**, then select a thumbnail to play.
 The camera option is available on devices and
 browsers that support file-input photo capture; **Upload photo** remains
 available as a fallback.
+
+## GitHub Pages and team feedback
+
+Publish the repository root to GitHub Pages, not the `src/` directory.
+The root [entry page](./index.html) uses relative asset paths, so it also works under a repository URL such as `https://ckloecker.github.io/dic-pic/`.
+No build, backend, or GitHub token is required.
+
+The game's feedback section offers **Bug report**, **Feature request**, and **General feedback** buttons.
+Choose **Low**, **Medium**, **High**, or **Critical** severity for any category, then use its button to open the GitHub issue form in a new tab.
+Review the prefilled category and severity, write the feedback, and submit while signed in to GitHub.
+GitHub stores the feedback as an issue attributed to the submitter's GitHub account.
+The game does not automatically attach photos, runner names, or scores.
+Feedback is public in a public repository, and a private repository requires appropriate access.
+
+Keep Issues enabled in `ckloecker/dic-pic` and merge the [feedback issue form](./.github/ISSUE_TEMPLATE/feedback.yml) into the repository's default branch before using the deployed buttons.
+GitHub loads issue forms from the default branch, regardless of which branch supplies the Pages site.
+Category and severity are recorded in the issue body rather than relying on label permissions.
+Maintainers can label and triage the issues for the next development iteration.
 
 ## Play
 
