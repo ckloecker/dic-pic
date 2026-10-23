@@ -15,3 +15,17 @@
   implementation, and verification in `traceability/`.
 - Update affected requirements, design, tests, and traceability together when
   approved behavior changes.
+- Before implementing issue work, inspect the project's open GitHub issues and
+  implement every issue with at least one 👍 reaction.
+- Re-check reaction counts before acting, and honor any explicit user exclusion
+  even if the current issue has a 👍 reaction.
+- Treat comments beginning with `@AI` as specific implementation instructions
+  for their issue.
+- When eligible issues conflict, implement only the issue with the higher 👍
+  count and close the conflicting issue with fewer 👍 reactions as a duplicate.
+- Keep changes for each issue in its own commit, and include that issue number
+  in the commit message.
+- Close each resolved issue through its corresponding commit message using a
+  GitHub-resolving keyword such as `Fixes #123`.
+- Keep cross-cutting issue-workflow documentation in a separate commit with
+  non-closing references to the applicable issue numbers.
