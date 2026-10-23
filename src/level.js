@@ -10,6 +10,14 @@ export const BIOMES = {
 export const LAYOUTS = { horizontal: "Horizontal", vertical: "Vertical", balanced: "Balanced" };
 export { closeAndFill } from "./morphology.js";
 
+function createRandom(seed = 0x6d2b79f5) {
+  let state = seed >>> 0;
+  return () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+
 function shuffle(values, random) {
   const result = [...values];
   for (let index = result.length - 1; index > 0; index -= 1) {
@@ -170,7 +178,66 @@ function addPickups(terrain, random) {
   terrain.pickups = pickups;
 }
 
-export function createSuggestions(rgba, width, height, random = Math.random) {
+function addMovingPlatforms(terrain, random) {
+  const { width, height, solid } = terrain;
+  const platforms = [];
+  const drillableColumn = (x, y) => {
+    if (x < 0 || x >= width) return false;
+    let blocked = false;
+    for (let row = 0; row < 3; row += 1) {
+      const cell = (y + row) * width + x;
+      if (terrain.route.protected[cell]) return false;
+      blocked = blocked || Boolean(solid[cell]);
+    }
+    return blocked;
+  };
+  for (let index = 0; index < 2; index += 1) {
+    const candidates = [];
+    for (let y = 1; y <= height - 4; y += 1) {
+      for (let left = 1; left <= width - 36; left += 1) {
+        const overlapsPlatform = platforms.some((platform) => (
+          left < platform.right + platform.width && left + 36 > platform.left
+            && y < platform.y + platform.height && y + 3 > platform.y
+        ));
+        const overlapsPickup = terrain.pickups.some((pickup) => (
+          left < pickup.x + pickup.width && left + 36 > pickup.x
+            && y < pickup.y + pickup.height && y + 3 > pickup.y
+        ));
+        if (overlapsPlatform || overlapsPickup) continue;
+        let clear = true;
+        for (let row = y; row < y + 3 && clear; row += 1) {
+          for (let column = left; column < left + 36; column += 1) {
+            const cell = row * width + column;
+            if (solid[cell] || terrain.route.protected[cell]) {
+              clear = false;
+              break;
+            }
+          }
+        }
+        if (clear) candidates.push({ left, right: left + 24, y });
+      }
+    }
+    if (!candidates.length) {
+      throw new RouteGenerationError("no room for two optional moving platforms outside the required route");
+    }
+    const { left, right, y } = candidates[Math.floor(random() * candidates.length)];
+    platforms.push({
+      x: left + Math.floor(random() * (right - left + 1)),
+      y,
+      left,
+      right,
+      width: 12,
+      height: 3,
+      speed: 18,
+      direction: random() < 0.5 ? -1 : 1,
+      expandLeft: drillableColumn(left - 1, y),
+      expandRight: drillableColumn(left + 36, y),
+    });
+  }
+  terrain.movingPlatforms = platforms;
+}
+
+export function createSuggestions(rgba, width, height, random = createRandom()) {
   const biomes = shuffle(Object.keys(BIOMES), random);
   const layouts = shuffle(Object.keys(LAYOUTS), random);
   return biomes.map((biome, index) => {
@@ -184,6 +251,7 @@ export function createSuggestions(rgba, width, height, random = Math.random) {
         terrain = planReferenceRoute({ ...source, biome, layout }, random, attempt > 0);
         addElements(terrain, random);
         addPickups(terrain, random);
+        addMovingPlatforms(terrain, random);
         if (!terrain.elements.length) {
           throw new RouteGenerationError("no room for collidable biome scenery outside the main corridor");
         }
@@ -210,10 +278,11 @@ export function createSuggestions(rgba, width, height, random = Math.random) {
 
 export function levelIdentity(level) {
   return JSON.stringify({
-    revision: 7, width: level.width, height: level.height,
+    revision: 8, width: level.width, height: level.height,
     biome: level.biome, layout: level.layout, spawn: level.spawn, flag: level.flag,
     solid: Array.from(level.solid), details: Array.from(level.details), accents: level.accents,
     pickups: level.pickups,
+    movingPlatforms: level.movingPlatforms,
     enemies: level.enemies,
     connectors: level.connectors,
     platforms: level.platforms,

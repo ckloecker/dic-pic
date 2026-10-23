@@ -1,11 +1,12 @@
 import { cancelCharge, DRILL_REACH, stepPlayer } from "./physics.js";
-import { applyRunEffects, collectPickups, createRun, reachedFlag, resetRun, stepRunEffects } from "./run.js";
+import { applyRunEffects, collectPickups, createRun, reachedFlag, resetRun, stepMovingPlatforms,
+  stepRunEffects } from "./run.js";
 import { enemyContact, stepEnemies } from "./enemies.js";
 import { getLeaderboard, isValidPlayerName, leaderboardRows, submitScore } from "./leaderboard.js";
 import { NoUsableEdgeError } from "./terrain.js";
 import { BIOMES, LAYOUTS, createSuggestions, levelIdentity } from "./level.js";
 import { drawBiomeEffects, drawEnemies, drawGate, drawHeadwear, drawPhoto, drawPreview,
-  drawPickups, paintTerrain, paintTerrainShadow } from "./scene.js";
+  drawMovingPlatforms, drawPickups, paintTerrain, paintTerrainShadow } from "./scene.js";
 
 const WORLD_WIDTH = 320;
 const WORLD_HEIGHT = 180;
@@ -387,6 +388,7 @@ function drawScene() {
   context.drawImage(state.effectLayer, 0, 0);
   clearTerrainLayer();
   context.drawImage(state.terrainLayer, 0, 0);
+  drawMovingPlatforms(context, state.movingPlatforms);
   drawEnemies(context, state.enemies, state.terrain.biome);
   drawPickups(context, state.pickups, state.effectSeconds);
   drawExit();
@@ -510,6 +512,7 @@ function gameFrame(timestamp) {
     state.elapsedMs = timestamp - state.startedAt;
     timerValue.textContent = elapsedLabel(state.elapsedMs);
     stepEnemies(state.enemies, dt);
+    stepMovingPlatforms(state, dt);
   }
 
   const hitEnemy = enemyContact(state.player, state.enemies, previousPlayer);

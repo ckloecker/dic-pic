@@ -78,6 +78,21 @@ export function drawPickups(context, pickups, seconds = 0) {
   }
 }
 
+export function drawMovingPlatforms(context, platforms) {
+  for (const platform of platforms) {
+    context.fillStyle = "#152b34";
+    context.fillRect(platform.x, platform.y, platform.width, platform.height);
+    context.fillStyle = "#83d8c2";
+    context.fillRect(platform.x, platform.y, platform.width, 1);
+    context.fillStyle = "#4f8c83";
+    for (let x = platform.x + 2; x < platform.x + platform.width - 1; x += 4) {
+      context.fillRect(x, platform.y + 1, 1, 1);
+    }
+    context.fillStyle = "#d4f2dc";
+    context.fillRect(platform.x + 1, platform.y + 2, platform.width - 2, 1);
+  }
+}
+
 export function drawBiomeEffects(context, width, height, biome, seconds = 0, reducedMotion = false) {
   const time = reducedMotion ? 0 : seconds;
   context.save();
@@ -225,6 +240,7 @@ export function drawPreview(context, image, option) {
   context.drawImage(layer, 0, 0);
   drawEnemies(context, option.enemies || [], option.biome);
   drawPickups(context, option.pickups || []);
+  drawMovingPlatforms(context, option.movingPlatforms || []);
   drawGate(context, option.flag);
   const player = { ...option.spawn, width: 6 };
   context.fillStyle = "#247f7b";

@@ -237,6 +237,53 @@ export function applyRunEffects(input, run) {
   return adjusted;
 }
 
+function clearPlatformPath(run, platform, x) {
+  const { terrain } = run;
+  if (x < 0 || x + platform.width > terrain.width) return false;
+  for (let y = platform.y; y < platform.y + platform.height; y += 1) {
+    for (let column = x; column < x + platform.width; column += 1) {
+      const cell = y * terrain.width + column;
+      if (terrain.solid[cell] || terrain.route?.protected[cell]) return false;
+    }
+  }
+  return true;
+}
+
+export function stepMovingPlatforms(run, dt) {
+  if (!Number.isFinite(dt) || dt < 0) {
+    throw new RangeError("Platform frame duration must be a non-negative number.");
+  }
+  const player = run.player;
+  for (const platform of run.movingPlatforms) {
+    const previousX = platform.x;
+    const supported = player.grounded
+      && Math.abs(player.y + player.height - platform.y) < 1e-6
+      && player.x + player.width > previousX
+      && player.x < previousX + platform.width;
+    if (platform.direction > 0 && platform.expandRight !== false
+      && clearPlatformPath(run, platform, platform.right + 1)) {
+      platform.right += 1;
+    } else if (platform.direction < 0 && platform.expandLeft !== false
+      && clearPlatformPath(run, platform, platform.left - 1)) {
+      platform.left -= 1;
+    }
+    let remaining = platform.speed * dt;
+    while (remaining > 1e-9 && platform.right > platform.left) {
+      const boundary = platform.direction > 0 ? platform.right : platform.left;
+      const distance = Math.abs(boundary - platform.x);
+      if (distance <= 1e-9) {
+        platform.direction *= -1;
+        continue;
+      }
+      const travel = Math.min(remaining, distance);
+      platform.x += platform.direction * travel;
+      remaining -= travel;
+      if (travel >= distance - 1e-9) platform.direction *= -1;
+    }
+    if (supported) player.x += platform.x - previousX;
+  }
+}
+
 export function respawnPlayer(run) {
   run.player = createPlayer(run.spawn.x, run.spawn.y);
 }

@@ -63,7 +63,11 @@ function isSolid(terrain, x, y) {
   if (cellX < 0 || cellX >= terrain.width || cellY < 0 || cellY >= terrain.height) {
     return false;
   }
-  return terrain.solid[cellY * terrain.width + cellX] === 1;
+  if (terrain.solid[cellY * terrain.width + cellX] === 1) return true;
+  return (terrain.movingPlatforms || []).some((platform) => (
+    cellX + 1 > platform.x && cellX < platform.x + platform.width
+      && cellY + 1 > platform.y && cellY < platform.y + platform.height
+  ));
 }
 
 function overlapsSolid(player, terrain) {

@@ -74,7 +74,7 @@ Openness and duration are measured but their former fixed ranges do not determin
 Try at most thirty-two candidates in each natural/repair graph stage and four assemblies per option.
 Later assemblies retain the twelve strongest layout-weighted traces as ordinary four-cell-thick photo surfaces to suppress clutter before route repair.
 Final safety failure raises `RouteGenerationError` rather than silently returning an unsafe option.
-Exact-option identity revision 7 includes supplemental platform cells, pickups, and moving-platform metadata along with existing geometry and patrol definitions.
+Exact-option identity revision 8 includes supplemental platform cells, pickups, and moving-platform metadata along with existing geometry and patrol definitions.
 
 ## Level options (`src/level.js`, `src/scene.js`)
 
