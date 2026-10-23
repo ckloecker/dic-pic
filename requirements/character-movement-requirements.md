@@ -7,7 +7,7 @@ If the game is accessed from a device with a keyboard, the controls shall be:
 * A or left arrow: Move left
 * W or up arrow: Enter background climbing (see "REQ-MOV-10")
 * S or down arrow: Climb down or aim the drill down
-* Space: Hold to charge, release to jump
+* Space: Press to jump immediately; hold briefly to jump higher
 * Return: Use the drill (see "REQ-MOV-03")
 
 If the game is accessed from a mobile/touch-only device, the controls shall be:
@@ -23,11 +23,9 @@ While background climbing, pressing either jump control shall drop immediately i
 
 ## REQ-MOV-02: Wall Jump
 
-The character shall be able to charge and jump from floors, either side of terrain walls, and either vertical image side border.
-Execution occurs when the jump control is released within three terrain cells of a floor or wall (REQ-MOV-07).
-A wall jump shall launch upward and away from the wall at normal horizontal movement speed, using the same charge duration and vertical height range as a floor jump.
-Gravity shall continue while charging beside a wall; charging shall not hold the character vertically.
-Outside the surface-distance tolerance, release shall cancel without launching, even during contact grace.
+The character shall jump immediately on pressing the jump control within three terrain cells of a floor, either side of a terrain wall, or either vertical image side border (REQ-MOV-07).
+A wall jump shall launch upward and away from the wall at normal horizontal movement speed, using the same hold window and vertical height range as a floor jump.
+Outside the surface-distance tolerance, a press shall not launch unless buffered until contact under REQ-MOV-07.
 There shall be no free additional airborne jumps.
 While background climbing, the jump control drops instead, as specified by REQ-MOV-10.
 While actively excavating, horizontal travel uses the limit in REQ-MOV-03.
@@ -38,11 +36,14 @@ Holding Return or the touch DRILL control shall operate a visible directional dr
 The drill shall cut a narrow tunnel in the pressed direction, including diagonally, upward while climbing, and downward while standing.
 With no direction pressed it shall drill in the character's horizontal facing direction.
 When drilling horizontally while walking, the tunnel shall not excavate cells below the player's feet or remove the supporting floor.
+The horizontal cut shall preserve the first supporting row below the character's footprint, including when floating-point rounding puts the feet infinitesimally beyond an integer row.
+Repeated left/right excavation shall not deepen its own floor.
+Background-climbing horizontal excavation shall retain its vertical position when no vertical direction is pressed.
 Excavated terrain shall remain removed for the current run, including terrain supporting the finish gate.
 While the drill is actively excavating intact terrain, normal horizontal movement shall be limited to background-climbing speed, twenty terrain cells per second.
 Holding the drill in already-open space shall retain normal eighty-cell-per-second horizontal movement.
 Background climbing shall remain twenty cells per second with normalized diagonals, including while drilling.
-Excavation shall not change gravity, jump charge, or vertical jump velocity, and shall not enable hovering.
+Excavation shall not change gravity, the jump hold window, or vertical jump velocity, and shall not enable hovering outside background climbing.
 Movement limits shall hold across supported frame durations and repeated resets without duplicate animation loops.
 
 ## REQ-MOV-04: Air Movement
@@ -50,30 +51,22 @@ Movement limits shall hold across supported frame durations and repeated resets 
 While "in air", i.e., executing a jump or falling, the character shall move left or right at normal speed unless a temporary speed pickup is active under REQ-LVL-18.
 Background climbing and active excavation are exceptions: REQ-MOV-10 specifies climbing speed and suspension of gravity, and REQ-MOV-03 limits horizontal active excavation without changing gravity.
 
-## REQ-MOV-05: Charged Jumps
+## REQ-MOV-05: Immediate Variable-Height Jumps
 
-Holding the jump control near a floor or wall shall charge a jump. Releasing
-within the contact tolerance shall execute the jump. A longer charge shall produce
-a higher jump, up to a maximum charge. Charging shall take time rather than
-add a separate score penalty. Charged jumps shall not enable additional
-unattached airborne jumps.
-Background attachment does not permit charging or launching under REQ-MOV-10.
-
-Maximum charge shall be reached after three seconds of holding the jump
-control. Holding beyond three seconds shall not increase the charge or
-automatically launch the jump. A quick tap shall retain the normal jump
-height. In unobstructed space, a fully charged jump shall rise by the full
-level height, measured from the character's launch position to the apex.
-
-A visible HUD charge meter shall show charge progress and explicitly indicate
-when maximum charge has been reached. An additional filling charge bar shall
-follow immediately above the character, with a distinct full-charge appearance.
-Both indicators shall clear when charge is cancelled or a jump launches.
-
-Normal horizontal movement shall remain available while charging. Lost contact
-shall preserve charge for the grace period in REQ-MOV-07; release shall still
-require current proximity as specified in REQ-MOV-02. Beginning to charge
-shall start the run timer if it has not already started.
+Pressing Space or touch JUMP near an eligible surface shall immediately apply the existing normal-jump minimum impulse.
+Continuing to hold the control shall increase upward velocity during a 250-millisecond window measured from launch.
+A quick tap shall retain the existing normal rise of approximately 38.6 terrain cells in unobstructed space.
+A full hold shall rise at most twice the normal jump height, approximately 77.1 cells, rather than a full level height.
+Intermediate holds shall produce intermediate heights.
+Releasing shall stop additional upward assistance without launching again or cancelling existing momentum.
+Holding beyond the window shall not increase jump height or automatically jump again on landing.
+Gravity and collision shall remain active, and ceiling contact shall stop upward assistance.
+The hold window shall remain valid after leaving the launch surface, without permitting additional unattached airborne jumps.
+Background attachment shall retain press-to-drop under REQ-MOV-10.
+A visible HUD meter and a bar immediately above the character shall show hold progress with a distinct maximum appearance.
+Both indicators shall clear on release, cancellation, ceiling contact, or the end of ascent.
+Normal horizontal movement shall remain available while holding, subject to the active-excavation limit.
+An immediate jump shall start the run timer.
 
 ## REQ-MOV-06: Level Ceiling
 
@@ -85,14 +78,12 @@ The camera shall remain fixed.
 
 ## REQ-MOV-07: Forgiving Surface Contact
 
-Floor and wall contact for charging/jumping shall allow a distance of up to
-three terrain cells. Charge shall survive up to 150 milliseconds without
-such contact, then cancel. Contact grace shall not permit a release beyond
-the three-cell distance. Jump presses shall be buffered for 150 milliseconds
-before contact, allowing a still-held control to begin charging on arrival;
-a release outside tolerance shall cancel rather than queue a later launch.
+Floor and wall contact for launching shall allow a distance of up to three terrain cells.
+Jump presses shall be buffered for 150 milliseconds before contact, allowing a still-held control to launch immediately on arrival.
+A release before contact shall cancel the buffered press rather than queue a later launch.
+After launch, upward assistance shall depend on the hold window rather than continued surface contact.
 
-Walking shall follow inclines and declines, including descending floor snapping within three cells, without intermittent charge loss.
+Walking shall follow inclines and declines, including descending floor snapping within three cells.
 Floor snapping shall never pull a rising jump back onto the floor.
 Terrain walls shall be actual terrain, while the left and right image borders shall also grant wall contact and wall jumps.
 The top image boundary remains the ceiling specified by REQ-MOV-06, and the bottom remains the floor specified by REQ-MOV-08; neither shall grant wall jumps.
@@ -104,20 +95,12 @@ Status: Superseded by REQ-SYS-14.
 Falling to the image bottom shall reset the entire run under REQ-SYS-14.
 The image bottom shall no longer be a safe surface for continued play.
 
-## REQ-MOV-09: Retain Existing Charged-Jump Interaction
+## REQ-MOV-09: Superseded Charge-and-Release Interaction
 
-Status: Approved clarification; no implementation change required.
+Status: Superseded by the approved immediate variable-height jump revision in REQ-MOV-01/02/05/07.
 
-After considering immediate-jump alternatives, the user chose to keep the
-existing jump interaction unchanged.
-Space/touch JUMP shall continue to
-charge while held and launch on release, with the current floor/wall
-proximity rules, three-second maximum charge, and HUD/on-character charge
-indicators specified by REQ-MOV-01/02/05/07.
-REQ-MOV-10 changes background attachment to press-to-drop without changing floor/wall behavior.
-
-The proposed responsive-jump redesign is withdrawn. This decision does not
-change the failure reset behavior in REQ-MOV-08/REQ-SYS-14.
+The previous hold-to-charge and release-to-launch interaction is replaced by launch-on-press with a 250-millisecond upward-assistance window.
+Failure resets under REQ-MOV-08/REQ-SYS-14 and background press-to-drop under REQ-MOV-10 remain unchanged.
 
 ## REQ-MOV-10: Background Climbing
 
@@ -131,4 +114,4 @@ Pressing Space or touch JUMP while attached shall immediately detach and drop th
 Holding or releasing that same jump press shall not charge or launch, even if the character lands before release.
 Held Up shall not automatically reattach after dropping; a new Up press shall be required.
 Climbing shall respect terrain collisions and the image boundaries unless the directional drill removes terrain.
-Climbing movement and charging shall count as elapsed race time.
+Climbing movement and immediate jumping shall count as elapsed race time.

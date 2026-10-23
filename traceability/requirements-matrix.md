@@ -1,5 +1,24 @@
 # Requirements traceability
 
+## Immediate variable-height jumps and horizontal drilling revision
+
+The user approved immediate floor/wall launch with the existing minimum impulse, a 250-millisecond hold window, and maximum rise of twice the normal height.
+REQ-MOV-01/02/05/07 replace charge-and-release behavior, REQ-MOV-09 is superseded, and REQ-MOV-10 retains background press-to-drop.
+REQ-MOV-03 now explicitly requires level horizontal excavation at fractional heights and floating-point floor boundaries.
+The [movement design](../design/detailed/game-components.md#movement-srcphysicsjs) allocates immediate impulse, launch-relative target-apex assistance, release cancellation, and directional excavation substeps to [physics](../src/physics.js).
+The [architecture](../design/system/game-architecture.md#acceptance-first-priority) records these movement changes, and [app indicators](../src/app.js) and [control guidance](../index.html) use the quarter-second hold window.
+The [unit regressions](../tests/unit/unit-tests.js) initially reproduced horizontal support removal and the lack of immediate launch.
+An isolated replay of the original vertical-substep drilling behavior sank from y=31 to y=37 and removed thirty supporting floor cells during one second of rightward drilling.
+The fixed replay stayed at y=31 and removed no floor cells, while continuing to excavate horizontally.
+Both left/right directions, walking/background climbing, fractional and floating-point-boundary heights, and 30/60/120 Hz are covered.
+The jump regressions measure tap, intermediate, maximum, and extended-hold apex heights at 30/60/120 Hz, plus walls, press buffering, airborne rejection, ceiling contact, and held-input landing.
+Verification on 2026-10-23 passed **90/90 unit checks** and **23/23 browser system checks** in Chromium, with browser caching disabled for the system run.
+The [browser checks](../tests/system/browser-tests.js) verify immediate launch, timer start, partial/full meter and following bar, release/blur cancellation, background drop, and existing gameplay regressions.
+The desert fixture supplies sufficient headroom for testing the complete hold window rather than colliding early with overhead jungle terrain.
+A real pointer press on touch JUMP moved the rendered player upward before release and cleared the hold meter after release.
+Physical touch-device testing remains outstanding.
+[ST-05/08/12](../tests/system/system-tests.md) and [AT-08/09/12/18](../tests/acceptance/test-cases.md) specify repeatable integrated verification.
+
 ## Design artifacts
 
 - [System architecture](../design/system/game-architecture.md) allocates
@@ -198,14 +217,14 @@ Physical mobile, camera, and simultaneous touch verification remain outstanding.
 | REQ-CHR-02 | [Player dimensions](../src/physics.js), [scaled renderer](../src/app.js), [flag anchoring](../src/run.js) | Unit verifies 6-by-9 collision dimensions and normal speed; browser sprite bounds and bar-following checks; ST-11/AT-19. |
 | REQ-CHR-04 | [Biome headwear renderer](../src/scene.js), [walking and climbing integration](../src/app.js) | Unit all three headwear images distinct and confined to the six-by-nine footprint; browser preview/live checks across all biomes; ST-15/AT-22. |
 | REQ-MOV-01 | [Input mapping](../src/app.js), [four-way touch controls](../index.html) | Browser verifies Space charge/release, W/up background climbing without drilling, and downward drill input; physical simultaneous touch-button testing remains outstanding. |
-| REQ-MOV-02 | [Floor/wall probes and release-to-jump](../src/physics.js) | Unit verifies left/right terrain-wall and image-side-border jumps up/away despite input toward the wall, continued gravity while charging, grounded release, and no surface-free air jumps; ST-12/AT-08. |
-| REQ-MOV-03 | [Active-excavation probe, speed selection, and directional cutter](../src/physics.js), [drill renderer/input](../src/app.js) | Unit verifies 20-cell/s active excavation at 30/60/120 Hz, 80-cell/s open drilling, eight-direction cuts, persistent tunnels, gravity/charge preservation, upward/downward drilling, and horizontal drilling that preserves the supporting floor; ST-05/AT-09. |
+| REQ-MOV-02 | [Floor/wall probes and immediate launch](../src/physics.js) | Unit verifies terrain-wall and image-border launches up/away on press despite opposing input, hold assistance, and no unattached air jumps; ST-12/AT-08. |
+| REQ-MOV-03 | [Active-excavation probe, speed selection, and directional cutter](../src/physics.js), [drill renderer/input](../src/app.js) | Unit verifies 20-cell/s active excavation at 30/60/120 Hz, 80-cell/s open drilling, eight-direction cuts, persistent tunnels, gravity/hold assistance, upward/downward drilling, and repeated level horizontal excavation at fractional heights and floating-point floor boundaries; ST-05/AT-09. |
 | REQ-MOV-04 | [Normal air movement](../src/physics.js) | Unit verifies normal horizontal airborne speed with and without drilling, with quarter-speed climbing tested separately. |
-| REQ-MOV-05 | [Charge simulation](../src/physics.js), [HUD and character bars/input](../src/app.js) | Unit three-second cap, full-height rise, partial strength, grace/buffering, no airborne/background launch, and drilling preservation; browser charge/bar/timer/blur regressions. |
+| REQ-MOV-05 | [Immediate launch and held-ascent simulation](../src/physics.js), [HUD and character bars/input](../src/app.js) | Unit measures normal tap rise, intermediate holds, twice-normal maximum, 250 ms cap, no repeated held jumps, ceiling/airborne rejection, and drilling preservation; browser immediate launch, meter/bar, timer, release, and blur; ST-08/AT-12. |
 | REQ-MOV-06 | [Ceiling collision](../src/physics.js), [fixed scene](../src/app.js) | Unit verifies y >= 0, stopped upward velocity, and subsequent gravity. |
-| REQ-MOV-07 | [Shared contact probes, snapping, grace and input buffer](../src/physics.js) | Unit verifies 3-cell floor/wall tolerance including image side borders, continuous charged ascent/descent on slopes, 150-ms charge grace and held-press buffering, distant-release cancellation with no queued launch, and no upward snapping or top/bottom boundary wall jumps; ST-12/AT-08/18. |
+| REQ-MOV-07 | [Shared contact probes, snapping, and press buffer](../src/physics.js) | Unit verifies three-cell floor/wall tolerance including image borders, walking on slopes, 150 ms still-held press buffering, assistance after leaving support, release cancellation, and no upward snapping or top/bottom boundary wall jumps; ST-12/AT-08/18. |
 | REQ-MOV-08 | [Boundary-aware floor probes and bottom clamp](../src/physics.js), [game loop](../src/app.js) | Unit empty-mask landing/walking/charging/jumping, nearest terrain above bottom, descending climber landing, and drilling to indestructible bottom; browser drill-down/standing/jump check; ST-09/AT-14. |
-| REQ-MOV-09 | [Unchanged floor/wall charged-jump interaction](../src/physics.js) | Existing REQ-MOV-01/02/05/07 regression tests rerun successfully. |
+| REQ-MOV-09 | Superseded by REQ-MOV-01/02/05/07 immediate variable-height jumps. | See the immediate-jump verification above. |
 | REQ-MOV-10 | [Immediate drop and consumed-press latch](../src/physics.js), [input and drop HUD](../src/app.js) | Unit immediate downward velocity, no charge/release launch even after landing, held-Up suppression, fresh-Up attachment, and unchanged floor jumps; browser drop-on-press and drill-release grip; ST-13/AT-20. |
 
 ## Requirement derivation
@@ -222,7 +241,7 @@ Physical mobile, camera, and simultaneous touch verification remain outstanding.
 | REQ-MOV-01 through REQ-MOV-07 | REQ-SYS-02; REQ-MOV-05 also changes timing under REQ-SYS-04; REQ-MOV-07 elaborates REQ-MOV-02/05 |
 | REQ-SYS-08, REQ-SYS-09 | REQ-SYS-04 run lifecycle |
 | REQ-MOV-08 | REQ-SYS-02; supersedes REQ-SYS-09 for bottom-edge falls |
-| REQ-MOV-09 | REQ-SYS-02; confirms unchanged REQ-MOV-01/02/05/07 after withdrawal of the proposed jump redesign |
+| REQ-MOV-09 | REQ-SYS-02; historical charge-and-release decision superseded by the approved immediate-jump revision |
 | REQ-MOV-10 | REQ-SYS-02/04; background climbing now consumes jump press as a drop instead of extending charged jumps |
 
 ## Verification record

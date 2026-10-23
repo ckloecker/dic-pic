@@ -313,7 +313,10 @@ test("REQ-MOV-01/10: W and up climb without drilling, charging or jumping", asyn
   assert(Number(find("#timer").textContent) > 0, "climbing did not start timer");
   find("#reset-button").click();
 });
-test("REQ-MOV-01/05 / REQ-SYS-04: Space charges, character bar fills, release launches", async () => {
+test("REQ-MOV-01/05 / REQ-SYS-04: Space launches immediately and hold boosts the jump", async () => {
+  find("#new-photo-button").click();
+  find('.level-choice[data-biome="desert"]').click();
+  await delay(50);
   const top = playerTop();
   const countColor = (red, green, blue) => {
     const pixels = canvasPixels();
@@ -325,18 +328,17 @@ test("REQ-MOV-01/05 / REQ-SYS-04: Space charges, character bar fills, release la
   };
   const yellowBeforeCharge = countColor(255, 209, 102);
   key("keydown", " ");
-  await until(() => find("#charge-meter").value >= 0.5);
+  await until(() => find("#charge-meter").value >= 0.05);
   const partial = countColor(159, 228, 193);
   assert(partial > 0, "on-character partial charge bar is missing");
-  await until(() => find("#charge-meter").value >= 1.5);
-  assert(countColor(159, 228, 193) > partial, "on-character bar did not fill with charge");
-  await until(() => find("#charge-meter").value >= 3);
-  assert(find("#charge-label").textContent.includes("MAX READY"), "maximum charge was not indicated");
+  assert(playerTop() < top, "press did not launch before release");
+  await until(() => find("#charge-meter").value >= 0.25);
+  assert(find("#charge-label").textContent.includes("MAX JUMP"), "maximum boost was not indicated");
   assert(countColor(255, 209, 102) > yellowBeforeCharge, "character bar lacks distinct full-charge appearance");
-  assert(Number(find("#timer").textContent) >= 3, "charging did not count as race time");
-  assert(Math.abs(playerTop() - top) < 1, "jump launched before release");
+  assert(Number(find("#timer").textContent) > 0, "jump did not start race time");
   key("keyup", " ");
-  await until(() => playerTop() < top - 10);
+  await until(() => find("#charge-meter").value === 0);
+  assert(playerTop() < top - 10, "jump did not retain its upward movement");
   assert(find("#charge-meter").value === 0, "launch did not clear meter");
   assert(countColor(255, 209, 102) === yellowBeforeCharge, "launch did not clear character bar");
 });
@@ -352,7 +354,7 @@ test("REQ-SYS-08: reset restores the scene, clears held input, and records no sc
   assert(JSON.stringify(app.localStorage) === before, "abandoned run wrote a score");
   key("keyup", "d");
 });
-test("REQ-MOV-05: blur cancels charge without launching", async () => {
+test("REQ-MOV-05: blur cancels additional jump assistance", async () => {
   find("#reset-button").click();
   const top = playerTop();
   key("keydown", " ");
@@ -361,7 +363,7 @@ test("REQ-MOV-05: blur cancels charge without launching", async () => {
   key("keyup", " ");
   await delay(100);
   assert(find("#charge-meter").value === 0, "blur did not clear charge");
-  assert(Math.abs(playerTop() - top) < 1, "cancelled charge launched");
+  assert(playerTop() < top, "blur incorrectly undid the initial jump");
   assert(errors.length === 0, `browser errors: ${errors.join(", ")}`);
 });
 test("REQ-MOV-03/10: background holds after drill release, then jump press drops", async () => {
@@ -456,7 +458,7 @@ test("REQ-CHR-02 / REQ-MOV-05: smaller sprite and charge bar move together", asy
     for (let y = 0; y < 540; y += 1) {
       for (let x = 0; x < 960; x += 1) {
         const i = (y * 960 + x) * 4;
-        if (!matches(pixels[i], pixels[i + 1], pixels[i + 2], y)) continue;
+        if (!matches(pixels[i], pixels[i + 1], pixels[i + 2], y, x)) continue;
         left = Math.min(left, x);
         right = Math.max(right, x);
         top = Math.min(top, y);
@@ -468,11 +470,16 @@ test("REQ-CHR-02 / REQ-MOV-05: smaller sprite and charge bar move together", asy
   };
   const sprite = () => {
     const top = Math.floor(playerTop() * 3);
-    return bounds((r, g, b, y) => y >= top && spriteColors.has(`${r},${g},${b}`));
+    return bounds((r, g, b, y) => y >= top && y < top + 27 && spriteColors.has(`${r},${g},${b}`));
   };
-  const bar = () => bounds((r, g, b) => r === 159 && g === 228 && b === 193);
+  const bar = () => {
+    const body = sprite();
+    return bounds((r, g, b, y, x) => y < body.top && y >= body.top - 18
+      && x >= body.left - 20 && x <= body.right + 20
+      && ((r === 159 && g === 228 && b === 193) || (r === 255 && g === 209 && b === 102)));
+  };
   key("keydown", " ");
-  await until(() => find("#charge-meter").value >= 0.4);
+  await until(() => find("#charge-meter").value >= 0.05);
   const before = sprite();
   const beforeBar = bar();
   assert(before.right - before.left < 18 && before.bottom - before.top < 27,

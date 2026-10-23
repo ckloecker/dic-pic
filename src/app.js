@@ -1,4 +1,4 @@
-import { cancelCharge, DRILL_REACH, stepPlayer } from "./physics.js";
+import { cancelCharge, DRILL_REACH, JUMP_HOLD_SECONDS, stepPlayer } from "./physics.js";
 import { applyRunEffects, collectPickups, createRun, reachedFlag, resetRun, stepMovingPlatforms,
   stepRunEffects } from "./run.js";
 import { enemyContact, stepEnemies } from "./enemies.js";
@@ -213,11 +213,11 @@ function stopAnimation() {
 
 function updateChargeIndicator() {
   const seconds = state.player?.chargeSeconds || 0;
-  const full = seconds >= 3;
+  const full = seconds >= JUMP_HOLD_SECONDS;
   document.querySelector("#charge-meter").value = seconds;
   const label = document.querySelector("#charge-label");
-  label.textContent = state.player?.climbing ? "Press jump to drop" : full ? "MAX READY — release to jump" : (
-    state.player?.charging ? `CHARGING ${Math.round(seconds / 3 * 100)}%` : "Hold jump to charge · release to jump"
+  label.textContent = state.player?.climbing ? "Press jump to drop" : full ? "MAX JUMP" : (
+    state.player?.charging ? `JUMP BOOST ${Math.round(seconds / JUMP_HOLD_SECONDS * 100)}%` : "Press jump · hold briefly to jump higher"
   );
   label.classList.toggle("charge-full", full);
 }
@@ -373,8 +373,8 @@ function drawPlayerCharge() {
   const y = Math.max(0, player.y - 5);
   context.fillStyle = "#16262d";
   context.fillRect(x, y, 12, 3);
-  context.fillStyle = player.chargeSeconds >= 3 ? "#ffd166" : "#9fe4c1";
-  context.fillRect(x + 1, y + 1, 10 * player.chargeSeconds / 3, 1);
+  context.fillStyle = player.chargeSeconds >= JUMP_HOLD_SECONDS ? "#ffd166" : "#9fe4c1";
+  context.fillRect(x + 1, y + 1, 10 * player.chargeSeconds / JUMP_HOLD_SECONDS, 1);
 }
 
 function drawDrill() {

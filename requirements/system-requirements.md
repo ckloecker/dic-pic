@@ -21,8 +21,7 @@ Placement shall prioritize safe support nearest a randomly selected edge and a d
 
 The main goal of the game is for the character to get to the exit as fast as possible.
 As soon as the character is moved by the player, a timer shall start.
-Beginning to charge a jump shall also start the timer, even before the
-character moves (see REQ-MOV-05).
+Pressing jump to launch shall also start the timer (see REQ-MOV-05).
 As soon as the character has reached the exit, the timer shall stop.
 
 ## REQ-SYS-05: Player Name

@@ -2,6 +2,10 @@
 
 ## Acceptance-first priority
 
+REQ-MOV-01/02/05/07 now use immediate floor/wall jumps with a 250-millisecond hold window and a maximum rise of twice normal height.
+REQ-MOV-03 preserves foot support during horizontal excavation, including floating-point boundary rounding.
+Background press-to-drop and photo-guided walking/climbing reference routes remain unchanged.
+
 REQ-LVL-01/05/07/08/09/11/16 replace strict numeric rejection with progressive strongest-edge selection and route repair.
 Openness, route duration, and section count remain quality targets.
 The route planner may connect separated edges and add longer bridges or horizontal stepping platforms, without manufacturing freestanding vertical walls.
@@ -23,7 +27,7 @@ storage, and cryptographic level identifiers.
 | Terrain generator | Normalize contrast, preserve diagonal contours and local edge directions, provisionally close/fill photo shapes, and suppress tiny fragments | REQ-SYS-03, REQ-LVL-01/03/05/08/09/11 |
 | Route planner and option assembly | Build bounded photo-edge connectors, reserve a contiguous no-drill corridor, place optional pickups and moving platforms outside required clearance, and verify final physics/enemy replay | REQ-LVL-01/07/08/09/10/11/12/15/16/18/19 |
 | Game loop and renderer | Draw filtered photo, high-contrast uniform-fill biome terrain, pickups, moving platforms, flying patrols, biome character poses, fixed gate, timer, charge bars, and prominent controls | REQ-SYS-02/03/04/10/16, REQ-CHR-01/02/04/05, REQ-MOV-05, REQ-LVL-02/06/07/10/14/15/18/19/20 |
-| Movement simulation | Charged floor/wall jumps, press-to-drop climbing, tolerant surface contact and press buffering, temporary speed effects, moving-platform collision, air movement, and directional tunnel drilling | REQ-MOV-01 through REQ-MOV-10, REQ-CHR-02, REQ-LVL-18/19 |
+| Movement simulation | Immediate variable-height floor/wall jumps, press-to-drop climbing, tolerant surface contact and press buffering, temporary speed effects, moving-platform collision, air movement, and directional tunnel drilling | REQ-MOV-01 through REQ-MOV-10, REQ-CHR-02, REQ-LVL-18/19 |
 | Run lifecycle | Validate safe non-border spawns and non-walking placements, reset the complete run on enemy or bottom contact, and restore pickups, platforms, terrain, timer, and enemies | REQ-SYS-04/08/09/10/14, REQ-LVL-07/15/18/19 |
 | Player session controller | Retain two player names and one selected generated option across sequential rounds, then attribute each completed score to the selected player | REQ-SYS-05/06/15, REQ-LVL-12/17 |
 | Enemy simulation | Generate clear protected flight areas, follow seeded waypoint loops, and detect two-axis swept contact | REQ-LVL-15/21, REQ-SYS-10/14 |

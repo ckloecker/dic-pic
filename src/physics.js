@@ -2,11 +2,13 @@ const NORMAL_SPEED = 80;
 const CLIMB_SPEED = NORMAL_SPEED / 4;
 export const GRAVITY = 420;
 const JUMP_VELOCITY = -180;
+const NORMAL_JUMP_HEIGHT = JUMP_VELOCITY ** 2 / (2 * GRAVITY);
 const PLAYER_WIDTH = 6;
 const PLAYER_HEIGHT = 9;
 const CONTACT_DISTANCE = 3;
-const CONTACT_GRACE = 0.15;
+const JUMP_BUFFER_SECONDS = 0.15;
 export const DRILL_REACH = 10;
+export const JUMP_HOLD_SECONDS = 0.25;
 
 export function createPlayer(x, y) {
   return {
@@ -20,6 +22,7 @@ export function createPlayer(x, y) {
     facing: 1,
     charging: false,
     chargeSeconds: 0,
+    jumpOriginY: y,
     drilling: false,
     excavating: false,
     drillX: 1,
@@ -28,15 +31,13 @@ export function createPlayer(x, y) {
     climbPhase: 0,
     upHeld: false,
     dropJumpHeld: false,
-    contactLostSeconds: 0,
     jumpBufferSeconds: -1,
   };
 }
 
-export function jumpSpeedForCharge(seconds, worldHeight, dt) {
-  const fraction = Math.max(0, Math.min(1, seconds / 3));
-  const normalHeight = JUMP_VELOCITY ** 2 / (2 * GRAVITY);
-  const height = normalHeight + (Math.max(normalHeight, worldHeight) - normalHeight) * fraction;
+export function jumpSpeedForHold(seconds, dt) {
+  const fraction = Math.max(0, Math.min(1, seconds / JUMP_HOLD_SECONDS));
+  const height = NORMAL_JUMP_HEIGHT * (1 + fraction);
   return Math.sqrt(2 * GRAVITY * height) + GRAVITY * dt / 2;
 }
 
@@ -44,7 +45,6 @@ export function cancelCharge(player) {
   player.charging = false;
   player.chargeSeconds = 0;
   player.jumpBufferSeconds = -1;
-  player.contactLostSeconds = 0;
 }
 
 export function findSpawnY(terrain, x, playerWidth = PLAYER_WIDTH, playerHeight = PLAYER_HEIGHT) {
@@ -74,7 +74,7 @@ function overlapsSolid(player, terrain) {
   const left = Math.floor(player.x);
   const right = Math.ceil(player.x + player.width) - 1;
   const top = Math.floor(player.y);
-  const bottom = Math.ceil(player.y + player.height) - 1;
+  const bottom = Math.ceil(player.y + player.height - 1e-9) - 1;
   for (let y = top; y <= bottom; y += 1) {
     for (let x = left; x <= right; x += 1) {
       if (isSolid(terrain, x, y)) {
@@ -142,7 +142,8 @@ function moveAxis(player, distance, axis, terrain) {
   const step = distance / steps;
   for (let index = 0; index < steps; index += 1) {
     player[axis] += step;
-    if (player.drilling) drillTunnel(player, terrain);
+    // Gravity must collide with a horizontal tunnel's floor, not excavate it.
+    if (player.drilling && (axis === "x" || Math.abs(player.drillY) > 1e-9)) drillTunnel(player, terrain);
     if (overlapsSolid(player, terrain)) {
       player[axis] -= step;
       if (axis === "x" && player.grounded) {
@@ -184,7 +185,7 @@ function drillTunnel(player, terrain, lookAhead = 0, probe = false) {
       const dy = y + 0.5 - centerY;
       const along = dx * player.drillX + dy * player.drillY;
       const across = -dx * player.drillY + dy * player.drillX;
-      if (Math.abs(player.drillY) < 1e-9 && y >= Math.ceil(player.y + player.height)) continue;
+      if (Math.abs(player.drillY) < 1e-9 && y >= Math.ceil(player.y + player.height - 1e-9)) continue;
       if (along < 0 || along > DRILL_REACH || Math.abs(across) > halfWidth) continue;
       if (x >= 0 && x < terrain.width && y >= 0 && y < terrain.height) {
         const index = y * terrain.width + x;
@@ -239,29 +240,28 @@ export function stepPlayer(player, input, terrain, dt) {
   const nearSurface = !player.climbing && (contact.floorDistance !== null || contact.wall !== 0);
   player.grounded = !player.climbing && contact.floorDistance !== null;
   if (player.grounded) snapToFloor(player, terrain);
-  player.contactLostSeconds = nearSurface ? 0 : player.contactLostSeconds + elapsed;
-
-  if (player.charging && player.contactLostSeconds > CONTACT_GRACE + 1e-9) cancelCharge(player);
-  player.jumpBufferSeconds = input.jumpPressed && !dropJump
-    ? CONTACT_GRACE
+  player.jumpBufferSeconds = input.jumpPressed && !dropJump && !player.charging
+    ? JUMP_BUFFER_SECONDS
     : Math.max(-1, player.jumpBufferSeconds - elapsed);
-  if (!dropJump && player.jumpBufferSeconds >= -1e-9 && nearSurface && (input.jumpHeld || input.jumpReleased)) {
-    player.charging = true;
-    player.chargeSeconds = 0;
-    player.jumpBufferSeconds = -1;
-  }
-  if (player.charging && input.jumpHeld && !input.jumpPressed) {
-    player.chargeSeconds = Math.min(3, player.chargeSeconds + elapsed);
-    if (player.chargeSeconds > 3 - 1e-9) player.chargeSeconds = 3;
-  }
   let wallLaunch = 0;
-  if (input.jumpReleased) {
-    if (!dropJump && player.charging && nearSurface) {
-      player.vy = -jumpSpeedForCharge(player.chargeSeconds, terrain.height, elapsed);
-      if (!player.grounded && !player.climbing) wallLaunch = -contact.wall;
-      player.climbing = false;
-      player.grounded = false;
+  if (!dropJump && !player.charging && player.jumpBufferSeconds >= -1e-9
+    && nearSurface && (input.jumpHeld || input.jumpPressed)) {
+    if (!player.grounded) wallLaunch = -contact.wall;
+    player.jumpOriginY = player.y;
+    player.vy = -jumpSpeedForHold(0, elapsed);
+    player.charging = Boolean(input.jumpHeld && !input.jumpReleased);
+    player.chargeSeconds = Math.min(JUMP_HOLD_SECONDS, elapsed);
+    player.grounded = false;
+    player.jumpBufferSeconds = -1;
+  } else if (player.charging && input.jumpHeld && player.vy < 0) {
+    if (player.chargeSeconds < JUMP_HOLD_SECONDS) {
+      player.chargeSeconds = Math.min(JUMP_HOLD_SECONDS, player.chargeSeconds + elapsed);
+      const targetHeight = NORMAL_JUMP_HEIGHT * (1 + player.chargeSeconds / JUMP_HOLD_SECONDS);
+      const remainingHeight = targetHeight - (player.jumpOriginY - player.y);
+      player.vy = -Math.sqrt(2 * GRAVITY * Math.max(0, remainingHeight)) - GRAVITY * elapsed / 2;
     }
+  }
+  if (input.jumpReleased || !input.jumpHeld || (player.charging && player.vy >= 0)) {
     cancelCharge(player);
   }
 
@@ -317,6 +317,7 @@ export function stepPlayer(player, input, terrain, dt) {
       player.vy = 0;
     } else {
       player.vy = 0;
+      cancelCharge(player);
     }
   } else {
     player.grounded = false;
@@ -331,8 +332,9 @@ export function stepPlayer(player, input, terrain, dt) {
   if (player.y < 0) {
     player.y = 0;
     player.vy = 0;
+    cancelCharge(player);
   }
-  if (player.y + player.height >= terrain.height) {
+  if (player.y + player.height > terrain.height || (player.y + player.height === terrain.height && player.vy >= 0)) {
     player.y = terrain.height - player.height;
     player.vy = 0;
     player.grounded = true;

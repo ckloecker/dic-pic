@@ -74,16 +74,15 @@ The live GitHub form must include the branch and commit fields from the latest t
 ## Play
 
 - Move with **A/D** or **left/right arrows**.
-- Hold **Space** near a floor or wall to charge; release to jump.
+- Press **Space** near a floor or wall to jump immediately; hold briefly to jump higher.
   **W/up does not jump.**
   Press **Space** while climbing to drop immediately, without charging or launching on release.
-  Three seconds reaches maximum charge, shown by **MAX READY**
-  and a gold bar above the character. A full charge can cover the level's
-  height, but terrain and the image's solid ceiling can stop it.
-- Wall jumps launch upward and away; you keep falling while wall-charging.
-  Contact allows a three-cell gap. Charge survives lost contact for 150 ms,
-  but release must still be within three cells of a surface. Still-held presses
-  buffer contact for 150 ms. Walking follows small inclines and declines;
+  A quarter-second hold reaches **MAX JUMP**, shown by a gold bar above the character.
+  A tap rises approximately 38.6 cells; a full hold reaches twice that height, unless terrain or the ceiling stops it.
+- Wall jumps launch upward and away on press.
+  Contact allows a three-cell gap.
+  Still-held presses buffer contact for 150 ms.
+  Walking follows small inclines and declines;
   rising jumps are never snapped back onto the floor.
 - Press **W/up** to grip and climb the background wall.
   Use directions to climb at **one quarter** of walking speed, including diagonals.
@@ -94,8 +93,9 @@ The live GitHub form must include the branch and commit fields from the latest t
   Drill upward while climbing or downward while standing.
   Excavating intact ground limits horizontal travel to **20 cells/second**, the same speed as climbing.
   Walking or drilling through open space stays at **80 cells/second**.
-  Gravity and charged jumps are unchanged.
-- On touch devices use the directional pad, hold/release **JUMP**, and hold
+  Horizontal excavation preserves the floor even with floating-point foot-position rounding.
+  Gravity and variable-height jumps remain active.
+- On touch devices use the directional pad, press/hold **JUMP**, and hold
   **DRILL**.
   UP enters background climbing; directions also aim the drill.
 - **Reset run** restores the same photo's original terrain, spawn, and timer;
@@ -145,7 +145,7 @@ Generation reserves a contiguous photo-edge-aligned main corridor before final f
 Every offered option still has an executable no-drill route with safe in-bounds endpoints and no walking-only finish.
 The recorded route mixes supported walking and background climbing and is replayed against the final terrain and enemy simulation.
 There is no waiting added to reach the duration target.
-Free climbing, full-height charged jumps, and optional drilling still allow skilled shortcuts; the reference duration is not a minimum finishing time.
+Free climbing, variable-height jumps, and optional drilling still allow skilled shortcuts; the reference duration is not a minimum finishing time.
 Deep optional filling is removed without inventing filler, and substantial photo features are preferred over tiny fragments.
 Generation first tries photo-derived geometry, then widens route connectivity and supplies missing horizontal supports.
 If clutter prevents a safe option, it prioritizes the strongest layout-relevant edges and retries with repaired platforms.
@@ -177,7 +177,7 @@ rejection, without installing packages.
 
 Open <http://localhost:8000/tests/system/runner.html> for automated browser
 checks of setup, opacity, Space-only jumping, the on-character charge bar,
-charge/release, timer, reset, press-to-drop climbing, biome previews, scenery, background effects, reduced motion, directional drilling, the solid bottom, enemy-contact respawning, no-drill route completion, and exact current-run scoreboard highlighting.
+immediate launch and hold assistance, timer, reset, press-to-drop climbing, biome previews, scenery, background effects, reduced motion, directional drilling, bottom/enemy full-run resets, no-drill route completion, and exact current-run scoreboard highlighting.
 Keep the test tab visible until its summary appears.
 
 Integrated browser checks are listed in
