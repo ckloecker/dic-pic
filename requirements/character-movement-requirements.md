@@ -47,7 +47,7 @@ Movement limits shall hold across supported frame durations and repeated resets 
 
 ## REQ-MOV-04: Air Movement
 
-While "in air", i.e., executing a jump or falling, the character shall move left or right at normal speed.
+While "in air", i.e., executing a jump or falling, the character shall move left or right at normal speed unless a temporary speed pickup is active under REQ-LVL-18.
 Background climbing and active excavation are exceptions: REQ-MOV-10 specifies climbing speed and suspension of gravity, and REQ-MOV-03 limits horizontal active excavation without changing gravity.
 
 ## REQ-MOV-05: Charged Jumps
@@ -97,15 +97,12 @@ Floor snapping shall never pull a rising jump back onto the floor.
 Terrain walls shall be actual terrain, while the left and right image borders shall also grant wall contact and wall jumps.
 The top image boundary remains the ceiling specified by REQ-MOV-06, and the bottom remains the floor specified by REQ-MOV-08; neither shall grant wall jumps.
 
-## REQ-MOV-08: Solid Image Bottom
+## REQ-MOV-08: Bottom-Edge Run Reset
 
-Status: Approved.
+Status: Superseded by REQ-SYS-14.
 
-The image's bottom boundary shall act as a solid floor. The character shall
-not fall through it and shall be able to stand, walk, and jump on it.
-Removing terrain above the boundary shall not allow the character to fall
-out of the image. This supersedes bottom-edge fall-and-respawn behavior in
-REQ-SYS-09. The boundary is a movement constraint, not generated photo terrain.
+Falling to the image bottom shall reset the entire run under REQ-SYS-14.
+The image bottom shall no longer be a safe surface for continued play.
 
 ## REQ-MOV-09: Retain Existing Charged-Jump Interaction
 
@@ -120,8 +117,7 @@ indicators specified by REQ-MOV-01/02/05/07.
 REQ-MOV-10 changes background attachment to press-to-drop without changing floor/wall behavior.
 
 The proposed responsive-jump redesign is withdrawn. This decision does not
-withdraw the approved solid-bottom requirement REQ-MOV-08, whose
-implementation is required.
+change the failure reset behavior in REQ-MOV-08/REQ-SYS-14.
 
 ## REQ-MOV-10: Background Climbing
 

@@ -110,9 +110,11 @@ Status: Approved.
 
 After selecting a photo, the player shall see three playable thumbnails with biome and layout labels before play.
 The options shall have distinct biome/layout pairs.
+Repeated generation from the same image shall reproduce the same three suggestions under REQ-LVL-17.
 Selecting an option shall start exactly its previewed terrain, biome, spawn, and gate.
 Reset shall restore that chosen option without rerandomizing.
 Scores shall be keyed by the photo and exact generated option, not mixed across different layouts.
+The same option shall be retained for both players in a sequential session under REQ-SYS-15.
 
 ## REQ-LVL-13: Biome Background Effects
 
@@ -132,6 +134,9 @@ Status: Approved.
 The displayed photo shall be darkened and desaturated while remaining recognizable.
 Generated terrain shall have a narrow dark outer border or shadow that does not change collision geometry.
 Opaque terrain outlines and 80%-opaque interiors shall remain as specified in REQ-LVL-06.
+Exposed terrain edges shall contrast clearly against the displayed photo.
+Interior filling shall use a uniform color per biome rather than checker or alternating tile patterns, while preserving the opacity in REQ-LVL-06.
+Decorative design elements shall appear occasionally and shall not obscure terrain or the photo.
 Thumbnails and gameplay shall use the same background and terrain treatment.
 Image analysis shall continue to use the unfiltered original photo.
 
@@ -144,7 +149,7 @@ Patrols shall reverse within checked, obstacle-free corridors without chasing, b
 The entire swept enemy footprint shall avoid the spawn and finish with a safety margin.
 Thumbnails shall show the initial enemies and selecting or resetting an option shall retain its exact patrol definitions.
 Enemy motion shall begin with the race timer, leaving the initial previewed scene and idle player safe.
-Enemy contact shall return the player to the selected spawn while preserving elapsed race time and drilled terrain, as specified in REQ-SYS-10.
+Enemy contact shall reset the entire run as specified in REQ-SYS-10/14.
 
 ## REQ-LVL-16: Photo-Aligned Reference Route
 
@@ -167,3 +172,45 @@ Existing free background climbing, full-height charged jumps, and drilling shall
 The reference duration is not a guaranteed minimum completion time for other routes.
 Generation shall use bounded planning and repair stages, preserving hard safety and no-drill completion guarantees instead of relaxing them.
 Validation shall cover diverse sparse, busy, horizontal, and vertical images and the supplied portrait rather than only a specially suitable fixture.
+
+## REQ-LVL-17: Reproducible Random Generation
+
+Status: Approved.
+
+The random number engine used for level generation shall be initialized with the same fixed seed and initial state at the start of every generation of three suggestions.
+All random choices affecting the suggestions shall use this reproducible random sequence, including biome/layout assignment, route and endpoint selection, scenery, moving platforms, pickups, and initial enemy patrol definitions.
+The same input image shall always produce the very same three suggestions in the same order, with identical previews, terrain, biome/layout labels, start and finish positions, scenery, moving platforms, pickups, and initial enemy patrol definitions.
+Results shall not depend on previous generations, player name, current time, or browser session.
+Random biome, layout, and edge selection under REQ-LVL-07/10/11 shall remain pseudorandom within this reproducible sequence rather than being resampled unpredictably.
+
+## REQ-LVL-18: Temporary Pickups
+
+Status: Approved.
+
+Each generated level option shall contain one to three speed pickups and one to three mushroom pickups.
+Touching a speed pickup shall double the character's movement speed for five seconds.
+Touching a mushroom pickup shall reverse the horizontal and vertical directional controls, including directional drilling, for five seconds.
+Pickup effects shall not stack.
+Collecting another pickup of an active effect type shall refresh that effect's five-second duration.
+Pickups shall be visible, collectible, and outside the required no-drill route clearance.
+Run reset shall restore collected pickups and clear active effects.
+
+## REQ-LVL-19: Optional Moving Platforms
+
+Status: Approved.
+
+Each generated level option shall contain two visible, collidable moving platforms, each twelve cells wide and three cells high.
+Platforms shall move horizontally at eighteen terrain cells per second within bounded obstacle-free paths.
+Platforms shall remain optional shortcuts and shall not be required by the verified no-drill route.
+When the player drills away terrain blocking a platform path, that platform's movement bounds shall extend into the newly cleared space.
+Platform motion shall begin with the race timer.
+Previews shall show each platform at its initial position, and reset shall restore the initial positions.
+
+## REQ-LVL-20: Uniform Terrain Fill and Edge Contrast
+
+Status: Approved.
+
+Exposed terrain edges shall have sufficient contrast against the displayed photo to remain readily distinguishable.
+Interior terrain filling shall use a uniform color per biome without checker or alternating tile patterns.
+Interior opacity shall remain as specified by REQ-LVL-06.
+Decorative design elements shall be occasional, photo-compatible, and shall not obscure the terrain or the photo.

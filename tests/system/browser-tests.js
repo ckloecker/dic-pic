@@ -25,6 +25,11 @@ function key(type, value) {
 function name(value) {
   find("#player-name").value = value;
   find("#player-name").dispatchEvent(new app.Event("input", { bubbles: true }));
+  const secondName = find("#second-player-name");
+  if (secondName) {
+    secondName.value = "Second Runner";
+    secondName.dispatchEvent(new app.Event("input", { bubbles: true }));
+  }
 }
 async function until(predicate, timeoutMs = 5000) {
   const deadline = performance.now() + timeoutMs;
@@ -110,6 +115,18 @@ test("REQ-SYS-11: the project root serves the game with project-relative assets"
     "root entry point does not load styles through a project-relative URL");
   assert(new URL(app.location.href).pathname === rootUrl.pathname, "system runner does not exercise the root entry point");
   assert(app.getComputedStyle(find(".app-shell")).display === "flex", "root page stylesheet did not load");
+});
+
+test("REQ-SYS-16: controls are prominently presented during play", async () => {
+  const panel = find(".controls-panel");
+  const title = find(".control-title");
+  assert(panel && title, "controls panel or title is missing");
+  const panelStyle = app.getComputedStyle(panel);
+  const titleStyle = app.getComputedStyle(title);
+  assert(panelStyle.backgroundColor !== "rgba(0, 0, 0, 0)"
+    && parseFloat(panelStyle.paddingTop) >= 16, "controls panel lacks a prominent background or spacing");
+  assert(parseFloat(titleStyle.fontSize) >= 14 && Number(titleStyle.fontWeight) >= 700,
+    "controls heading is not visually prominent");
 });
 
 test("REQ-SYS-12: every category and severity opens a private-data-free GitHub form", async () => {
@@ -266,7 +283,7 @@ test("REQ-LVL-06/08: render photo-aligned platform interiors at 80% opacity", as
   for (const [x, y] of samples.slice(0,3)) {
     const original = sourceContext.getImageData(x, y, 1, 1).data;
     const offset = (y * 3 * 960 + x * 3) * 4;
-    const tile = (Math.floor(x / 5) + Math.floor(y / 4)) % 2 === 0 ? [139, 91, 64] : [105, 69, 54];
+    const tile = [139, 91, 64];
     for (let channel = 0; channel < 3; channel += 1) {
       const expected = Math.round(original[channel] * 0.2 + tile[channel] * 0.8);
       assert(Math.abs(pixels[offset + channel] - expected) <= 1, `platform alpha/alignment mismatch at ${x},${y}`);
@@ -362,7 +379,7 @@ test("REQ-MOV-03/10: background holds after drill release, then jump press drops
   assert(errors.length === 0, `browser errors: ${errors.join(", ")}`);
 });
 
-test("REQ-MOV-03/08: drill down lands at solid bottom without respawn", async () => {
+test("REQ-SYS-14: falling onto the image bottom fully resets the run", async () => {
   find("#reset-button").click();
   const initialTop = playerTop();
   key("keydown", "ArrowUp");
@@ -370,18 +387,18 @@ test("REQ-MOV-03/08: drill down lands at solid bottom without respawn", async ()
   await until(() => playerTop() < initialTop - 15);
   key("keyup", "ArrowUp");
   const beforeDown = Number(find("#timer").textContent);
+  assert(beforeDown > 0, "test failed to start the run before bottom fall");
   key("keydown", "ArrowDown");
-  await until(() => playerTop() >= 170, 10000);
+  await until(() => find("#contact-message").textContent.includes("bottom"), 10000);
   key("keyup", "ArrowDown");
   key("keyup", "Enter");
-  const top = playerTop();
-  await delay(200);
-  assert(top >= 170 && Math.abs(playerTop() - top) < 1, "bottom contact respawned or fell out");
-  assert(Number(find("#timer").textContent) >= beforeDown && beforeDown > 0, "bottom contact reset the running timer");
+  await until(() => find("#timer").textContent === "0.00");
+  assert(Math.abs(playerTop() - initialTop) < 1, "bottom contact did not restore the starting position");
+  assert(Number(find("#timer").textContent) === 0, "bottom contact did not reset the timer");
   key("keydown", " ");
   await until(() => find("#charge-meter").value > 0);
   key("keyup", " ");
-  await until(() => playerTop() < top - 5);
+  await until(() => playerTop() < initialTop - 5);
   assert(errors.length === 0, `browser errors: ${errors.join(", ")}`);
 });
 
@@ -648,20 +665,19 @@ test("REQ-LVL-15 / REQ-SYS-10: live enemy contact keeps time and tunnels, clears
       tick();
     }
     for(const value of ["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"])key("keyup",value);
-    assert(find("#contact-message").textContent.includes("Time and tunnels kept"),
+    assert(find("#contact-message").textContent.includes("Enemy contact — run reset"),
       `enemy contact did not respawn at ${playerLeft()},${playerTop()} toward ${aimX},${aimY}`);
     assert(find("#complete-panel").hidden, "enemy contact completed or saved a run");
     assert(JSON.stringify(app.localStorage) === savedScores, "enemy contact wrote a score");
-    const elapsed = Number(find("#timer").textContent);
-    assert(elapsed > 4, "contact reset the timer");
-    assert(tunnelSample() === drilled, "contact restored excavated terrain");
+    assert(Number(find("#timer").textContent) === 0, "contact did not reset the timer");
+    assert(tunnelSample() === undrilled, "contact did not restore excavated terrain");
     const returnedTop = playerTop();
     assert(Math.abs(returnedTop - initialTop) < 1, `contact did not return to selected spawn: ${returnedTop}`);
     const returnedLeft = playerLeft();
     for (let i = 0; i < 10; i += 1) tick();
     assert(Math.abs(playerLeft() - returnedLeft) < 1 && find("#charge-meter").value === 0,
       "held movement/drill controls survived contact");
-    assert(Number(find("#timer").textContent) > elapsed, "contact stopped race timing");
+    assert(Number(find("#timer").textContent) === 0, "held input started the reset run");
     find("#reset-button").click();
     assert(checksum() === initial, "manual reset did not restore terrain and enemies");
     assert(find("#timer").textContent === "0.00" && !find("#contact-message").textContent, "manual reset retained contact state");
@@ -776,6 +792,14 @@ test("REQ-LVL-16 / REQ-SYS-06: no-drill replay finishes and outlines the exact r
     const saved=JSON.parse(app.localStorage.getItem(storageKey));
     assert(saved.length===1&&saved[0].id,"ranked attempt was not persisted with an identity");
     app.localStorage.setItem(storageKey,JSON.stringify(saved));
+    const initialScene=canvasPixels();
+    find("#next-player").value="Second Runner";
+    find("#next-round-button").click();
+    await until(()=>!find("#game-screen").hidden);
+    assert(find("#level-title").textContent.includes("Second Runner"),"next round did not select the second player");
+    assert(find("#timer").textContent==="0.00"&&canvasPixels().every((value,index)=>value===initialScene[index]),
+      "second player did not receive the same reset course");
+    replay();
     find("#replay-button").click();
     const tied=replay();
     assert(tied.rows.length===2&&tied.current===tied.rows[1],"equal name/time highlighted the older attempt");

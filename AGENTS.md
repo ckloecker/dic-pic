@@ -23,8 +23,10 @@
   for their issue.
 - When eligible issues conflict, implement only the issue with the higher 👍
   count and close the conflicting issue with fewer 👍 reactions as a duplicate.
-- Keep changes for each issue in its own commit, and include that issue number
-  in the commit message.
+- Keep implementation changes for each issue in its own commit, and include
+  that issue number in the commit message.
+- Cross-cutting requirements, design, tests, and traceability may use a separate
+  non-closing commit that references every affected issue.
 - Close each resolved issue through its corresponding commit message using a
   GitHub-resolving keyword such as `Fixes #123`.
 - Keep cross-cutting issue-workflow documentation in a separate commit with

@@ -51,20 +51,45 @@ zero. An abandoned run shall not record a score.
 
 ## REQ-SYS-09: Falling Out of the Level
 
-Status: Superseded for bottom-edge falls by REQ-MOV-08.
+Status: Superseded by REQ-SYS-14.
 
-The solid image bottom shall prevent falling out of the level, including after excavation.
-Bottom-edge contact shall not respawn the character or reset the timer or tunnels.
+Bottom-edge contact after falling shall reset the entire run under REQ-SYS-14.
 
 ## REQ-SYS-10: Enemy Contact
 
 Status: Approved.
 
-Contact with any flying patrol enemy shall immediately return the character to the selected starting position.
-Enemy contact shall preserve the running timer, drilled terrain, selected option, and enemy patrol progress.
-The returned character shall have fresh movement state and held controls shall be cleared.
+Contact with any flying patrol enemy shall immediately reset the entire run as specified by REQ-SYS-14.
+The reset shall restore the original terrain, selected starting position, initial enemy patrol positions, fresh movement state, and zero timer, and shall clear held controls.
 Enemy contact shall take priority over simultaneous finish contact and shall not record a score.
 Manual reset shall continue to restore terrain, enemy starting positions, controls, and the timer under REQ-SYS-08.
+
+## REQ-SYS-14: Run Reset on Failure
+
+Status: Approved.
+
+Enemy contact or reaching the image bottom after falling shall immediately reset the entire run.
+The reset shall restore the original undrilled terrain, the selected starting position, initial enemy positions, fresh movement and pickup state, and a zero timer.
+Held controls shall be cleared, and the failed run shall not be recorded.
+The player character shall not be initially positioned against any image border.
+The player may touch other image borders during play.
+
+## REQ-SYS-15: Sequential Two-Player Sessions
+
+Status: Approved.
+
+The setup shall collect valid names for two players.
+After each completed round, the game shall allow selection of which of the two players plays the next round.
+Both players in the session shall play the same exact generated level option, including terrain, biome, start, finish, moving platforms, pickups, and enemies.
+Starting the next round shall reset the selected option to its original state and start its timer at zero.
+Each completed round shall be attributed to the name of the selected player.
+
+## REQ-SYS-16: Prominent Gameplay Controls
+
+Status: Approved.
+
+The gameplay controls and instructions shall be visually prominent and easy to find.
+Their visual grouping and text shall remain readable and usable on desktop and narrow/mobile viewports.
 
 ## REQ-SYS-11: Static Root Entry Point
 

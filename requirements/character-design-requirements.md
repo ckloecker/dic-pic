@@ -25,3 +25,10 @@ Status: Approved.
 
 The runner shall wear the current biome's explorer hat, original fedora, or diving bell in both walking and climbing poses.
 Headwear shall remain within the six-by-nine-cell rendered footprint and shall not change collision or movement.
+
+## REQ-CHR-05: Underwater Swimming Visuals
+
+Status: Approved.
+
+In underwater levels, the character shall use an animated swimming-themed visual pose instead of the background-climbing visual pose.
+This change shall affect visuals only and shall not change collision dimensions, physics, controls, or race timing.

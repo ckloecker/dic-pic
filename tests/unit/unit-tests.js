@@ -110,6 +110,70 @@ test("REQ-LVL-01/16: offered options retain executable no-drill routes without n
   }
 });
 
+test("REQ-LVL-18: speed pickup doubles horizontal movement and expires after five seconds", () => {
+  const terrain = flatTerrain(120, 60, 50);
+  const normal = physicsApi.createPlayer(10, 41);
+  const boosted = physicsApi.createPlayer(10, 41);
+  physicsApi.stepPlayer(normal, { move: 1 }, terrain, 0.25);
+  physicsApi.stepPlayer(boosted, { move: 1, speedMultiplier: 2 }, terrain, 0.25);
+  assert(Math.abs(boosted.x - normal.x * 2 + 10) < 0.01, "speed pickup did not double walking speed");
+});
+
+test("REQ-LVL-18: pickup timers refresh without stacking and reset with the run", () => {
+  const original = flatTerrain(80, 70, 60);
+  original.pickups = [
+    { type: "speed", x: 10, y: 40, width: 4, height: 4 },
+    { type: "speed", x: 10, y: 40, width: 4, height: 4 },
+    { type: "reverse", x: 10, y: 40, width: 4, height: 4 },
+  ];
+  const run = runApi.createRun(original);
+  run.player.x = 10;
+  run.player.y = 40;
+  runApi.collectPickups(run);
+  assert(run.effects.speedSeconds === 5 && run.effects.reverseSeconds === 5, "pickup did not activate a five-second effect");
+  runApi.stepRunEffects(run, 2);
+  runApi.collectPickups(run);
+  assert(run.effects.speedSeconds === 5, "repeat pickup did not refresh its timer");
+  assert(runApi.applyRunEffects({ move: 1, moveY: -1, drill: true }, run).move === -1
+    && runApi.applyRunEffects({ move: 1, moveY: -1 }, run).moveY === 1,
+  "mushroom did not reverse all directional controls");
+  const reset = runApi.createRun(original);
+  assert(reset.pickups.length === 3 && reset.effects.speedSeconds === 0 && reset.effects.reverseSeconds === 0,
+    "new run retained collected pickups or active effects");
+});
+
+test("REQ-LVL-19: moving platforms reverse at clear path ends and extend after drilling", () => {
+  const original = flatTerrain(80, 70, 60);
+  original.solid.fill(0);
+  for (let x = 22; x < 24; x += 1) {
+    for (let y = 10; y < 13; y += 1) original.solid[y * 80 + x] = 1;
+  }
+  original.movingPlatforms = [
+    { x: 10, y: 10, left: 10, right: 10, width: 12, height: 3, speed: 18, direction: 1 },
+    { x: 40, y: 30, left: 40, right: 50, width: 12, height: 3, speed: 18, direction: -1 },
+  ];
+  const run = runApi.createRun(original);
+  runApi.stepMovingPlatforms(run, 0.1);
+  assert(run.movingPlatforms[0].right === 10, "platform path crossed intact terrain");
+  run.terrain.solid[10 * 80 + 22] = 0;
+  run.terrain.solid[11 * 80 + 22] = 0;
+  run.terrain.solid[12 * 80 + 22] = 0;
+  runApi.stepMovingPlatforms(run, 0.1);
+  assert(run.movingPlatforms[0].right > 10, "drilling did not extend the platform path");
+  run.player = physicsApi.createPlayer(12, 1);
+  run.player.grounded = true;
+  runApi.stepMovingPlatforms(run, 0.1);
+  physicsApi.stepPlayer(run.player, {}, run.terrain, 0);
+  assert(run.player.grounded && run.player.y + run.player.height === run.movingPlatforms[0].y,
+    "moving platform did not provide player support");
+  const carriedX = run.player.x;
+  runApi.stepMovingPlatforms(run, 0.1);
+  assert(run.player.x > carriedX, "moving platform did not carry its rider");
+  for (let frame = 0; frame < 100; frame += 1) runApi.stepMovingPlatforms(run, 0.05);
+  assert(run.movingPlatforms.every((platform) => platform.x >= platform.left && platform.x <= platform.right),
+    "platform escaped its expanded path bounds");
+});
+
 test("REQ-LVL-16: bridges connect detected supported surfaces beyond eighteen cells", () => {
   for(const [gap,anchored,evidence] of [[12,true,true],[18,true,true],[19,true,true],
     [12,false,true],[12,true,false]]){
@@ -133,6 +197,61 @@ test("REQ-LVL-16: bridges connect detected supported surfaces beyond eighteen ce
       assert(bridge.cells.every(cell=>connected.photoSolid[cell]),"connector collision is missing");
       assert(!terrain.photoSolid[20*90+32],"connector mutated source photo evidence");
     }
+  }
+});
+
+test("REQ-LVL-18: generated levels have one to three pickups of each type outside the safe route", () => {
+  const width = 320, height = 180;
+  const pixels = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
+    const value = x >= 18 && x < 300 && ((y >= 22 && y < 58) || (y >= 78 && y < 112) || (y >= 132 && y < 168)) ? 220 : 20;
+    pixels.set([value, value, value, 255], (y * width + x) * 4);
+  }
+  let seed = 123;
+  const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+  for (const option of levelApi.createSuggestions(pixels, width, height, random)) {
+    for (const type of ["speed", "reverse"]) {
+      const pickups = option.pickups.filter((pickup) => pickup.type === type);
+      assert(pickups.length >= 1 && pickups.length <= 3, `invalid ${type} pickup count`);
+      for (const pickup of pickups) {
+        assert(pickup.x >= 0 && pickup.y >= 0 && pickup.x + pickup.width <= width
+          && pickup.y + pickup.height <= height, "pickup is outside the level");
+        for (let y = pickup.y; y < pickup.y + pickup.height; y += 1) {
+          for (let x = pickup.x; x < pickup.x + pickup.width; x += 1) {
+            const cell = y * width + x;
+            assert(!option.solid[cell] && !option.route.protected[cell], "pickup obstructs terrain or the reference route");
+          }
+        }
+      }
+    }
+  }
+});
+
+test("REQ-LVL-19: two optional moving platforms are bounded and clear of the reference route", () => {
+  const width = 320, height = 180;
+  const pixels = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
+    const value = x >= 18 && x < 300 && ((y >= 22 && y < 58) || (y >= 78 && y < 112) || (y >= 132 && y < 168)) ? 220 : 20;
+    pixels.set([value, value, value, 255], (y * width + x) * 4);
+  }
+  let seed = 456;
+  const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+  for (const option of levelApi.createSuggestions(pixels, width, height, random)) {
+    assert(option.movingPlatforms?.length === 2, "expected exactly two moving platforms");
+    for (const platform of option.movingPlatforms) {
+      assert(platform.width === 12 && platform.height === 3 && platform.speed === 18,
+        "platform size or speed is incorrect");
+      assert(platform.x >= platform.left && platform.x <= platform.right
+        && platform.left >= 0 && platform.right + platform.width <= width
+        && platform.y >= 0 && platform.y + platform.height <= height, "platform exceeds its motion bounds");
+      for (let x = platform.left; x < platform.right + platform.width; x += 1) {
+        for (let y = platform.y; y < platform.y + platform.height; y += 1) {
+          const cell = y * width + x;
+          assert(!option.solid[cell] && !option.route.protected[cell], "platform path obstructs terrain or required route");
+        }
+      }
+    }
+    assert(routeApi.verifyReferenceRoute(option).valid, "moving platforms invalidated the no-drill route");
   }
 });
 
@@ -231,27 +350,35 @@ if (enemyApi) {
     try { enemyApi.createEnemies(blocked); } catch (error) { rejected = /patrol/i.test(error.message); }
     assert(rejected, "no-corridor case silently omitted enemies");
   });
-  test("REQ-SYS-10: swept enemy contact respawns only player and preserves tunnels, time, and patrols", () => {
+  test("REQ-SYS-14: enemy contact resets terrain, player, timer, pickups, platforms, and patrols", () => {
     const original = flatTerrain(100, 80, 60);
-    original.spawn = { x: 0, y: 51 };
+    original.spawn = { x: 2, y: 51 };
     original.flag = { x: 80, y: 60, width: 12, height: 18 };
     original.enemies = [{ x: 40, y: 20, left: 20, right: 70, width: 10, height: 6, phase: 20, speed: 18 }];
+    original.pickups = [{ type: "speed", x: 30, y: 20, width: 4, height: 4 }];
+    original.movingPlatforms = [{ x: 10, y: 10, left: 10, right: 20, width: 12, height: 3, speed: 18, direction: 1 }];
     const run = runApi.createRun(original);
     run.startedAt = 100;
     run.elapsedMs = 900;
     run.terrain.solid[65 * 100 + 5] = 0;
+    run.pickups.length = 0;
+    run.effects.speedSeconds = 4;
+    run.movingPlatforms[0].x = 15;
     run.player.x = 60;
     run.player.y = 20;
     const previous = { ...run.player, x: 20 };
     assert(enemyApi.enemyContact(run.player, run.enemies, previous), "swept contact was missed");
     assert(!enemyApi.enemyContact({ ...run.player, y: 0 }, run.enemies, { ...previous, y: 0 }),
       "noncontact horizontal crossing counted");
-    runApi.respawnPlayer(run);
-    assert(run.player.x === 0 && run.player.y === 51 && !run.player.charging, "player not restored");
-    assert(run.startedAt === 100 && run.elapsedMs === 900 && !run.terrain.solid[6505], "contact reset the run");
+    runApi.resetRun(run);
+    assert(run.player.x === 2 && run.player.y === 51 && !run.player.charging, "player not restored");
+    assert(run.startedAt === null && run.elapsedMs === 0 && run.terrain.solid[6505], "run timer or terrain was not reset");
+    assert(run.pickups.length === 1 && run.effects.speedSeconds === 0, "pickup state survived reset");
+    assert(run.movingPlatforms[0].x === 10, "moving platform position survived reset");
+    assert(run.enemies[0].x === 40, "enemy patrol position survived reset");
     enemyApi.stepEnemies(run.enemies, 1);
     assert(original.enemies[0].x === 40, "runtime enemy mutation changed selected option");
-    assert(runApi.createRun(original).enemies[0].x === 40, "manual reset retained enemy progress");
+    assert(runApi.createRun(original).enemies[0].x === 40, "new run retained enemy progress");
     const reversing = { x: 9.8, y: 0, left: 0, right: 10, width: 1, height: 1, speed: 18, phase: 9.8 };
     enemyApi.stepEnemies([reversing], 0.4 / 18);
     const nearTurn = { x: 10.95, y: 0, width: 1, height: 1 };
@@ -1024,9 +1151,51 @@ if (runApi) {
           assert(context.getImageData(x, y, 1, 1).data[3] === 255, "exposed outline is translucent");
         }
         assert(context.getImageData(8, 8, 1, 1).data[3] === 204, "interior is not 80% opaque");
+        const firstFill = context.getImageData(8, 8, 1, 1).data;
+        const secondFill = context.getImageData(10, 8, 1, 1).data;
+        assert(firstFill[0] === secondFill[0] && firstFill[1] === secondFill[1] && firstFill[2] === secondFill[2],
+          "interior fill is patterned instead of uniform");
         terrain.solid[8 * 20 + 9] = 0;
         sceneApi.paintTerrain(context, terrain);
         assert(context.getImageData(8, 8, 1, 1).data[3] === 255, "new tunnel outline is translucent");
+      });
+      test("REQ-CHR-05: underwater swimming visuals animate inside the unchanged character footprint", () => {
+        const player = { x: 5, y: 5, width: 6, height: 9, facing: 1 };
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = 20;
+        const context = canvas.getContext("2d");
+        sceneApi.drawSwimmingPlayer(context, player, 0);
+        const first = context.getImageData(0, 0, 20, 20).data;
+        context.clearRect(0, 0, 20, 20);
+        sceneApi.drawSwimmingPlayer(context, player, 1);
+        const second = context.getImageData(0, 0, 20, 20).data;
+        assert(first.some(Boolean) && second.some(Boolean), "swimming pose is invisible");
+        assert(first.some((value, index) => value !== second[index]), "swimming pose is not animated");
+        for (let y = 0; y < 20; y += 1) for (let x = 0; x < 20; x += 1) {
+          if (second[(y * 20 + x) * 4 + 3]) {
+            assert(x >= 5 && x < 11 && y >= 5 && y < 14, "swimming artwork exceeds the character footprint");
+          }
+        }
+      });
+      test("REQ-LVL-18/19: pickup and moving-platform artwork stays visible within the world", () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 40;
+        canvas.height = 30;
+        const context = canvas.getContext("2d");
+        sceneApi.drawPickups(context, [
+          { type: "speed", x: 3, y: 4, width: 4, height: 4 },
+          { type: "reverse", x: 10, y: 4, width: 4, height: 4 },
+        ], 0);
+        sceneApi.drawMovingPlatforms(context, [
+          { x: 20, y: 10, width: 12, height: 3 },
+        ]);
+        const pixels = context.getImageData(0, 0, 40, 30).data;
+        assert(pixels.some(Boolean), "pickup or platform artwork is not visible");
+        for (let y = 0; y < 30; y += 1) for (let x = 0; x < 40; x += 1) {
+          if (pixels[(y * 40 + x) * 4 + 3]) {
+            assert(x >= 3 && x < 32 && y >= 4 && y < 13, "pickup or platform artwork exceeds its declared bounds");
+          }
+        }
       });
       test("REQ-LVL-01/11: mixed photo gives distinct filled horizontal, vertical, and balanced layouts", () => {
         const width = 320, height = 180;
@@ -1318,6 +1487,14 @@ if (runApi) {
               "seeded option has a walk-only finish");
             assert(option.enemies.length === 2 && JSON.stringify(run.enemies) === JSON.stringify(option.enemies),
               "preview enemies changed at game start");
+            assert(option.spawn.x > 0 && option.spawn.y > 0
+              && option.spawn.x + run.player.width < width
+              && option.spawn.y + run.player.height < height, "player spawn touches an image border");
+                  assert(run.pickups.length === option.pickups.length
+              && run.movingPlatforms.length === option.movingPlatforms.length,
+            "runtime pickups or platforms differ from their preview");
+                  assert(option.movingPlatforms.every((platform, index) => platform.x === run.movingPlatforms[index].x),
+                    "platform preview changed at run start");
             const changedEnemy = { ...option, enemies: option.enemies.map((enemy) => ({ ...enemy, speed: enemy.speed + 1 })) };
             assert(levelApi.levelIdentity(changedEnemy) !== levelApi.levelIdentity(option), "patrols omitted from score identity");
             const identity = levelApi.levelIdentity(option);
@@ -1371,6 +1548,17 @@ if (runApi) {
         };
         assert(ratio("vertical") > ratio("horizontal") * 1.5, "layout labels do not change geometry balance");
       });
+      test("REQ-LVL-17: the same image deterministically reproduces its suggestions without an injected random source", () => {
+        const { pixels, width, height } = fixturePixels();
+        const first = levelApi.createSuggestions(pixels, width, height);
+        levelApi.createSuggestions(pixels.slice(), width, height);
+        const repeated = levelApi.createSuggestions(pixels, width, height);
+        assert(first.length === 3 && repeated.length === 3, "generation did not return three options");
+        first.forEach((option, index) => {
+          assert(levelApi.levelIdentity(option) === levelApi.levelIdentity(repeated[index]),
+            `suggestion ${index + 1} changed after another image generation`);
+        });
+      });
     }
     for (let y = originalFlag.y; y < 60; y += 1) {
       for (let x = originalFlag.x; x < originalFlag.x + originalFlag.width; x += 1) {
@@ -1379,18 +1567,27 @@ if (runApi) {
     }
     assert(JSON.stringify(run.flag) === JSON.stringify(originalFlag), "drilling moved the flag");
   });
-  test("REQ-SYS-08/09: fresh runs restore terrain; respawn preserves tunnels and timer", () => {
+  test("REQ-SYS-08/14: resetting restores terrain, patrols, pickups, platforms, and timer", () => {
     const original = flatTerrain(60, 60, 30);
+    original.spawn = { x: 2, y: 21 };
+    original.enemies = [{ x: 25, y: 10, left: 20, right: 35, width: 10, height: 6, speed: 18, phase: 0 }];
+    original.pickups = [{ type: "speed", x: 12, y: 10, width: 4, height: 4 }];
+    original.movingPlatforms = [{ x: 10, y: 5, left: 10, right: 20, width: 12, height: 3, speed: 18, direction: 1 }];
     const run = runApi.createRun(original);
     run.terrain.solid[35 * 60 + 10] = 0;
     run.startedAt = 123;
     run.elapsedMs = 500;
     run.player.x = 40;
     run.player.chargeSeconds = 2;
-    runApi.respawnPlayer(run);
-    assert(run.player.x === run.spawn.x && run.player.chargeSeconds === 0, "respawn did not restore player");
-    assert(run.startedAt === 123 && run.elapsedMs === 500, "respawn reset timer");
-    assert(run.terrain.solid[35 * 60 + 10] === 0, "respawn restored drilled terrain");
+    run.enemies[0].x = 30;
+    run.pickups.length = 0;
+    run.movingPlatforms[0].x = 18;
+    runApi.resetRun(run);
+    assert(run.player.x === run.spawn.x && run.player.chargeSeconds === 0, "reset did not restore player");
+    assert(run.startedAt === null && run.elapsedMs === 0, "reset did not clear timer");
+    assert(run.terrain.solid[35 * 60 + 10] === 1, "reset did not restore drilled terrain");
+    assert(run.enemies[0].x === 25 && run.pickups.length === 1 && run.movingPlatforms[0].x === 10,
+      "reset did not restore initial enemies, pickups, and moving platforms");
     const fresh = runApi.createRun(original);
     assert(original.solid[35 * 60 + 10] === 1 && fresh.terrain.solid[35 * 60 + 10] === 1, "reset failed to restore terrain");
     assert(fresh.startedAt === null && fresh.elapsedMs === 0, "fresh run timer was not reset");

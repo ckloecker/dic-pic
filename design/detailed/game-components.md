@@ -13,7 +13,7 @@ Verification covers the supplied portrait and sparse, disconnected, busy, horizo
 
 ## Requirements covered
 
-This design elaborates REQ-SYS-01 through REQ-SYS-06, REQ-SYS-08/09/10/11/12/13, REQ-LVL-01 through REQ-LVL-16, REQ-CHR-01/02/03/04, and REQ-MOV-01 through REQ-MOV-10.
+This design elaborates REQ-SYS-01 through REQ-SYS-06, REQ-SYS-08 through REQ-SYS-16, REQ-LVL-01 through REQ-LVL-20, REQ-CHR-01/02/03/04/05, and REQ-MOV-01 through REQ-MOV-10.
 
 ## Terrain (`src/terrain.js`)
 
@@ -46,6 +46,8 @@ Uniform images or images without usable traces raise `NoUsableEdgeError`.
 The terrain retains `solid`, filtered all-shape `photoSolid`, traced `features`, and `edgeDirections`, in addition to dimensions, version, and a compatibility-only `surfaceY`.
 Collision and coloring use the live mask, including separate platforms and drilled tunnels.
 The renderer draws exposed outlines fully opaque and interiors at 80% opacity without moving the photo.
+REQ-LVL-20 uses a uniform fill color for each biome interior and removes checker or alternating tile patterns.
+The dark terrain halo and exposed surface colors contrast against the unchanged filtered photo.
 
 ## Reference route (`src/route.js`)
 
@@ -77,7 +79,10 @@ Exact-option identity revision 6 includes supplemental platform cells along with
 ## Level options (`src/level.js`, `src/scene.js`)
 
 REQ-LVL-10/11/12 add three options after photo decoding and before play.
-Each batch independently shuffles the three biomes and the three layouts, pairing them without duplicate pairs.
+Each batch shuffles the three biomes and the three layouts separately, pairing them without duplicate pairs.
+REQ-LVL-17 requires a fresh random number engine initialized with the same fixed seed and state at the beginning of every batch.
+Biome/layout shuffles, route attempts and repairs, endpoint selection, scenery placement, pickup placement, platform placement, and initial enemy generation must consume that reproducible sequence rather than time-based or session-dependent randomness.
+Repeated generation of the same image must yield identical ordered options and initial previews, even after generating another image or starting a new browser session.
 Photo analysis and provisional closing/filling precede route planning; route clearance and optional fill removal precede biome scenery.
 Exterior flood fill distinguishes open background from enclosed photo-derived regions.
 Jungle trees use 27-to-45-cell silhouettes with trunks, roots, layered canopies, climbing plants, and hanging vines.
@@ -90,12 +95,19 @@ Biome element cells share the terrain mask and are therefore drillable with norm
 The shared scene renderer draws identical terrain colors, elements, gates, and biome headwear for thumbnails and live play.
 Headwear stays within the original collision footprint in standing and climbing poses.
 Options retain their original mask, spawn, gate, biome, and layout.
-A SHA-256 digest of photo identity and serialized exact option geometry identifies leaderboard scores.
+A SHA-256 digest of photo identity and serialized exact option geometry, pickups, and moving platforms identifies leaderboard scores.
 Reset clones the selected option rather than regenerating or resampling randomness.
+Each option contains one to three speed pickups and one to three control-reversal mushrooms outside the required route clearance.
+It also contains two collidable twelve-by-three-cell platforms at eighteen terrain cells per second on bounded horizontal clear paths outside the required route.
+Platform path bounds extend into adjacent cells only after those cells become clear, including when drilling removes blocking terrain.
+Pickup effects last five seconds, never stack, and refresh when another pickup of the same type is collected.
+Run reset restores pickup availability and initial moving-platform positions.
+Thumbnails and gameplay draw the same pickups and initial platform positions.
 REQ-LVL-13 adds a shared background-effects renderer between the photo and terrain.
 Desert sunshine/rays, underwater bubbles/light shafts, and jungle sunbeams/leaf motes use deterministic positions with time-varying cosmetic motion.
 The reduced-motion preference freezes this layer without changing gameplay or the timer.
 Thumbnails show the same effect layer at its initial phase.
+REQ-CHR-05 adds an animated underwater swimming pose without changing the player collision box or movement physics.
 
 ### Nontrivial placement, readability, and enemies
 
@@ -119,9 +131,10 @@ Analytic reflected motion stays inside the corridor even after a large timestep.
 Patrols remain stationary before the timer starts and have no cosmetic motion under reduced motion.
 Use swept player/enemy contact to prevent tunneling at the maximum frame interval.
 Split patrol sweeps at reflection endpoints so contact during a reversal cannot be missed.
-REQ-SYS-10 respawns only the player and clears controls, preserving terrain, enemy progress, and race time.
+REQ-SYS-10/14 resets the full run on enemy contact, restoring terrain, patrols, pickups, platforms, player, controls, and timer.
 Resolve enemy contact before checking completion and never save a score for contact alone.
-Manual reset restores the original patrol states.
+Manual and failure resets restore the original patrol states.
+Player start footprints remain at least one terrain cell from all image boundaries.
 
 ## Movement (`src/physics.js`)
 
@@ -131,12 +144,12 @@ the highest point across their footprint. `createPlayer(x, y)` creates the
 player state. `stepPlayer(player, input, terrain, dt)` applies horizontal
 movement, gravity, charged floor/wall jump input, collision resolution, and drilling.
 `input` has `move` (-1, 0, or 1), `jumpPressed`, `jumpReleased`, `jumpHeld`,
-and `drill`, plus vertical directional input `moveY`. The player footprint shall
+and `drill`, plus vertical directional input `moveY` and a temporary speed multiplier. The player footprint shall
 be 6 by 9 cells.
 A shared contact probe shall find floor/wall terrain up to 3 cells away.
 Floor probes and downward snapping shall run only when not rising.
 Side probes shall exclude the foot boundary to avoid treating floor steps as walls, and shall treat the left and right image borders as virtual walls without adding terrain cells.
-The top and bottom image boundaries shall remain a ceiling and floor, not wall-jump surfaces.
+The top image boundary remains a ceiling, and the bottom boundary triggers a full run reset instead of a safe floor.
 Downward snapping and upward stepping shall run per half-cell horizontal substep so slopes remain supported.
 Pressing near a surface begins charging; release while currently near one
 launches. Wall release shall set horizontal velocity to 80 cells/second away
@@ -165,7 +178,8 @@ Jump press while climbing cancels charge, detaches immediately, and restores gra
 A consumed-jump latch prevents the same press from charging on landing or launching on release.
 Another Up edge is required to reattach.
 Climbing respects mask collisions, the ceiling, and the solid image bottom.
-The bottom participates in floor probes and snapping but never in wall probes or the terrain mask.
+Moving platform collision uses a separate dynamic mask so its cells remain distinct from photo terrain and drilling.
+The run loop carries a supported rider with platform movement and updates each platform's clear path bounds when drilling opens additional cells.
 The drill direction is normalized from directional input, defaulting to horizontal facing.
 A rectangular cutter extends 10 cells from the player center along that direction.
 Its transverse half-width covers the projected player footprint plus half a cell, producing a passable tunnel rather than a surrounding excavation.
@@ -176,6 +190,8 @@ Active excavation limits horizontal normal-mode movement to twenty cells per sec
 Excavation increments terrain version only when cells change and does not change gravity or charging state.
 The renderer draws an oriented drill tip and alternates climbing hands and feet based on distance traveled.
 Air movement outside climbing and active excavation remains at normal speed.
+A speed pickup doubles horizontal movement for five seconds without changing jump height or stacking; a second pickup refreshes the timer.
+The mushroom effect reverses both directional axes, including drill aim, for five seconds; repeat collection refreshes its timer without stacking.
 Ground movement can step up small terrain edges; higher
 obstacles require a jump. Ground contact at any point below the player's
 footprint counts as support.
@@ -186,6 +202,7 @@ W/up enters background climbing; W/S and up/down arrows control vertical climbin
 Space charges a jump and W/up does not jump.
 Touch controls provide four directions, a jump button,
 and a dedicated held drill button.
+An active mushroom pickup reverses horizontal and vertical directional input before simulation.
 
 The charge meter shows progress and a distinct MAX READY label at three
 seconds. A second bar immediately above the player fills with charge and
@@ -205,20 +222,26 @@ The browser test loads and decodes the declared icon before setup, then compares
 
 ## Run lifecycle (`src/run.js`, `src/app.js`)
 
-`createRun(terrain)` clones the original terrain and retains a variant's precomputed safe spawn and finish gate.
+`createRun(terrain)` clones the original terrain and retains a variant's precomputed safe spawn, finish gate, pickups, and moving platforms.
 Offered options use route-validated supported endpoints, edge priority, and conservative rejection of walking-only finishes.
 The gate is 12 by 18 cells, including its two poles and contrasting checkered banner.
 Its position remains fixed after drilling and completion requires rectangle overlap.
 No terrain is protected or added beneath it.
 The canvas caption occupies normal flow below the playfield so it cannot obscure a gate at any sampled edge.
-`respawnPlayer(run)` replaces only player state at the starting position; terrain, enemy patrol progress, and elapsed time survive.
-
 Reset during play or after completion creates a fresh run from the unmodified
-original terrain, retains photo/name/scores, clears controls, and resets timer
-and charge display. One cancellable animation-frame handle prevents parallel
-loops after resetting. Charging and background-climbing movement start race time.
-The solid bottom prevents bottom-edge respawns.
+original terrain, retains the photo, both player names, selected option, and scores, clears controls, and resets timer, charge, pickups, platforms, and enemies.
+Enemy contact and bottom-edge contact use the same full-run reset path, leave the next run unstarted, and never write a score.
+One cancellable animation-frame handle prevents parallel loops after resetting.
+Charging and background-climbing movement start race time.
+The completion panel offers the second player selection for the next round while retaining the exact chosen option.
 Existing per-variant leaderboard entries are retained.
+
+## Prominent controls and biome character pose (`index.html`, `src/app.js`, `src/scene.js`, `src/styles.css`)
+
+REQ-SYS-16 presents control guidance in a high-contrast grouped panel with a prominent heading, desktop key mapping, charge meter, and touch controls.
+Responsive styles preserve visibility and usability on narrow screens.
+REQ-CHR-05 draws an animated swimming-themed player pose in underwater levels only.
+The pose stays inside the unchanged six-by-nine collision footprint and does not change physics, input, or timer behavior.
 
 ## Score store (`src/leaderboard.js`)
 

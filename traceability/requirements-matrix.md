@@ -7,6 +7,19 @@
 - [Detailed design](../design/detailed/game-components.md) specifies terrain
   detection, collision, charged jumps, background climbing, directional tunnel drilling, run lifecycle, root hosting, and GitHub feedback.
 
+## Approved reproducible generation requirement
+
+The user approved reproducible randomness so that the same image always creates the very same three level suggestions.
+[REQ-LVL-17](../requirements/level-design-requirements.md#req-lvl-17-reproducible-random-generation) requires the same fixed seed and initial random engine state for each generation batch, and REQ-LVL-12 links the three-option choice to this guarantee.
+The [architecture](../design/system/game-architecture.md#approved-random-option-extension) and [detailed option design](../design/detailed/game-components.md#level-options-srcleveljs-srcscenejs) allocate the shared reproducible sequence across shuffling, routes, endpoints, scenery, and enemies.
+
+| Requirement | Implementation surface | Verification |
+|---|---|---|
+| REQ-LVL-17, derived from REQ-SYS-03 and REQ-LVL-12 | [Option assembler](../src/level.js), including downstream random choices; implementation pending. | [AT-33](../tests/acceptance/test-cases.md) specifies repeated-image, intervening-image, reload, and new-session comparisons; execution pending. |
+
+This revision updates requirements, design, and acceptance criteria only.
+Runtime behavior has not been changed or verified against REQ-LVL-17.
+
 ## Approved deployed feedback version revision
 
 The user approved deployment-time branch/commit injection and automatic Pages deployment from `develop` only.
@@ -54,6 +67,37 @@ The four existing photo fixtures produced thirty-six verified options across thr
 Every one of these seventy-eight sampled options passed final actual physics/enemy replay without drilling and conservative walking-only rejection.
 Tests verify strongest-edge prioritization, longer real-edge bridges, supplemental platform collision/drilling/reset, clear endpoints and corridors, stable exact-option previews, and unchanged gameplay/scoreboard regressions.
 The finite test sample is evidence of improved acceptance, not a universal guarantee for unseen photos.
+
+## Approved 👍 issue implementation revision
+
+The user approved implementation of open issues with at least one 👍 and directed that issue-specific `@AI` comments be followed.
+The user directly excluded #6, so it is not in scope despite GitHub reporting one 👍 reaction at the time of inspection.
+The in-scope issues are #3, #5, #9, #10, #11, #14, #15, and #16.
+No conflicting eligible issues were found, so no issue was selected for closure as a duplicate.
+The user specified one to three pickups of each type, five-second effects, no stacking, and timer refresh on recollection, and asked that this be documented in issue #3.
+The user specified two 12-by-3-cell platforms at 18 cells per second, bounded clear paths, optional-route status, and path extension after drilling for issue #14.
+The user specified visual-only underwater swimming for issue #16.
+The user specified full reset on enemy contact and bottom-edge contact, and confirmed that generated spawns must not be on image borders for issue #11.
+The user specified two player names and player selection after each round for issue #15.
+The [system requirements](../requirements/system-requirements.md) define full failure reset, sequential players, and prominent controls.
+The [level requirements](../requirements/level-design-requirements.md) define uniform high-contrast terrain, deterministic pickups, and optional moving platforms.
+The [character requirements](../requirements/character-design-requirements.md) define the underwater visual pose.
+The [detailed design](../design/detailed/game-components.md) allocates generation, rendering, physics, and run lifecycle behavior.
+
+| Requirement | Issue | Implementation surface | Verification |
+|---|---|---|---|
+| REQ-SYS-16 | #9 | `index.html`, `src/styles.css` | ST-29, AT-34, browser control-visibility assertion. |
+| REQ-LVL-20 | #10 | `src/scene.js` | ST-30, AT-35, uniform interior RGB and contrast checks. |
+| REQ-LVL-18 | #3/#5 | `src/level.js`, `src/run.js`, `src/physics.js`, `src/app.js`, `src/scene.js` | ST-31, AT-36, pickup counts, collision, timers, refresh, reversal, and reset checks. |
+| REQ-SYS-14 | #11 | `src/run.js`, `src/app.js`, `src/physics.js` | ST-09/21, ST-31/32, AT-14/28/36/37, full-reset tests. |
+| REQ-LVL-19 | #14 | `src/level.js`, `src/run.js`, `src/physics.js`, `src/scene.js` | ST-32, AT-37, safe paths, rider collision, path extension, and reset tests. |
+| REQ-SYS-15, REQ-LVL-17 | #15 | `index.html`, `src/app.js`, `src/level.js`, `src/leaderboard.js` | ST-33, AT-33/38, deterministic-generation and sequential-score tests. |
+| REQ-CHR-05 | #16 | `src/app.js`, `src/scene.js` | ST-34, AT-39, fixed-footprint visual animation test. |
+
+Before implementation, the unit runner passed **74/86** checks.
+The twelve failures reproduced the missing speed boost, pickup state, moving-platform behavior, full-run reset, uniform fill, underwater pose, generated pickup/platform metadata, and deterministic default generation.
+The browser runner reproduced the missing prominent control treatment.
+Further failures in the baseline browser run were analyzed separately and are not attributed to these requirements without retesting.
 
 ## Historical approved strict route-first revision
 
