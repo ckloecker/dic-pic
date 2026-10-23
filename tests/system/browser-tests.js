@@ -618,24 +618,35 @@ test("REQ-SYS-14: enemy contact fully resets the run and manual reset restores a
     timestamp += 1000 / 60;
     callback(timestamp);
   };
-  const checksum = (ignorePlayer = false) => {
+  // Exclude swimming animation and browser-dependent filtered-photo rasterization.
+  const gameplayColors = new Set(["228,215,164", "25,15,38", "239,142,219", "255,255,255",
+    "21,43,52", "131,216,194", "79,140,131", "212,242,220", "20,33,43", "255,225,140",
+    "56,37,31", "255,209,102", "86,55,79", "217,131,193", "240,207,178"]);
+  const gameplayChecksum = () => {
     const option = fixtureOptions.find(option => option.biome === "underwater");
-    return canvasPixels().reduce((sum, value, index) => {
-      const x = Math.floor(index / 4) % 960 / 3;
+    const pixels = canvasPixels();
+    let sum = 0;
+    for (let index = 0; index < pixels.length; index += 4) {
+      const x = index / 4 % 960 / 3;
       const y = Math.floor(index / 4 / 960) / 3;
-      if (ignorePlayer && x >= option.spawn.x - 1 && x < option.spawn.x + 7
-        && y >= option.spawn.y - 1 && y < option.spawn.y + 10) return sum;
-      return (sum + value * (index % 97)) >>> 0;
-    }, 0);
+      if (x >= option.spawn.x - 1 && x < option.spawn.x + 7
+        && y >= option.spawn.y - 1 && y < option.spawn.y + 10) continue;
+      if (gameplayColors.has(`${pixels[index]},${pixels[index + 1]},${pixels[index + 2]}`)) {
+        sum = (sum + (pixels[index] + pixels[index + 1] * 3 + pixels[index + 2] * 7) * (index % 97)) >>> 0;
+      }
+    }
+    return sum;
   };
   const savedScores = JSON.stringify(app.localStorage);
   try {
     find('.level-choice[data-biome="underwater"]').click();
-    await until(() => !find("#game-screen").hidden);
-    const idleScene = checksum(true);
+    await until(() => !find("#game-screen").hidden
+      && find("#level-title").textContent.startsWith("Underwater"));
+    find("#reset-button").click();
+    const idleScene = gameplayChecksum();
     const initialTop = playerTop();
     for (let i = 0; i < 20; i += 1) tick();
-    assert(checksum(true) === idleScene && find("#timer").textContent === "0.00", "idle enemies moved or started time");
+    assert(gameplayChecksum() === idleScene && find("#timer").textContent === "0.00", "idle enemies moved or started time");
     const option=fixtureOptions.find(option=>option.biome==="underwater");
     const enemy=option.enemies[0];
     const sampleX=Math.round(option.spawn.x+3);
@@ -691,7 +702,7 @@ test("REQ-SYS-14: enemy contact fully resets the run and manual reset restores a
       "held movement/drill controls survived contact");
     assert(Number(find("#timer").textContent) === 0, "held input started the reset run");
     find("#reset-button").click();
-    assert(checksum(true) === idleScene, "manual reset did not restore terrain and enemies");
+    assert(gameplayChecksum() === idleScene, "manual reset did not restore terrain and enemies");
     assert(Math.abs(playerTop() - initialTop) < 1, "manual reset changed the selected spawn");
     assert(find("#timer").textContent === "0.00" && !find("#contact-message").textContent, "manual reset retained contact state");
     assert(tunnelSample() !== drilled, "test did not excavate a real terrain cell");

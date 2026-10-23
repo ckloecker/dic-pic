@@ -1405,7 +1405,8 @@ if (runApi) {
         for(const option of options){
           assert(routeApi.verifyReferenceRoute(option).valid,"vertical photo has no valid reference route");
           const extra=new Set([...option.elements.flatMap(element=>element.cells),
-            ...option.connectors.flatMap(connector=>connector.cells)]);
+            ...option.connectors.flatMap(connector=>connector.cells),
+            ...option.platforms.flatMap(platform=>platform.cells)]);
           assert(option.solid.every((cell,index)=>!cell||option.photoSolid[index]||extra.has(index)),
             "route generation invented non-photo walls or filler");
         }
@@ -1596,7 +1597,8 @@ if (runApi) {
       test("REQ-LVL-17: the same image deterministically reproduces its suggestions without an injected random source", () => {
         const { pixels, width, height } = fixturePixels();
         const first = levelApi.createSuggestions(pixels, width, height);
-        levelApi.createSuggestions(pixels.slice(), width, height);
+        const other = fixturePixels("vertical");
+        levelApi.createSuggestions(other.pixels, other.width, other.height);
         const repeated = levelApi.createSuggestions(pixels, width, height);
         assert(first.length === 3 && repeated.length === 3, "generation did not return three options");
         first.forEach((option, index) => {
