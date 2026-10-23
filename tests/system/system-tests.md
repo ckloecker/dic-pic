@@ -14,17 +14,17 @@ Completion checks temporarily write only their exact fixture score key and resto
 | ST-01 | REQ-SYS-01/11 | Open the project root URL in a current browser at desktop and narrow/mobile viewport sizes, including a repository-path hosting prefix. | The root URL serves the setup screen with working styles, icon, and modules, and play remains usable at both sizes. |
 | ST-02 | REQ-SYS-03, REQ-LVL-01/03/04/16 | Upload route-capable and sparse fixtures, start a level, and inspect the collision mask. | Both provide three playable choices; photo edges remain visible; density is a preference rather than a rejection gate. |
 | ST-02b | REQ-LVL-05 | Upload a uniform image without visible edges. | Contrast normalization cannot invent a contour; the game rejects the image and asks for another. |
-| ST-03 | REQ-SYS-04 | Leave the player idle, move or charge, then touch the exit flag. | The timer stays at zero until player-driven movement or charging, and stops on actual contact with the flag, not a horizontal crossing at another height. |
+| ST-03 | REQ-SYS-04 | Leave the player idle, move or jump, then touch the exit flag. | The timer stays at zero until player-driven movement or a jump launch, and stops on actual contact with the flag, not a horizontal crossing at another height. |
 | ST-04 | REQ-SYS-05, REQ-SYS-06 | Try invalid and valid names, complete two runs of the same image, then inspect results. | Invalid names cannot start; valid names are saved with sorted per-image scores in this browser. |
-| ST-05 | REQ-MOV-01 through REQ-MOV-04, REQ-MOV-10 | Use Space and touch JUMP; climb without drilling; walk while drilling horizontally across supported terrain; aim drill in all directions and measure horizontal excavation at 30/60/120 Hz. | Horizontal drilling preserves the supporting floor. Active horizontal excavation is 20 cells/s; open walking/drilling is 80; climbing is 20 with normalized diagonals; gravity and charge remain unchanged. |
+| ST-05 | REQ-MOV-01 through REQ-MOV-04, REQ-MOV-10 | Use Space and touch JUMP; climb without drilling; walk while drilling horizontally across supported terrain; aim drill in all directions and measure horizontal excavation at 30/60/120 Hz. | Horizontal drilling preserves the supporting floor. Active horizontal excavation is 20 cells/s; open walking/drilling is 80; climbing is 20 with normalized diagonals; gravity, jump velocity, and double-jump availability remain unchanged. |
 | ST-06 | REQ-CHR-01, REQ-LVL-02 | Inspect the rendered character and level overlay. | Visuals use original character art and a general retro pixel-art style. |
 | ST-07 | REQ-LVL-06 | Sample tops, sides, undersides, tunnel boundaries, and interiors against the photo. | Exposed outlines are fully opaque; interiors blend 80% terrain and 20% background within one rounding unit. |
-| ST-08 | REQ-MOV-05/06, REQ-SYS-04 | Press Space or touch JUMP and compare tap, partial, 250 ms, and longer holds; blur during ascent and jump into the ceiling. | Press launches and starts race time immediately; hold raises the apex from approximately 38.6 to 77.1 cells; both bars fill to MAX JUMP; release and blur end assistance without another impulse; the ceiling blocks upward travel and ends assistance. |
+| ST-08 | REQ-MOV-02/05/06, REQ-SYS-04 | Press Space or touch JUMP with a tap and a long hold; press again in the air, then a third time; land, touch a wall, or grip the background and repeat; wall-jump from both sides; jump into the ceiling; reset during a burst. | Press launches and starts race time immediately; every jump rises approximately 38.6 cells regardless of hold; exactly one airborne double jump of the same height is available until landing, wall contact, or background attachment; no hold meter or bar appears; wall jumps alone show a dust burst on the wall side that stays inside the image and ends after about 300 ms; reset clears the burst; the ceiling blocks upward travel. |
 | ST-09 | REQ-SYS-08/09/14, REQ-MOV-08 | Reset a modified run, then drill down to the image bottom. | Manual reset and bottom contact restore the original run state without changing saved scores; bottom contact clears the timer and does not leave the player at the boundary. |
 | ST-10 | REQ-LVL-07/08 | Drill under the flag and inspect a multi-height photo. | Flag remains fixed without protected support; multiple separate platforms follow image edges. |
 | ST-11 | REQ-LVL-09, REQ-CHR-02 | Inspect terrain and runner scale. | 6-by-9 character; no unconditional rectangular cuts or invented freestanding vertical walls; diagonal photo contours survive noise suppression. |
 | ST-12 | REQ-MOV-02/07 | Walk inclines/declines and press jump beside terrain walls and both vertical image borders; test three-cell contact and 150 ms buffered presses; press just after walking off a cliff and after leaving a wall. | Slopes retain support; eligible presses launch immediately upward and away from walls; still-held presses buffer for 150 ms; release cancels queued launches; continued assistance does not require surface contact; floor grace extends three cells and wall grace four cells from the last contact, once per launch. |
-| ST-13 | REQ-MOV-10 | Climb, stop, drill and release drill, then press jump; hold through landing and release. | Animated hands/feet grip the wall; jump press drops immediately without charge or launch; held Up does not reattach; a consumed drop press cannot charge on landing or jump on release. |
+| ST-13 | REQ-MOV-10 | Climb, stop, drill and release drill, then press jump; hold through landing and release. | Animated hands/feet grip the wall; jump press drops immediately without launch; held Up does not reattach; a consumed drop press cannot jump on landing or on release. |
 | ST-14 | REQ-CHR-03 | Load the game before setup; fetch and decode its declared favicon and compare rasterized pixels with player artwork. | The local SVG loads successfully and matches the original character geometry and colors without starting a game. |
 | ST-15 | REQ-LVL-10/11/12, REQ-CHR-04 | Generate three suggestions, compare preview/live geometry, inspect biome headwear and textures, drill elements, then reset. | Three distinct labeled options precede play; biome elements collide and drill; headwear is cosmetic; reset restores the exact selected option. |
 | ST-16 | REQ-LVL-07/11/16 | Generate seeded batches and measure local edge evidence, closing/filling, spawn distance, and gate extents. | All biome/layout/edge choices occur; layout uses real local edge directions; the 12-by-18 gate and distant start are clear and in bounds. |
@@ -48,7 +48,17 @@ Completion checks temporarily write only their exact fixture score key and resto
 | ST-34 | REQ-CHR-05 | Compare underwater player pixels across different animation phases and compare with a non-underwater biome. | Swimming artwork visibly animates only underwater and remains inside the unchanged 6-by-9 collision footprint. |
 | ST-35 | REQ-LVL-15/17/21 | Observe two-axis enemy flight, reset and replay identical timed inputs, and cross vertical path segments and waypoint turns. | Paths and motion repeat, stay clear of terrain and protected areas, and swept contact resets the full run without tunneling or bounding-box false positives. |
 
-## Current voted-issue verification
+## Current double-jump verification
+
+Execution on 2026-10-23 passed **101/101 unit checks** and **22/22 browser system checks** in Chromium in six consecutive runs with HTTP caching disabled.
+The revised unit tests initially failed 25 checks against the hold-boost implementation, reproducing variable height, the missing double jump, and the missing wall-jump burst.
+ST-03/08 verify that a press launches and starts the timer immediately, every jump has the same height regardless of hold, one double jump is available and a third press does not rise, and no hold meter or charge bar exists.
+Unit checks verify restoration by landing, wall contact, and background climbing, ledge walk-off retention, grace jumps that do not consume the double jump, and buffering only without a double jump.
+Unit checks verify that only wall jumps create the 300 ms burst on the kicked-off wall side inside the image, and that reset clears it.
+The removed browser blur-assistance check has no remaining hold behavior to test; blur still clears buffered input.
+The preview/reset browser check now compares 3-by-3 block color averages with a small tolerance because Chrome changes canvas rasterization of antialiased edges after repeated readbacks.
+
+## Historical voted-issue verification
 
 Execution on 2026-10-23 passed **88/88 unit checks** and **23/23 browser system checks** in Chromium.
 ST-09/21 verify full failure resets, including timer, drilled terrain, held controls, initial enemies, and no saved score.
@@ -147,7 +157,7 @@ A seed-123 three-option route-fixture batch took about 610 ms:
 | Underwater / balanced | 25.58 | 5 | 63.74% |
 | Jungle / horizontal | 32.01 | 5 | 64.50% |
 
-Reference routes mix walking and background climbing; charged jumping and drilling remain unrestricted player-selected shortcuts.
+Reference routes mix walking and background climbing; double jumping and drilling remain unrestricted player-selected shortcuts.
 The source portrait rejection and route-fixture thumbnails/live geometry were inspected.
 Historical raw platform and mixed-orientation fixtures are not guaranteed to satisfy the new minimum amount of ground.
 Physical Android/iOS, camera permissions, and simultaneous real touch input remain unverified.

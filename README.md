@@ -74,12 +74,12 @@ The live GitHub form must include the branch and commit fields from the latest t
 ## Play
 
 - Move with **A/D** or **left/right arrows**.
-- Press **Space** near a floor or wall to jump immediately; hold briefly to jump higher.
+- Press **Space** near a floor or wall to jump immediately; every jump rises approximately 38.6 cells, unless terrain or the ceiling stops it.
+  Press **Space** again in the air for one **double jump** of the same height.
+  Landing, touching a wall, or gripping the background restores the double jump, and walking off a ledge keeps it.
   **W/up does not jump.**
-  Press **Space** while climbing to drop immediately, without charging or launching on release.
-  A quarter-second hold reaches **MAX JUMP**, shown by a gold bar above the character.
-  A tap rises approximately 38.6 cells; a full hold reaches twice that height, unless terrain or the ceiling stops it.
-- Wall jumps launch upward and away on press.
+  Press **Space** while climbing to drop immediately, without launching on release.
+- Wall jumps launch upward and away on press, with a brief dust burst on the wall side.
   Contact allows a three-cell gap.
   Still-held presses buffer contact for 150 ms.
   Walking follows small inclines and declines;
@@ -94,7 +94,7 @@ The live GitHub form must include the branch and commit fields from the latest t
   Excavating intact ground limits horizontal travel to **20 cells/second**, the same speed as climbing.
   Walking or drilling through open space stays at **80 cells/second**.
   Horizontal excavation preserves the floor even with floating-point foot-position rounding.
-  Gravity and variable-height jumps remain active.
+  Gravity, jumps, and the double jump remain active.
 - On touch devices use the directional pad, press/hold **JUMP**, and hold
   **DRILL**.
   UP enters background climbing; directions also aim the drill.
@@ -147,7 +147,7 @@ Generation reserves a contiguous photo-edge-aligned main corridor before final f
 Every offered option still has an executable no-drill route with safe in-bounds endpoints and no walking-only finish.
 The recorded route mixes supported walking and background climbing and is replayed against the final terrain and enemy simulation.
 There is no waiting added to reach the duration target.
-Free climbing, variable-height jumps, and optional drilling still allow skilled shortcuts; the reference duration is not a minimum finishing time.
+Free climbing, jumps and double jumps, and optional drilling still allow skilled shortcuts; the reference duration is not a minimum finishing time.
 Deep optional filling is removed without inventing filler, and substantial photo features are preferred over tiny fragments.
 Generation first tries photo-derived geometry, then widens route connectivity and supplies missing horizontal supports.
 If clutter prevents a safe option, it prioritizes the strongest layout-relevant edges and retries with repaired platforms.
@@ -178,8 +178,8 @@ ranking, including low-contrast edge normalization and unusable-image
 rejection, without installing packages.
 
 Open <http://localhost:8000/tests/system/runner.html> for automated browser
-checks of setup, opacity, Space-only jumping, the on-character charge bar,
-immediate launch and hold assistance, timer, reset, press-to-drop climbing, biome previews, scenery, background effects, reduced motion, directional drilling, bottom/enemy full-run resets, no-drill route completion, and exact current-run scoreboard highlighting.
+checks of setup, opacity, Space-only jumping without a hold meter or charge bar,
+immediate launch and a single double jump, timer, reset, press-to-drop climbing, biome previews, scenery, background effects, reduced motion, directional drilling, bottom/enemy full-run resets, no-drill route completion, and exact current-run scoreboard highlighting.
 Keep the test tab visible until its summary appears.
 
 Integrated browser checks are listed in

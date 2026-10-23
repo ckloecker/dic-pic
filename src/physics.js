@@ -2,7 +2,6 @@ const NORMAL_SPEED = 80;
 const CLIMB_SPEED = NORMAL_SPEED / 4;
 export const GRAVITY = 420;
 const JUMP_VELOCITY = -180;
-const NORMAL_JUMP_HEIGHT = JUMP_VELOCITY ** 2 / (2 * GRAVITY);
 const PLAYER_WIDTH = 6;
 const PLAYER_HEIGHT = 9;
 const CONTACT_DISTANCE = 3;
@@ -10,7 +9,6 @@ const JUMP_BUFFER_SECONDS = 0.15;
 const FLOOR_GRACE_DISTANCE = 3;
 const WALL_GRACE_DISTANCE = 4;
 export const DRILL_REACH = 10;
-export const JUMP_HOLD_SECONDS = 0.25;
 
 export function createPlayer(x, y) {
   return {
@@ -22,9 +20,11 @@ export function createPlayer(x, y) {
     vy: 0,
     grounded: false,
     facing: 1,
-    charging: false,
-    chargeSeconds: 0,
-    jumpOriginY: y,
+    airJumps: 1,
+    jumpKind: null,
+    jumpWallSide: 0,
+    jumpX: x,
+    jumpY: y,
     drilling: false,
     excavating: false,
     drillX: 1,
@@ -43,15 +43,12 @@ function withinGrace(player, grace, distance) {
   return Boolean(grace) && Math.hypot(player.x - grace.x, player.y - grace.y) <= distance + 1e-9;
 }
 
-export function jumpSpeedForHold(seconds, dt) {
-  const fraction = Math.max(0, Math.min(1, seconds / JUMP_HOLD_SECONDS));
-  const height = NORMAL_JUMP_HEIGHT * (1 + fraction);
-  return Math.sqrt(2 * GRAVITY * height) + GRAVITY * dt / 2;
+// Half a frame of gravity is added so the discrete integration still reaches the normal height.
+export function jumpSpeed(dt) {
+  return -JUMP_VELOCITY + GRAVITY * dt / 2;
 }
 
-export function cancelCharge(player) {
-  player.charging = false;
-  player.chargeSeconds = 0;
+export function cancelJumpInput(player) {
   player.jumpBufferSeconds = -1;
 }
 
@@ -219,18 +216,20 @@ export function stepPlayer(player, input, terrain, dt) {
   const speedMultiplier = Number.isFinite(input.speedMultiplier) ? Math.max(1, input.speedMultiplier) : 1;
   const direction = Math.sign(input.move || 0);
   const vertical = Math.sign(input.moveY || 0);
+  player.jumpKind = null;
+  player.jumpWallSide = 0;
   if (direction) player.facing = direction;
   if (vertical < 0 && !player.upHeld) {
     player.climbing = true;
     player.vy = 0;
-    cancelCharge(player);
+    cancelJumpInput(player);
   }
   player.upHeld = vertical < 0;
   if (player.climbing && input.jumpPressed) {
     player.climbing = false;
     player.vy = 0;
     player.dropJumpHeld = true;
-    cancelCharge(player);
+    cancelJumpInput(player);
   }
   const dropJump = player.dropJumpHeld;
   if (!input.jumpHeld) player.dropJumpHeld = false;
@@ -257,35 +256,34 @@ export function stepPlayer(player, input, terrain, dt) {
   } else if (contact.wall) {
     player.wallGrace = { x: player.x, y: player.y, side: contact.wall };
   }
+  if (player.climbing || player.grounded || contact.wall) player.airJumps = 1;
   const floorGrace = !nearSurface && withinGrace(player, player.floorGrace, FLOOR_GRACE_DISTANCE);
   const wallGrace = !nearSurface && !floorGrace && withinGrace(player, player.wallGrace, WALL_GRACE_DISTANCE);
-  player.jumpBufferSeconds = input.jumpPressed && !dropJump && !player.charging
+  const freshPress = Boolean(input.jumpPressed) && !dropJump;
+  player.jumpBufferSeconds = freshPress
     ? JUMP_BUFFER_SECONDS
     : Math.max(-1, player.jumpBufferSeconds - elapsed);
   let wallLaunch = 0;
-  if (!dropJump && !player.charging && player.jumpBufferSeconds >= -1e-9
+  if (!dropJump && player.jumpBufferSeconds >= -1e-9
     && (nearSurface || floorGrace || wallGrace) && (input.jumpHeld || input.jumpPressed)) {
     if (wallGrace) wallLaunch = -player.wallGrace.side;
     else if (!player.grounded && !floorGrace) wallLaunch = -contact.wall;
+    player.jumpKind = wallLaunch ? "wall" : "floor";
+  } else if (freshPress && player.airJumps > 0) {
+    player.airJumps = 0;
+    player.jumpKind = "air";
+  }
+  if (player.jumpKind) {
+    player.jumpWallSide = -wallLaunch;
+    player.jumpX = wallLaunch > 0 ? player.x : wallLaunch < 0 ? player.x + player.width : player.x + player.width / 2;
+    player.jumpY = player.y + player.height / 2;
     player.floorGrace = null;
     player.wallGrace = null;
-    player.jumpOriginY = player.y;
-    player.vy = -jumpSpeedForHold(0, elapsed);
-    player.charging = Boolean(input.jumpHeld && !input.jumpReleased);
-    player.chargeSeconds = Math.min(JUMP_HOLD_SECONDS, elapsed);
+    player.vy = -jumpSpeed(elapsed);
     player.grounded = false;
     player.jumpBufferSeconds = -1;
-  } else if (player.charging && input.jumpHeld && player.vy < 0) {
-    if (player.chargeSeconds < JUMP_HOLD_SECONDS) {
-      player.chargeSeconds = Math.min(JUMP_HOLD_SECONDS, player.chargeSeconds + elapsed);
-      const targetHeight = NORMAL_JUMP_HEIGHT * (1 + player.chargeSeconds / JUMP_HOLD_SECONDS);
-      const remainingHeight = targetHeight - (player.jumpOriginY - player.y);
-      player.vy = -Math.sqrt(2 * GRAVITY * Math.max(0, remainingHeight)) - GRAVITY * elapsed / 2;
-    }
   }
-  if (input.jumpReleased || !input.jumpHeld || (player.charging && player.vy >= 0)) {
-    cancelCharge(player);
-  }
+  if (input.jumpReleased || !input.jumpHeld) cancelJumpInput(player);
 
   if (player.climbing) {
     const magnitude = Math.max(1, Math.hypot(direction, vertical));
@@ -314,6 +312,7 @@ export function stepPlayer(player, input, terrain, dt) {
       player.grounded = true;
     }
     player.climbPhase += Math.hypot(player.x - beforeX, player.y - beforeY) / 3;
+    player.airJumps = 1;
     return;
   }
 
@@ -339,7 +338,6 @@ export function stepPlayer(player, input, terrain, dt) {
       player.vy = 0;
     } else {
       player.vy = 0;
-      cancelCharge(player);
     }
   } else {
     player.grounded = false;
@@ -354,11 +352,11 @@ export function stepPlayer(player, input, terrain, dt) {
   if (player.y < 0) {
     player.y = 0;
     player.vy = 0;
-    cancelCharge(player);
   }
   if (player.y + player.height > terrain.height || (player.y + player.height === terrain.height && player.vy >= 0)) {
     player.y = terrain.height - player.height;
     player.vy = 0;
     player.grounded = true;
   }
+  if (player.grounded) player.airJumps = 1;
 }

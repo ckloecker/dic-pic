@@ -434,7 +434,7 @@ if (enemyApi) {
     assert(!enemyApi.enemyContact({ ...run.player, y: 0 }, run.enemies, { ...previous, y: 0 }),
       "noncontact horizontal crossing counted");
     runApi.resetRun(run);
-    assert(run.player.x === 2 && run.player.y === 51 && !run.player.charging, "player not restored");
+    assert(run.player.x === 2 && run.player.y === 51 && run.player.airJumps === 1 && run.player.jumpKind === null, "player not restored");
     assert(run.startedAt === null && run.elapsedMs === 0 && run.terrain.solid[6505], "run timer or terrain was not reset");
     assert(run.pickups.length === 1 && run.effects.speedSeconds === 0, "pickup state survived reset");
     assert(run.movingPlatforms[0].x === 10, "moving platform position survived reset");
@@ -604,7 +604,7 @@ if (terrainApi) {
     const wallX = [48, 49, 50, 51].find((x) => terrain.solid[40 * width + x]);
     const player = physicsApi.createPlayer(wallX - 6 - 2, 30);
     physicsApi.stepPlayer(player, { jumpPressed: true, jumpHeld: true }, terrain, 0.05);
-    assert(player.charging, "generated wall did not support charging");
+    assert(player.jumpKind === "wall", "generated wall did not support a wall jump");
     assert(player.vy < 0 && player.vx === -80, "generated wall did not support an upward/away jump");
     physicsApi.stepPlayer(player, { jumpReleased: true }, terrain, 0.05);
   });
@@ -691,13 +691,13 @@ if (physicsApi) {
     }
   });
 
-  test("REQ-MOV-05: press launches immediately; holding increases rise only for 250 ms", () => {
+  test("REQ-MOV-05: press launches immediately to a fixed height regardless of hold duration", () => {
     for (const dt of [1 / 30, 1 / 60, 1 / 120]) {
       const rise = (hold) => {
         const terrain = flatTerrain(120, 300, 280);
         const player = physicsApi.createPlayer(50, 271);
         physicsApi.stepPlayer(player, { jumpPressed: true, jumpHeld: true }, terrain, dt);
-        assert(player.y < 271 && player.vy < 0, "press did not launch immediately");
+        assert(player.y < 271 && player.vy < 0 && player.jumpKind === "floor", "press did not launch immediately");
         let highest = player.y;
         let time = dt;
         for (let frame = 0; frame < 3 / dt; frame += 1) {
@@ -707,17 +707,84 @@ if (physicsApi) {
         }
         return 271 - highest;
       };
-      const tap = rise(0);
-      const partial = rise(0.125);
-      const full = rise(0.25);
-      const long = rise(2);
       const normal = 180 ** 2 / (2 * physicsApi.GRAVITY);
-      assert(Math.abs(tap - normal) < 1, `tap rise ${tap}`);
-      assert(partial > tap && partial < full, "partial hold did not produce intermediate height");
-      assert(Math.abs(full - 2 * normal) < 1, `full rise ${full}`);
-      assert(Math.abs(long - full) < 1, `holding beyond window changed rise: ${long} vs ${full}`);
+      for (const hold of [0, 0.125, 0.25, 2]) {
+        const height = rise(hold);
+        assert(Math.abs(height - normal) < 1, `hold ${hold}s rose ${height}, expected ${normal}`);
+      }
     }
   });
+
+  test("REQ-MOV-05: one airborne double jump rises another normal height, then no more", () => {
+    const normal = 180 ** 2 / (2 * physicsApi.GRAVITY);
+    for (const dt of [1 / 30, 1 / 60, 1 / 120]) {
+      const terrain = flatTerrain(120, 400, 380);
+      const player = physicsApi.createPlayer(50, 371);
+      physicsApi.stepPlayer(player, { jumpPressed: true, jumpHeld: true }, terrain, dt);
+      assert(player.jumpKind === "floor" && player.airJumps === 1, "floor jump consumed the double jump");
+      for (let frame = 0; frame < 0.6 / dt; frame += 1) physicsApi.stepPlayer(player, { jumpReleased: frame === 0 }, terrain, dt);
+      assert(player.vy > 0 && !player.grounded, "test did not reach the falling phase");
+      const pressY = player.y;
+      physicsApi.stepPlayer(player, { move: 1, jumpPressed: true, jumpHeld: true }, terrain, dt);
+      assert(player.jumpKind === "air" && player.vy < 0 && player.airJumps === 0, "falling press did not double jump");
+      assert(player.vx === 80, "double jump did not keep normal horizontal movement");
+      let highest = player.y;
+      while (player.vy < 0) {
+        physicsApi.stepPlayer(player, {}, terrain, dt);
+        highest = Math.min(highest, player.y);
+      }
+      assert(Math.abs(pressY - highest - normal) < 1, `double jump rose ${pressY - highest}, expected ${normal}`);
+      const before = player.vy;
+      physicsApi.stepPlayer(player, { jumpPressed: true, jumpHeld: true }, terrain, dt);
+      assert(player.jumpKind === null && player.vy > before, "a third jump launched in the air");
+    }
+  });
+
+  test("REQ-MOV-05: landing, wall contact, and background attachment restore the double jump", () => {
+    const floor = flatTerrain(120, 300, 280);
+    const landing = physicsApi.createPlayer(50, 200);
+    landing.airJumps = 0;
+    for (let frame = 0; frame < 100 && !landing.grounded; frame += 1) physicsApi.stepPlayer(landing, {}, floor, 0.05);
+    assert(landing.grounded && landing.airJumps === 1, "landing did not restore the double jump");
+    for (const side of [-1, 1]) {
+      const terrain = flatTerrain(100, 200, 200);
+      const wallX = side < 0 ? 30 : 50;
+      for (let y = 1; y < 190; y += 1) terrain.solid[y * 100 + wallX] = 1;
+      const touching = physicsApi.createPlayer(side < 0 ? wallX + 3 : wallX - 8, 40);
+      touching.airJumps = 0;
+      physicsApi.stepPlayer(touching, {}, terrain, 0.01);
+      assert(touching.airJumps === 1, `wall contact on side ${side} did not restore the double jump`);
+    }
+    const open = flatTerrain(100, 200, 200);
+    const climber = physicsApi.createPlayer(40, 60);
+    climber.airJumps = 0;
+    physicsApi.stepPlayer(climber, { moveY: -1 }, open, 0.01);
+    assert(climber.climbing && climber.airJumps === 1, "background attachment did not restore the double jump");
+    physicsApi.stepPlayer(climber, { jumpPressed: true, jumpHeld: true }, open, 0.01);
+    assert(!climber.climbing && climber.jumpKind === null && climber.airJumps === 1, "drop launched or consumed the double jump");
+    physicsApi.stepPlayer(climber, { jumpReleased: true }, open, 0.01);
+    physicsApi.stepPlayer(climber, { jumpPressed: true, jumpHeld: true }, open, 0.01);
+    assert(climber.jumpKind === "air" && climber.vy < 0, "fresh press after dropping did not double jump");
+  });
+
+  test("REQ-MOV-02/05: wall jumps report the kicked-off wall side for the visual burst", () => {
+    for (const side of [-1, 1]) {
+      const terrain = flatTerrain(100, 200, 200);
+      const wallX = side < 0 ? 30 : 50;
+      for (let y = 1; y < 190; y += 1) terrain.solid[y * 100 + wallX] = 1;
+      const player = physicsApi.createPlayer(side < 0 ? wallX + 2 : wallX - 7, 40);
+      const edge = side < 0 ? player.x : player.x + player.width;
+      physicsApi.stepPlayer(player, { jumpPressed: true, jumpHeld: true }, terrain, 0.02);
+      assert(player.jumpKind === "wall" && player.jumpWallSide === side, `wall side ${side} was not reported`);
+      assert(player.jumpX === edge && player.jumpY === 40 + player.height / 2, "wall burst origin is not at the wall-side edge");
+      physicsApi.stepPlayer(player, { jumpHeld: true }, terrain, 0.02);
+      assert(player.jumpKind === null && player.jumpWallSide === 0, "jump report persisted beyond its step");
+    }
+    const floor = physicsApi.createPlayer(50, 271);
+    physicsApi.stepPlayer(floor, { jumpPressed: true, jumpHeld: true }, flatTerrain(120, 300, 280), 0.02);
+    assert(floor.jumpKind === "floor" && floor.jumpWallSide === 0, "floor jump reported a wall side");
+  });
+
   test("REQ-MOV-03: continuous excavation is twenty cells per second, empty drill travel remains eighty", () => {
     for (const dt of [1/30,1/60,1/120]) {
       const terrain = flatTerrain(200,80,70);
@@ -816,21 +883,21 @@ if (physicsApi) {
     }
   });
 
-  test("REQ-MOV-03/05: drilling preserves jump charge", () => {
+  test("REQ-MOV-03/05: drilling preserves jump velocity and the double jump", () => {
     const terrain = flatTerrain(60, 60, 40);
     const player = physicsApi.createPlayer(4, 31);
     physicsApi.stepPlayer(player, { jumpPressed: true, jumpHeld: true }, terrain, 0);
+    const launch = player.vy;
     physicsApi.stepPlayer(player, { drill: true, jumpHeld: true }, terrain, 0.05);
-    assert(player.charging && player.chargeSeconds === 0.05, "drill cancelled jump assistance");
-    physicsApi.stepPlayer(player, { jumpReleased: true }, terrain, 0.05);
-    assert(player.vy < 0, "drill prevented charged jump");
+    assert(Math.abs(player.vy - launch - physicsApi.GRAVITY * 0.05) < 1e-9, "drill changed jump velocity");
+    assert(player.airJumps === 1, "drill consumed the double jump");
   });
 
   test("REQ-MOV-10: jump press immediately drops, consumes release, and requires fresh Up", () => {
     const terrain = flatTerrain(100, 100, 100);
     const player = physicsApi.createPlayer(40, 60);
     physicsApi.stepPlayer(player, { moveY: -1, jumpPressed: true, jumpHeld: true }, terrain, 0.05);
-    assert(!player.climbing && !player.charging && player.vy > 0, "press did not immediately drop");
+    assert(!player.climbing && player.jumpKind === null && player.vy > 0, "press did not immediately drop");
     const dropY = player.y;
     physicsApi.stepPlayer(player, { moveY: -1, jumpHeld: true }, terrain, 0.05);
     physicsApi.stepPlayer(player, { moveY: -1, jumpReleased: true }, terrain, 0.05);
@@ -847,27 +914,27 @@ if (physicsApi) {
     assert(player.climbing, "fresh Up did not reattach");
   });
 
-  test("REQ-MOV-10: a held drop press cannot charge on landing or launch on release", () => {
+  test("REQ-MOV-10: a held drop press cannot jump on landing or launch on release", () => {
     const terrain = flatTerrain(100, 100, 80);
     const player = physicsApi.createPlayer(40, 65);
     physicsApi.stepPlayer(player, { moveY: -1 }, terrain, 0);
     for (let frame = 0; frame < 30; frame += 1) {
       physicsApi.stepPlayer(player, { jumpPressed: frame === 0, jumpHeld: true }, terrain, 0.05);
-      assert(!player.charging, "held drop press charged near terrain");
+      assert(player.jumpKind === null, "held drop press jumped near terrain");
     }
     physicsApi.stepPlayer(player, { jumpReleased: true }, terrain, 0.05);
     assert(player.grounded && player.vy === 0, "drop release launched from floor");
     physicsApi.stepPlayer(player, { jumpPressed: true, jumpHeld: true }, terrain, 0);
-    assert(player.charging, "fresh floor press no longer charges");
+    assert(player.jumpKind === "floor", "fresh floor press no longer jumps");
   });
 
-  test("REQ-MOV-08: solid bottom supports landing, walking, charging and jumping without terrain", () => {
+  test("REQ-MOV-08: solid bottom supports landing, walking and jumping without terrain", () => {
     const terrain = flatTerrain(100, 60, 60);
     const player = physicsApi.createPlayer(20, 49);
     for (let frame = 0; frame < 30; frame += 1) physicsApi.stepPlayer(player, {}, terrain, 0.05);
     assert(player.y === 51 && player.grounded && player.vy === 0, "bottom did not stop feet");
     physicsApi.stepPlayer(player, { move: 1, jumpPressed: true, jumpHeld: true }, terrain, 0.05);
-    assert(player.x === 24 && player.charging, "bottom did not allow walking/charging");
+    assert(player.x === 24 && player.jumpKind === "floor", "bottom did not allow walking/jumping");
     physicsApi.stepPlayer(player, { jumpReleased: true }, terrain, 0.05);
     assert(player.vy < 0 && player.y < 51, "bottom did not allow jumping");
     assert(!terrain.solid.some(Boolean), "boundary added generated terrain");
@@ -938,7 +1005,7 @@ if (physicsApi) {
     assert(player.vx === 0 && player.vy === 0, "boundary did not stop climbing velocity");
   });
 
-  test("REQ-MOV-02/05: jump launches on press on a surface but not in air", () => {
+  test("REQ-MOV-02/05: jump launches on press on a surface; without a double jump not in air", () => {
     const terrain = flatTerrain();
     const player = physicsApi.createPlayer(10, 15);
     physicsApi.stepPlayer(player, {}, terrain, 0.016);
@@ -948,6 +1015,7 @@ if (physicsApi) {
     physicsApi.stepPlayer(player, { jumpReleased: true }, terrain, 0.016);
     assert(player.vy < 0, "grounded jump should move upward");
     const jumpVelocity = player.vy;
+    player.airJumps = 0;
     physicsApi.stepPlayer(player, { jumpPressed: true, jumpReleased: true }, terrain, 0.016);
     assert(player.vy > jumpVelocity, "airborne jump request should not reset jump velocity");
     assert(player.vy < 0, "player should still be rising after the ignored request");
@@ -959,13 +1027,13 @@ if (physicsApi) {
     for (let frame = 0; frame < 100; frame += 1) {
       physicsApi.stepPlayer(player, { jumpPressed: frame === 0, jumpHeld: true }, terrain, 0.05);
     }
-    assert(!player.charging, `assistance remained active after landing`);
     assert(player.y === 271 && player.vy === 0, "held jump repeated automatically");
+    assert(player.airJumps === 1, "landing did not restore the double jump");
   });
 
-  test("REQ-MOV-05: maximum launch strength represents twice normal height", () => {
-    const expectedHeight = 180 ** 2 / physicsApi.GRAVITY;
-    const speed = physicsApi.jumpSpeedForHold(0.25, 1 / 240);
+  test("REQ-MOV-05: launch speed represents the normal jump height", () => {
+    const expectedHeight = 180 ** 2 / (2 * physicsApi.GRAVITY);
+    const speed = physicsApi.jumpSpeed(1 / 240);
     let y = 0;
     let vy = -speed;
     let apex = 0;
@@ -975,11 +1043,10 @@ if (physicsApi) {
       apex = Math.min(apex, y);
     }
     assert(Math.abs(-apex - expectedHeight) < 0.1, `rise was ${-apex}, expected ${expectedHeight}`);
-    assert(physicsApi.jumpSpeedForHold(0, 1 / 60) < physicsApi.jumpSpeedForHold(0.125, 1 / 60),
-      "partial charge did not increase jump strength");
+    assert(!("jumpSpeedForHold" in physicsApi) && !("JUMP_HOLD_SECONDS" in physicsApi), "hold-to-boost jump API remains");
   });
 
-  test("REQ-MOV-05: ascent eventually ends assistance and release adds no impulse", () => {
+  test("REQ-MOV-05: releasing in the air adds no impulse", () => {
     const terrain = flatTerrain(60, 60, 40);
     terrain.solid.fill(0);
     for (let x = 0; x < 12; x += 1) terrain.solid[40 * 60 + x] = 1;
@@ -988,13 +1055,12 @@ if (physicsApi) {
     for (let frame = 0; frame < 10; frame += 1) {
       physicsApi.stepPlayer(player, { move: 1, jumpHeld: true }, terrain, 0.05);
     }
-    assert(!player.charging, "assistance survived the end of ascent");
     const vy = player.vy;
     physicsApi.stepPlayer(player, { jumpReleased: true }, terrain, 0.01);
     assert(player.vy >= vy, "release in air launched a jump");
   });
 
-  test("REQ-MOV-05: a player landed at a fractional coordinate can charge", () => {
+  test("REQ-MOV-05: a player landed at a fractional coordinate can jump", () => {
     const terrain = flatTerrain(60, 60, 40);
     const player = physicsApi.createPlayer(4, 20.37);
     for (let frame = 0; frame < 60; frame += 1) {
@@ -1003,7 +1069,7 @@ if (physicsApi) {
     player.y = 30.7;
     player.grounded = true;
     physicsApi.stepPlayer(player, { jumpPressed: true, jumpHeld: true }, terrain, 1 / 60);
-    assert(player.charging, `landed player could not charge at y=${player.y}`);
+    assert(player.jumpKind === "floor", `landed player could not jump at y=${player.y}`);
   });
 
   test("REQ-MOV-06: ceiling blocks upward motion and player falls back down", () => {
@@ -1016,17 +1082,17 @@ if (physicsApi) {
     assert(player.y > 0 && player.vy > 0, "player did not fall after hitting ceiling");
   });
 
-  test("REQ-MOV-05/06: ceiling stops held upward assistance", () => {
-    const terrain = flatTerrain(100, 70, 69);
-    const player = physicsApi.createPlayer(40, 60);
+  test("REQ-MOV-05/06: ceiling stops a held jump", () => {
+    const terrain = flatTerrain(100, 40, 39);
+    const player = physicsApi.createPlayer(40, 30);
     physicsApi.stepPlayer(player, { jumpPressed: true, jumpHeld: true }, terrain, 1 / 60);
     let highest = player.y;
     for (let frame = 0; frame < 120; frame += 1) {
       physicsApi.stepPlayer(player, { jumpHeld: true }, terrain, 1 / 60);
       highest = Math.min(highest, player.y);
-      if (player.y === 0) assert(!player.charging && player.vy === 0, "ceiling left assistance active");
+      if (player.y === 0) assert(player.vy === 0, "ceiling left upward movement active");
     }
-    assert(highest === 0, `maximum jump did not reach ceiling: y=${highest}`);
+    assert(highest === 0, `jump did not reach ceiling: y=${highest}`);
   });
 
   test("air movement uses normal horizontal speed", () => {
@@ -1097,12 +1163,12 @@ if (physicsApi) {
     }
   });
 
-  test("REQ-MOV-07: charges work exactly three cells above floor but not beyond", () => {
+  test("REQ-MOV-07: floor jumps work exactly three cells above floor but not beyond", () => {
     const terrain = flatTerrain(80, 80, 60);
     for (const [gap, allowed] of [[0, true], [2.9, true], [3, true], [3.1, false]]) {
       const player = physicsApi.createPlayer(10, 60 - 9 - gap);
       physicsApi.stepPlayer(player, { jumpPressed: true, jumpHeld: true }, terrain, 0);
-      assert(player.charging === allowed, `incorrect floor tolerance at gap ${gap}`);
+      assert(player.jumpKind === (allowed ? "floor" : "air"), `incorrect floor tolerance at gap ${gap}`);
     }
   });
 
@@ -1135,41 +1201,31 @@ if (physicsApi) {
         const nearX = side < 0 ? wallX + 1 + gap : wallX - 6 - gap;
         const nearby = physicsApi.createPlayer(nearX, 40);
         physicsApi.stepPlayer(nearby, { jumpPressed: true, jumpHeld: true }, terrain, 0);
-        assert(nearby.charging === (gap <= 3), `incorrect wall tolerance on side ${side}, gap ${gap}`);
+        assert(nearby.jumpKind === (gap <= 3 ? "wall" : "air"), `incorrect wall tolerance on side ${side}, gap ${gap}`);
       }
       const x = side < 0 ? wallX + 1 + 3 : wallX - 6 - 3;
       const player = physicsApi.createPlayer(x, 40);
       physicsApi.stepPlayer(player, { move: side, jumpPressed: true, jumpHeld: true }, terrain, 0.05);
-      assert(player.charging, `no wall charge on side ${side}`);
+      assert(player.jumpKind === "wall" && player.airJumps === 1, `no wall jump on side ${side}`);
       assert(player.y < 40 && player.vy < 0 && player.vx === -side * 80, "wall press did not launch upward and away");
-      const expectedVy = -physicsApi.jumpSpeedForHold(0, 0.05) + physicsApi.GRAVITY * 0.05;
-      assert(Math.abs(player.vy - expectedVy) < 1e-9, "wall jump did not use ground charge strength");
+      const expectedVy = -physicsApi.jumpSpeed(0.05) + physicsApi.GRAVITY * 0.05;
+      assert(Math.abs(player.vy - expectedVy) < 1e-9, "wall jump did not use floor jump strength");
       assert(Math.abs(player.x - x + side * 4) < 0.001, "away launch was overridden by input");
     }
   });
 
-  test("REQ-MOV-07: assistance survives leaving support and release never relaunches", () => {
+  test("REQ-MOV-07: release never relaunches or queues a launch", () => {
     const terrain = flatTerrain(100, 100, 70);
-    const player = physicsApi.createPlayer(10, 61);
-    physicsApi.stepPlayer(player, { jumpPressed: true, jumpHeld: true }, terrain, 0);
-    terrain.solid.fill(0);
-    physicsApi.stepPlayer(player, { jumpHeld: true }, terrain, 0.05);
-    physicsApi.stepPlayer(player, { jumpHeld: true }, terrain, 0.05);
-    assert(player.charging, "charge cancelled before grace elapsed");
-    physicsApi.stepPlayer(player, { jumpHeld: true }, terrain, 0.05);
-    assert(player.charging, "charge did not survive exactly 150 ms");
-    physicsApi.stepPlayer(player, { jumpHeld: true }, terrain, 0.001);
-    assert(player.charging, "hold window incorrectly required continued contact");
     const other = physicsApi.createPlayer(10, 61);
     terrain.solid.fill(1, 70 * 100);
     physicsApi.stepPlayer(other, { jumpPressed: true, jumpHeld: true }, terrain, 0);
     terrain.solid.fill(0);
     const beforeRelease = other.vy;
     physicsApi.stepPlayer(other, { jumpReleased: true }, terrain, 0.01);
-    assert(other.vy > beforeRelease && !other.charging, "release added an impulse");
+    assert(other.vy > beforeRelease && other.jumpKind === null, "release added an impulse");
     terrain.solid.fill(1, 70 * 100);
     physicsApi.stepPlayer(other, {}, terrain, 0.01);
-    assert(other.vy > beforeRelease && !other.charging, "release queued a launch");
+    assert(other.vy > beforeRelease && other.jumpKind === null, "release queued a launch");
   });
 
   test("REQ-MOV-07: a held press buffers contact for 150 ms, not longer", () => {
@@ -1177,6 +1233,7 @@ if (physicsApi) {
     for (const [wait, expected] of [[0.1, true], [0.15, true], [0.151, false], [0.16, false]]) {
       for (const frameDuration of [0.02, 0.05]) {
         const player = physicsApi.createPlayer(10, 10);
+        player.airJumps = 0;
         physicsApi.stepPlayer(player, { jumpPressed: true, jumpHeld: true }, terrain, 0);
         let elapsed = 0;
         while (elapsed < wait - 1e-9) {
@@ -1186,7 +1243,7 @@ if (physicsApi) {
         }
         player.y = 61;
         physicsApi.stepPlayer(player, { jumpHeld: true }, terrain, 0);
-        assert(player.charging === expected, `incorrect buffer behavior after ${wait}s`);
+        assert((player.jumpKind === "floor") === expected, `incorrect buffer behavior after ${wait}s`);
       }
     }
   });
@@ -1201,8 +1258,8 @@ if (physicsApi) {
       player.y += dy;
       player.vy = 50;
       physicsApi.stepPlayer(player, { move: 1, jumpPressed: true, jumpHeld: true }, terrain, 0);
-      assert(player.charging === expected && (player.vy < 0) === expected, `incorrect floor grace at ${dx},${dy}`);
-      if (expected) assert(player.vx === 80, "floor grace did not keep normal floor-jump movement");
+      assert(player.jumpKind === (expected ? "floor" : "air") && player.vy < 0, `incorrect floor grace at ${dx},${dy}`);
+      if (expected) assert(player.vx === 80 && player.airJumps === 1, "floor grace changed movement or consumed the double jump");
     }
   });
 
@@ -1220,7 +1277,8 @@ if (physicsApi) {
         }
         assert(!player.grounded && player.vy >= 0, `player did not walk off the cliff at ${frameDuration}`);
         physicsApi.stepPlayer(player, { move: 1, jumpPressed: true, jumpHeld: true }, terrain, frameDuration);
-        assert((player.vy < 0) === expected, `incorrect walk-off grace at x ${pressX}, frame ${frameDuration}`);
+        assert(player.jumpKind === (expected ? "floor" : "air") && player.vy < 0,
+          `incorrect walk-off grace or missing double jump at x ${pressX}, frame ${frameDuration}`);
       }
     }
   });
@@ -1237,8 +1295,8 @@ if (physicsApi) {
         player.x += away * dx;
         player.y += dy;
         physicsApi.stepPlayer(player, { move: side, jumpPressed: true, jumpHeld: true }, terrain, 0);
-        assert(player.charging === expected && (player.vy < 0) === expected, `incorrect wall grace on side ${side} at ${dx},${dy}`);
-        if (expected) assert(player.vx === away * 80, "wall grace did not launch away from the last wall");
+        assert(player.jumpKind === (expected ? "wall" : "air") && player.vy < 0, `incorrect wall grace on side ${side} at ${dx},${dy}`);
+        if (expected) assert(player.vx === away * 80 && player.jumpWallSide === side, "wall grace did not launch away from the last wall");
       }
     }
   });
@@ -1251,9 +1309,11 @@ if (physicsApi) {
     player.y += 1;
     physicsApi.stepPlayer(player, { jumpPressed: true, jumpReleased: true }, terrain, 0);
     assert(player.vy < 0, "grace jump did not launch");
-    const afterLaunch = player.vy;
     physicsApi.stepPlayer(player, { jumpPressed: true, jumpReleased: true }, terrain, 0.01);
-    assert(player.vy > afterLaunch, "grace granted an additional airborne jump");
+    assert(player.jumpKind === "air", "grace was not consumed by the launch");
+    const afterDouble = player.vy;
+    physicsApi.stepPlayer(player, { jumpPressed: true, jumpReleased: true }, terrain, 0.01);
+    assert(player.jumpKind === null && player.vy > afterDouble, "grace granted an additional airborne jump");
     const climber = physicsApi.createPlayer(40, 61);
     terrain.solid.fill(1, 70 * 100);
     physicsApi.stepPlayer(climber, {}, terrain, 0);
@@ -1262,32 +1322,32 @@ if (physicsApi) {
     physicsApi.stepPlayer(climber, { jumpPressed: true, jumpHeld: true }, terrain, 0);
     physicsApi.stepPlayer(climber, { jumpReleased: true }, terrain, 0);
     physicsApi.stepPlayer(climber, { jumpPressed: true, jumpHeld: true }, terrain, 0);
-    assert(!climber.charging && climber.vy >= 0, "grace survived background attachment");
+    assert(climber.jumpKind === "air", "grace survived background attachment");
   });
 
-  test("REQ-MOV-02/07: rising jumps are not snapped or recharged; image side borders are jumpable", () => {
+  test("REQ-MOV-02/07: rising jumps are not snapped or floor-jumped again; image side borders are jumpable", () => {
     const terrain = flatTerrain(100, 100, 70);
     const player = physicsApi.createPlayer(10, 61);
     physicsApi.stepPlayer(player, { jumpPressed: true, jumpReleased: true }, terrain, 0.01);
     const y = player.y;
     const vy = player.vy;
     physicsApi.stepPlayer(player, { jumpPressed: true, jumpReleased: true }, terrain, 0.01);
-    assert(player.y < y && player.vy > vy && !player.charging, "rising jump snapped or double-jumped");
+    assert(player.y < y && player.jumpKind === "air", "rising jump snapped or relaunched as a floor jump");
     for (const [side, away] of [[-1, 1], [1, -1]]) {
-      for (const [gap, canCharge] of [[0, true], [3, true], [3.1, false]]) {
+      for (const [gap, canWallJump] of [[0, true], [3, true], [3.1, false]]) {
         const x = side < 0 ? gap : terrain.width - 6 - gap;
         const edge = physicsApi.createPlayer(x, 10);
         physicsApi.stepPlayer(edge, { move: -away, jumpPressed: true, jumpHeld: true }, terrain, 0.01);
-        assert(edge.charging === canCharge, `incorrect image-border tolerance on side ${side}, gap ${gap}`);
-        assert((edge.vy < 0) === canCharge, `incorrect image-border launch on side ${side}, gap ${gap}`);
-        if (canCharge) assert(edge.vx === away * 80, "image side border did not launch away");
+        assert(edge.jumpKind === (canWallJump ? "wall" : "air"), `incorrect image-border tolerance on side ${side}, gap ${gap}`);
+        assert(edge.vy < 0, `missing image-border launch on side ${side}, gap ${gap}`);
+        if (canWallJump) assert(edge.vx === away * 80, "image side border did not launch away");
         else assert(edge.vx !== away * 80, "distant image border granted a wall jump");
       }
     }
     const noTerrain = flatTerrain(100, 100, 100);
     const ceiling = physicsApi.createPlayer(10, 0);
     physicsApi.stepPlayer(ceiling, { jumpPressed: true, jumpReleased: true }, noTerrain, 0.01);
-    assert(!ceiling.charging && ceiling.vy > 0, "ceiling granted a wall jump");
+    assert(ceiling.jumpKind === "air" && ceiling.jumpWallSide === 0, "ceiling granted a wall jump");
     const bottom = physicsApi.createPlayer(10, 91);
     physicsApi.stepPlayer(bottom, { jumpPressed: true, jumpHeld: true }, noTerrain, 0);
     physicsApi.stepPlayer(bottom, { jumpReleased: true }, noTerrain, 0.01);
@@ -1361,6 +1421,52 @@ if (runApi) {
             assert(x >= 5 && x < 11 && y >= 5 && y < 14, "swimming artwork exceeds the character footprint");
           }
         }
+      });
+      test("REQ-MOV-02: wall-jump bursts appear on the wall side, stay in the image, and fade after 300 ms", () => {
+        const pixelsFor = (puff) => {
+          const canvas = document.createElement("canvas");
+          canvas.width = 60;
+          canvas.height = 40;
+          const context = canvas.getContext("2d");
+          context.fillStyle = "#123456";
+          sceneApi.drawWallJumpPuff(context, puff, 60);
+          assert(context.fillStyle === "#123456", "wall burst leaked canvas state");
+          return context.getImageData(0, 0, 60, 40).data;
+        };
+        for (const side of [-1, 1]) {
+          const pixels = pixelsFor({ x: 30, y: 20, side, seconds: 0.1 });
+          let wallSide = 0, awaySide = 0;
+          for (let y = 0; y < 40; y += 1) for (let x = 0; x < 60; x += 1) {
+            if (!pixels[(y * 60 + x) * 4 + 3]) continue;
+            if ((x - 30) * side >= -1) wallSide += 1;
+            else awaySide += 1;
+          }
+          assert(wallSide > 0 && awaySide === 0, `wall burst on side ${side} was not drawn on the wall side`);
+        }
+        assert(pixelsFor({ x: 0, y: 20, side: -1, seconds: 0 }).some((value, index) => index % 4 === 3 && value),
+          "wall burst at the image border was drawn outside the image");
+        assert(!pixelsFor({ x: 30, y: 20, side: 1, seconds: 0.3 }).some(Boolean), "wall burst did not end after 300 ms");
+        assert(!pixelsFor(null).some(Boolean), "missing wall burst drew pixels");
+      });
+      test("REQ-MOV-02 / REQ-SYS-14: wall jumps start a 300 ms burst that reset clears", () => {
+        const run = runApi.createRun({ ...flatTerrain(60, 60, 30), spawn: { x: 2, y: 21 }, flag: { x: 50, y: 30, width: 3, height: 6 } });
+        assert(run.wallPuff === null, "a new run started with a wall burst");
+        Object.assign(run.player, { jumpKind: "floor", jumpWallSide: 0, jumpX: 2, jumpY: 25 });
+        runApi.stepWallJumpPuff(run, 0);
+        assert(run.wallPuff === null, "a floor jump started a wall burst");
+        Object.assign(run.player, { jumpKind: "wall", jumpWallSide: -1, jumpX: 2, jumpY: 25 });
+        runApi.stepWallJumpPuff(run, 0.016);
+        assert(run.wallPuff && run.wallPuff.side === -1 && run.wallPuff.x === 2 && run.wallPuff.y === 25 && run.wallPuff.seconds === 0,
+          "a wall jump did not start a burst at its wall-side origin");
+        run.player.jumpKind = null;
+        runApi.stepWallJumpPuff(run, 0.29);
+        assert(run.wallPuff && Math.abs(run.wallPuff.seconds - 0.29) < 1e-9, "wall burst ended early");
+        runApi.stepWallJumpPuff(run, 0.02);
+        assert(run.wallPuff === null, "wall burst outlived 300 ms");
+        run.player.jumpKind = "wall";
+        runApi.stepWallJumpPuff(run, 0);
+        runApi.resetRun(run);
+        assert(run.wallPuff === null, "reset did not clear the wall burst");
       });
       test("REQ-LVL-18: enlarged pickup silhouettes have vivid colors, dark outlines, and soft auras", () => {
         for (const [type, color] of [["speed", [255, 230, 0]], ["reverse", [255, 45, 117]]]) {
@@ -1805,12 +1911,12 @@ if (runApi) {
     run.startedAt = 123;
     run.elapsedMs = 500;
     run.player.x = 40;
-    run.player.chargeSeconds = 2;
+    run.player.airJumps = 0;
     run.enemies[0].x = 30;
     run.pickups.length = 0;
     run.movingPlatforms[0].x = 18;
     runApi.resetRun(run);
-    assert(run.player.x === run.spawn.x && run.player.chargeSeconds === 0, "reset did not restore player");
+    assert(run.player.x === run.spawn.x && run.player.airJumps === 1, "reset did not restore player");
     assert(run.startedAt === null && run.elapsedMs === 0, "reset did not clear timer");
     assert(run.terrain.solid[35 * 60 + 10] === 1, "reset did not restore drilled terrain");
     assert(run.enemies[0].x === 25 && run.pickups.length === 1 && run.movingPlatforms[0].x === 10,

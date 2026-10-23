@@ -7,7 +7,7 @@ If the game is accessed from a device with a keyboard, the controls shall be:
 * A or left arrow: Move left
 * W or up arrow: Enter background climbing (see "REQ-MOV-10")
 * S or down arrow: Climb down or aim the drill down
-* Space: Press to jump immediately; hold briefly to jump higher
+* Space: Press to jump immediately; press again in the air to double jump
 * Return: Use the drill (see "REQ-MOV-03")
 
 If the game is accessed from a mobile/touch-only device, the controls shall be:
@@ -19,15 +19,16 @@ Touch controls shall provide up/down buttons as well as left/right buttons.
 Return or the dedicated drill button shall remain held to drill.
 W/up shall not jump.
 Space shall be the only keyboard jump control; the touch JUMP control shall retain the same behavior.
-While background climbing, pressing either jump control shall drop immediately instead of charging or jumping (REQ-MOV-10).
+While background climbing, pressing either jump control shall drop immediately instead of jumping (REQ-MOV-10).
 
 ## REQ-MOV-02: Wall Jump
 
 The character shall jump immediately on pressing the jump control within three terrain cells of a floor, either side of a terrain wall, or either vertical image side border (REQ-MOV-07).
-A wall jump shall launch upward and away from the wall at normal horizontal movement speed, using the same hold window and vertical height range as a floor jump.
-Outside the surface-distance tolerance, a press shall not launch unless buffered until contact or still within the contact-loss grace distance under REQ-MOV-07.
+A wall jump shall launch upward and away from the wall at normal horizontal movement speed, with the same fixed vertical height as a floor jump.
+Outside the surface-distance tolerance and contact-loss grace distance under REQ-MOV-07, a press shall use the single airborne double jump under REQ-MOV-05 if it is available, and otherwise shall not launch unless buffered until contact.
 A wall-grace jump shall launch upward and away from the last-contacted wall.
-There shall be no free additional airborne jumps.
+Every wall jump, including a wall-grace jump, shall show a brief visual burst of dust puffs on the side of the wall the character kicked off from, lasting about 300 milliseconds and staying within the image.
+The burst shall be cosmetic only, shall not appear for floor or double jumps, and shall clear on run reset.
 While background climbing, the jump control drops instead, as specified by REQ-MOV-10.
 While actively excavating, horizontal travel uses the limit in REQ-MOV-03.
 
@@ -44,7 +45,7 @@ Excavated terrain shall remain removed for the current run, including terrain su
 While the drill is actively excavating intact terrain, normal horizontal movement shall be limited to background-climbing speed, twenty terrain cells per second.
 Holding the drill in already-open space shall retain normal eighty-cell-per-second horizontal movement.
 Background climbing shall remain twenty cells per second with normalized diagonals, including while drilling.
-Excavation shall not change gravity, the jump hold window, or vertical jump velocity, and shall not enable hovering outside background climbing.
+Excavation shall not change gravity, double-jump availability, or vertical jump velocity, and shall not enable hovering outside background climbing.
 Movement limits shall hold across supported frame durations and repeated resets without duplicate animation loops.
 
 ## REQ-MOV-04: Air Movement
@@ -52,21 +53,21 @@ Movement limits shall hold across supported frame durations and repeated resets 
 While "in air", i.e., executing a jump or falling, the character shall move left or right at normal speed unless a temporary speed pickup is active under REQ-LVL-18.
 Background climbing and active excavation are exceptions: REQ-MOV-10 specifies climbing speed and suspension of gravity, and REQ-MOV-03 limits horizontal active excavation without changing gravity.
 
-## REQ-MOV-05: Immediate Variable-Height Jumps
+## REQ-MOV-05: Fixed-Height Jumps and Double Jump
 
-Pressing Space or touch JUMP near an eligible surface shall immediately apply the existing normal-jump minimum impulse.
-Continuing to hold the control shall increase upward velocity during a 250-millisecond window measured from launch.
-A quick tap shall retain the existing normal rise of approximately 38.6 terrain cells in unobstructed space.
-A full hold shall rise at most twice the normal jump height, approximately 77.1 cells, rather than a full level height.
-Intermediate holds shall produce intermediate heights.
-Releasing shall stop additional upward assistance without launching again or cancelling existing momentum.
-Holding beyond the window shall not increase jump height or automatically jump again on landing.
-Gravity and collision shall remain active, and ceiling contact shall stop upward assistance.
-The hold window shall remain valid after leaving the launch surface, without permitting additional unattached airborne jumps.
+Pressing Space or touch JUMP near an eligible surface shall immediately launch a jump of fixed height, approximately 38.6 terrain cells in unobstructed space.
+Holding or releasing the control shall not change jump height or launch again.
+While airborne and outside floor/wall contact and grace, a fresh press shall launch exactly one double jump.
+A double jump shall reset vertical velocity to the same fixed launch velocity, rising approximately another 38.6 cells, regardless of whether the character was rising or falling.
+A double jump shall keep normal player-controlled horizontal movement and shall not launch away from any wall.
+The double jump shall be restored on landing, on wall contact within the REQ-MOV-07 tolerance, and on background attachment under REQ-MOV-10.
+A character that walks or falls off a ledge without jumping shall keep its double jump available.
+There shall be no further airborne jumps until the double jump is restored.
+Holding the control through landing shall not automatically jump again.
+Gravity and collision shall remain active, and ceiling contact shall stop upward movement.
 Background attachment shall retain press-to-drop under REQ-MOV-10.
-A visible HUD meter and a bar immediately above the character shall show hold progress with a distinct maximum appearance.
-Both indicators shall clear on release, cancellation, ceiling contact, or the end of ascent.
-Normal horizontal movement shall remain available while holding, subject to the active-excavation limit.
+There shall be no hold meter and no charge bar above the character.
+Normal horizontal movement shall remain available while jumping, subject to the active-excavation limit.
 An immediate jump shall start the run timer.
 
 ## REQ-MOV-06: Level Ceiling
@@ -81,14 +82,14 @@ The camera shall remain fixed.
 
 Floor and wall contact for launching shall allow a distance of up to three terrain cells.
 Jump presses shall be buffered for 150 milliseconds before contact, allowing a still-held control to launch immediately on arrival.
-A release before contact shall cancel the buffered press rather than queue a later launch.
-After launch, upward assistance shall depend on the hold window rather than continued surface contact.
+A press is only buffered when no double jump is available, and a release before contact shall cancel the buffered press rather than queue a later launch.
 
 After walking off a cliff, having support removed, or otherwise losing floor contact, a jump press shall still launch a floor jump while the character remains within three terrain cells of its position at the last floor contact.
 After losing wall contact, a jump press shall still launch a wall jump while the character remains within four terrain cells of its position at the last wall contact.
 Grace distances shall be straight-line distances, so falling straight down cannot extend grace indefinitely.
 Floor grace shall take precedence over wall grace, and current contact shall take precedence over both.
 A launch shall consume both graces, and background attachment shall clear them, so grace never grants an additional airborne jump.
+A grace jump is a floor or wall jump and shall not consume the double jump.
 
 Walking shall follow inclines and declines, including descending floor snapping within three cells.
 Floor snapping shall never pull a rising jump back onto the floor.
@@ -104,9 +105,9 @@ The image bottom shall no longer be a safe surface for continued play.
 
 ## REQ-MOV-09: Superseded Charge-and-Release Interaction
 
-Status: Superseded by the approved immediate variable-height jump revision in REQ-MOV-01/02/05/07.
+Status: Superseded by the approved fixed-height double-jump revision in REQ-MOV-01/02/05/07.
 
-The previous hold-to-charge and release-to-launch interaction is replaced by launch-on-press with a 250-millisecond upward-assistance window.
+The previous hold-to-charge and release-to-launch interaction, and the later 250-millisecond hold-to-boost variable-height jump, are both replaced by fixed-height launch-on-press with one airborne double jump.
 Failure resets under REQ-MOV-08/REQ-SYS-14 and background press-to-drop under REQ-MOV-10 remain unchanged.
 
 ## REQ-MOV-10: Background Climbing
@@ -117,8 +118,9 @@ Directional controls shall move the climbing character at one quarter of normal 
 Releasing directional controls shall hold position without gravity.
 When the character's feet meet terrain or the solid image bottom while descending, climbing shall end and normal walking shall resume.
 Holding Up shall allow climbing away from a standing position.
-Pressing Space or touch JUMP while attached shall immediately detach and drop the character, cancelling charge and restoring gravity without an upward launch.
-Holding or releasing that same jump press shall not charge or launch, even if the character lands before release.
+Pressing Space or touch JUMP while attached shall immediately detach and drop the character, restoring gravity without an upward launch.
+Holding or releasing that same jump press shall not launch, even if the character lands before release.
+After dropping, the restored double jump shall remain available for a fresh press.
 Held Up shall not automatically reattach after dropping; a new Up press shall be required.
 Climbing shall respect terrain collisions and the image boundaries unless the directional drill removes terrain.
 Climbing movement and immediate jumping shall count as elapsed race time.

@@ -60,7 +60,7 @@ Generated terrain shall follow visible features at multiple heights in the
 input image rather than reduce the image to one continuous, gently ramped
 floor. Separate platforms shall support jumping between image features.
 Detected photo edges shall guide generated support, with supplemental bridges and stepping platforms permitted under REQ-LVL-16.
-Variable-height jumps under REQ-MOV-05 and background climbing remain available, and drilling is an optional shortcut rather than a requirement to finish.
+Fixed-height jumps and double jumps under REQ-MOV-05 and background climbing remain available, and drilling is an optional shortcut rather than a requirement to finish.
 
 ## REQ-LVL-09: Sparse Platforms and Photo-Aligned Walls
 
@@ -168,7 +168,7 @@ Connectors and supplemental platforms shall be visible, collidable, drillable, p
 No unsupported freestanding vertical walls shall be invented to achieve verticality.
 Filling and scenery shall not obstruct the validated route, and enemy timing shall be included in final route verification.
 Walking-only finishes shall remain rejected.
-Existing free background climbing, variable-height jumps under REQ-MOV-05, and drilling shall remain available, including skilled shortcuts.
+Existing free background climbing, fixed-height jumps and double jumps under REQ-MOV-05, and drilling shall remain available, including skilled shortcuts.
 The reference duration is not a guaranteed minimum completion time for other routes.
 Generation shall use bounded planning and repair stages, preserving hard safety and no-drill completion guarantees instead of relaxing them.
 Validation shall cover diverse sparse, busy, horizontal, and vertical images and the supplied portrait rather than only a specially suitable fixture.

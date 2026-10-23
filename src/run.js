@@ -175,6 +175,7 @@ export function createRun(original) {
     pickups: (original.pickups || []).map((pickup) => ({ ...pickup })),
     movingPlatforms: (original.movingPlatforms || []).map((platform) => ({ ...platform })),
     effects: { speedSeconds: 0, reverseSeconds: 0 },
+    wallPuff: null,
     startedAt: null,
     elapsedMs: 0,
   };
@@ -225,6 +226,19 @@ export function stepRunEffects(run, dt) {
   }
   run.effects.speedSeconds = Math.max(0, run.effects.speedSeconds - dt);
   run.effects.reverseSeconds = Math.max(0, run.effects.reverseSeconds - dt);
+}
+
+export const WALL_PUFF_SECONDS = 0.3;
+
+export function stepWallJumpPuff(run, dt) {
+  if (run.wallPuff) {
+    run.wallPuff.seconds += dt;
+    if (run.wallPuff.seconds >= WALL_PUFF_SECONDS - 1e-9) run.wallPuff = null;
+  }
+  const { player } = run;
+  if (player.jumpKind === "wall") {
+    run.wallPuff = { x: player.jumpX, y: player.jumpY, side: player.jumpWallSide, seconds: 0 };
+  }
 }
 
 export function applyRunEffects(input, run) {

@@ -1,12 +1,12 @@
-import { cancelCharge, DRILL_REACH, JUMP_HOLD_SECONDS, stepPlayer } from "./physics.js";
+import { cancelJumpInput, DRILL_REACH, stepPlayer } from "./physics.js";
 import { applyRunEffects, collectPickups, createRun, reachedFlag, resetRun, stepMovingPlatforms,
-  stepRunEffects } from "./run.js";
+  stepRunEffects, stepWallJumpPuff } from "./run.js";
 import { enemyContact, stepEnemies } from "./enemies.js";
 import { getLeaderboard, isValidPlayerName, leaderboardRows, submitScore } from "./leaderboard.js";
 import { NoUsableEdgeError } from "./terrain.js";
 import { BIOMES, LAYOUTS, createSuggestions, levelIdentity } from "./level.js";
 import { drawBiomeEffects, drawEnemies, drawGate, drawHeadwear, drawPhoto, drawPreview,
-  drawMovingPlatforms, drawPickups, drawSwimmingPlayer, paintTerrain, paintTerrainShadow } from "./scene.js";
+  drawMovingPlatforms, drawPickups, drawSwimmingPlayer, drawWallJumpPuff, paintTerrain, paintTerrainShadow } from "./scene.js";
 
 const WORLD_WIDTH = 320;
 const WORLD_HEIGHT = 180;
@@ -200,7 +200,6 @@ function setUpGame() {
   document.querySelector("#level-title").textContent = `${BIOMES[terrain.biome].label} finish, ${state.playerName}`;
   timerValue.textContent = "0.00";
   document.querySelector("#contact-message").textContent = "";
-  updateChargeIndicator();
   drawScene();
   state.frameHandle = requestAnimationFrame(gameFrame);
 }
@@ -209,17 +208,6 @@ function stopAnimation() {
   if (state.frameHandle !== null) cancelAnimationFrame(state.frameHandle);
   state.frameHandle = null;
   state.running = false;
-}
-
-function updateChargeIndicator() {
-  const seconds = state.player?.chargeSeconds || 0;
-  const full = seconds >= JUMP_HOLD_SECONDS;
-  document.querySelector("#charge-meter").value = seconds;
-  const label = document.querySelector("#charge-label");
-  label.textContent = state.player?.climbing ? "Press jump to drop" : full ? "MAX JUMP" : (
-    state.player?.charging ? `JUMP BOOST ${Math.round(seconds / JUMP_HOLD_SECONDS * 100)}%` : "Press jump · hold briefly to jump higher"
-  );
-  label.classList.toggle("charge-full", full);
 }
 
 function restartRun() {
@@ -366,17 +354,6 @@ function drawPlayer() {
   drawHeadwear(context, state.player, state.terrain.biome);
 }
 
-function drawPlayerCharge() {
-  const player = state.player;
-  if (!player.charging) return;
-  const x = Math.max(0, Math.min(WORLD_WIDTH - 12, player.x + player.width / 2 - 6));
-  const y = Math.max(0, player.y - 5);
-  context.fillStyle = "#16262d";
-  context.fillRect(x, y, 12, 3);
-  context.fillStyle = player.chargeSeconds >= JUMP_HOLD_SECONDS ? "#ffd166" : "#9fe4c1";
-  context.fillRect(x + 1, y + 1, 10 * player.chargeSeconds / JUMP_HOLD_SECONDS, 1);
-}
-
 function drawDrill() {
   const player = state.player;
   if (!player.drilling) return;
@@ -411,7 +388,7 @@ function drawScene() {
   drawExit();
   drawPlayer();
   drawDrill();
-  drawPlayerCharge();
+  drawWallJumpPuff(context, state.wallPuff, WORLD_WIDTH);
 }
 
 function getInput() {
@@ -521,13 +498,13 @@ function gameFrame(timestamp) {
     state.startedAt = timestamp;
   }
   stepPlayer(state.player, input, state.terrain, dt);
+  stepWallJumpPuff(state, dt);
   collectPickups(state);
   state.jumpPressed = false;
   state.jumpReleased = false;
 
   const movedByPlayer = (input.move !== 0 && state.player.x !== beforeX)
-    || (input.jumpReleased && state.player.y !== beforeY)
-    || state.player.charging
+    || state.player.jumpKind !== null
     || (wasClimbing && input.jumpPressed)
     || (input.moveY !== 0 && state.player.y !== beforeY);
   if (state.startedAt === null && movedByPlayer) {
@@ -552,7 +529,6 @@ function gameFrame(timestamp) {
       : "Bottom contact — run reset.";
     timerValue.textContent = "0.00";
   }
-  updateChargeIndicator();
   drawScene();
   if (!hitEnemy && !hitBottom && reachedFlag(state)) {
     finishLevel();
@@ -572,7 +548,7 @@ function clearControls() {
   state.jumpPressed = false;
   state.jumpReleased = false;
   if (state.player) {
-    cancelCharge(state.player);
+    cancelJumpInput(state.player);
     state.player.upHeld = false;
     state.player.dropJumpHeld = false;
   }
@@ -689,7 +665,7 @@ bindHoldButton(
     touchState.jump = false;
     state.jumpPressed = false;
     state.jumpReleased = false;
-    if (state.player) cancelCharge(state.player);
+    if (state.player) cancelJumpInput(state.player);
   },
 );
 bindHoldButton(

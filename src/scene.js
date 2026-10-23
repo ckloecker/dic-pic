@@ -90,6 +90,22 @@ export function drawPickups(context, pickups, seconds = 0) {
   context.restore();
 }
 
+export function drawWallJumpPuff(context, puff, width) {
+  const duration = 0.3;
+  if (!puff || puff.seconds >= duration) return;
+  const progress = Math.max(0, puff.seconds / duration);
+  const size = 2 + progress * 2;
+  context.save();
+  context.globalAlpha = 1 - progress;
+  for (const [index, dy] of [-4, -1.5, 1, 3.5].entries()) {
+    const distance = 0.5 + progress * 3 + (index % 2) * 1.5;
+    const x = Math.max(size / 2, Math.min(width - size / 2, puff.x + puff.side * distance));
+    context.fillStyle = index % 2 ? "#fff6dc" : "#e8cf9f";
+    context.fillRect(x - size / 2, puff.y + dy * (1 + progress / 2) - size / 2, size, size);
+  }
+  context.restore();
+}
+
 export function drawMovingPlatforms(context, platforms) {
   for (const platform of platforms) {
     context.fillStyle = "#152b34";

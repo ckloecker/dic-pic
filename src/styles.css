@@ -776,25 +776,6 @@ kbd {
   gap: 12px;
 }
 
-.charge-panel {
-  display: flex;
-  flex-basis: 100%;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  color: var(--muted);
-}
-
-#charge-meter {
-  width: 140px;
-  accent-color: var(--mint);
-}
-
-.charge-full {
-  color: var(--orange);
-  font-weight: 700;
-}
-
 .movement-pad {
   display: grid;
   grid-template-columns: repeat(3, 40px);

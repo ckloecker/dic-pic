@@ -341,7 +341,7 @@ export function verifyReferenceRoute(level) {
     const releasingUp = previous.upHeld && !action.input.moveY
       && level.route.actions[index + 1]?.input.moveY < 0;
     if (Math.hypot(player.x - previous.x, player.y - previous.y) < 1e-9
-      && !player.charging && !releasingUp) {
+      && !releasingUp) {
       return { valid: false, seconds, reason: "idle padding" };
     }
     stepEnemies(enemies, action.dt);

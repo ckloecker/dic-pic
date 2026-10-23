@@ -26,7 +26,7 @@ Validate the actual physics and enemy simulation without drilling or idle paddin
 Prefer 55–70% open cells without rejecting sparse or dense sources solely for occupancy.
 Connect useful detected surfaces and add missing horizontal supports without manufacturing vertical walls.
 Keep the free climbing and jumping controls; reference-route timing does not forbid shortcuts.
-REQ-MOV-03 limits active excavation to twenty cells per second horizontally, retaining eighty in open space and preserving climbing, gravity, and variable-height jumping.
+REQ-MOV-03 limits active excavation to twenty cells per second horizontally, retaining eighty in open space and preserving climbing, gravity, fixed-height jumping, and the double jump.
 REQ-SYS-06 uses per-attempt identity for highlighting rather than matching name/time, stable equal-time ordering, and a transient unranked footer outside the stored top ten.
 Research basis: [constructive generation and generator evaluation](https://www.pcgbook.com/) and [Spelunky's connected solution-path construction](https://tinysubversions.com/spelunkyGen/).
 
@@ -66,7 +66,7 @@ Reject walking-only finishes using the conservative walking graph both before an
 Execute walking and background-climbing inputs using `stepPlayer`, recording the actual timestep and input sequence until gate contact.
 Require at least half a second of each movement mode and at least two connected sections without idle padding.
 The first eight candidate attempts prioritize four or more sections and twenty-to-forty-second durations, then allow valid routes outside those quality targets.
-The reference route uses walking and climbing; variable-height jumps remain available for player-selected shortcuts rather than being required by the recorded route.
+The reference route uses walking and climbing; fixed-height jumps and double jumps remain available for player-selected shortcuts rather than being required by the recorded route.
 Dilate reserved clearance by three cells to protect floor/wall contact probes from later scenery.
 After scenery and patrol placement, replay the stored actions against the final mask and actual enemy simulation.
 Reject drilling, enemy contact, blocked clearance, unsafe endpoints, invalid platforms/connectors, invalid timesteps, mismatched replay duration, missing sections, and premature finish.
@@ -148,7 +148,7 @@ The world uses terrain-mask cells as its coordinate units.
 `findSpawnY(terrain, x, playerWidth, playerHeight)` places the player above
 the highest point across their footprint. `createPlayer(x, y)` creates the
 player state. `stepPlayer(player, input, terrain, dt)` applies horizontal
-movement, gravity, immediate variable-height floor/wall jump input, collision resolution, and drilling.
+movement, gravity, immediate fixed-height floor/wall/double jump input, collision resolution, and drilling.
 `input` has `move` (-1, 0, or 1), `jumpPressed`, `jumpReleased`, `jumpHeld`,
 and `drill`, plus vertical directional input `moveY` and a temporary speed multiplier. The player footprint shall
 be 6 by 9 cells.
@@ -157,17 +157,18 @@ Floor probes and downward snapping shall run only when not rising.
 Side probes shall exclude the foot boundary to avoid treating floor steps as walls, and shall treat the left and right image borders as virtual walls without adding terrain cells.
 The top image boundary remains a ceiling, and the bottom boundary triggers a full run reset instead of a safe floor.
 Downward snapping and upward stepping shall run per half-cell horizontal substep so slopes remain supported.
-Pressing within three cells of a surface launches immediately with the normal jump impulse.
+Pressing within three cells of a surface launches immediately with the fixed normal jump impulse `jumpSpeed(dt)`, the normal 180 cells/second plus a half-step gravity correction so discrete integration reaches about 38.6 cells.
 Wall presses set horizontal velocity to 80 cells/second away from the wall for the launch frame; subsequent normal directional input remains available.
 The active-excavation speed limit also applies to horizontal launch travel, without changing vertical jump velocity.
-Gravity continues during ascent.
-Holding increases the target apex from the normal height to twice that height during a 250-millisecond window.
-Store launch height and elapsed hold time, and derive upward velocity from remaining height to the interpolated apex with a half-step gravity correction.
-Release ends assistance without another impulse, and holding beyond the window cannot add height.
-Ceiling contact and the end of ascent cancel assistance; landing never repeats a held jump.
-Presses are buffered for 150 ms; a still-held press launches upon contact, while release clears the buffer.
+Gravity continues during ascent, and holding or releasing the control never changes height or launches again.
+Player state holds `airJumps`, either 1 or 0, which is set to 1 by a new player, any grounded step including the landing step, current wall contact within three cells, and background climbing.
+Without floor/wall contact or grace, a fresh non-drop press with `airJumps` 1 performs the double jump: it resets vertical velocity to the same fixed launch speed, keeps normal directional input, and sets `airJumps` to 0.
+Floor, wall, and grace jumps take priority and never consume `airJumps`; walking or falling off a ledge leaves it available.
+Each step resets `jumpKind` to null and, on launch, records `jumpKind` as floor, wall, or air, `jumpWallSide` as the kicked-off wall side or 0, and `jumpX`/`jumpY` at the wall-side edge and mid-height of the pre-launch footprint.
+Ceiling contact stops upward movement; landing never repeats a held jump because only a fresh press sets the buffer, and launching clears it.
+A press that cannot launch and has no double jump is buffered for 150 ms; a still-held press launches upon contact, while release clears the buffer.
 A negative remaining-buffer value represents no pending press; zero is the inclusive boundary with a numerical epsilon.
-Blur and reset clear assistance and buffered input.
+Blur and reset clear buffered input through `cancelJumpInput`.
 Each non-climbing step records the player position as floor grace while grounded, clearing wall grace, or as wall grace with the wall side while touching only a wall.
 Without current contact, a press may launch a floor jump within a 3-cell straight-line distance of the floor-grace position, otherwise a wall jump away from the recorded side within 4 cells of the wall-grace position.
 Launching consumes both graces, background attachment clears them, and a new run creates a player without grace.
@@ -180,8 +181,8 @@ Normal movement speed is 80 cells/second.
 A fresh negative `moveY` edge enters persistent background climbing at 20 cells/second with normalized diagonals and no gravity.
 Player state retains the previous Up input, climbing mode, drill direction, and climbing animation phase.
 Directional release holds position; downward foot contact exits climbing, but Up can depart from a floor.
-Jump press while climbing cancels charge, detaches immediately, and restores gravity without launching.
-A consumed-jump latch prevents the same press from charging on landing or launching on release.
+Jump press while climbing clears buffered input, detaches immediately, and restores gravity without launching, leaving the restored double jump for a later fresh press.
+A consumed-jump latch prevents the same press from launching on landing or on release.
 Another Up edge is required to reattach.
 Climbing respects mask collisions, the ceiling, and the solid image bottom.
 Moving platform collision uses a separate dynamic mask so its cells remain distinct from photo terrain and drilling.
@@ -193,7 +194,7 @@ For horizontal drilling, cells wholly below the player's feet shall remain solid
 The cutter runs before collision checks at each half-cell movement substep and while stationary.
 Probe the current cutter and its next-frame reach before excavation so rasterization cannot alternate normal and slow speeds at high frame rates.
 Active excavation limits horizontal normal-mode movement to twenty cells per second, while an empty cutter retains eighty.
-Excavation increments terrain version only when cells change and does not change gravity or charging state.
+Excavation increments terrain version only when cells change and does not change gravity, jump velocity, or double-jump availability.
 The renderer draws an oriented drill tip and alternates climbing hands and feet based on distance traveled.
 Air movement outside climbing and active excavation remains at normal speed.
 A speed pickup doubles horizontal movement for five seconds without changing jump height or stacking; a second pickup refreshes the timer.
@@ -205,18 +206,18 @@ footprint counts as support.
 The browser game maps D/A, arrow keys, Space, and held Return to this input
 shape.
 W/up enters background climbing; W/S and up/down arrows control vertical climbing and drill aim.
-Space launches immediately and can be held briefly to increase height; W/up does not jump.
+Space launches immediately and a second press in the air double jumps; W/up does not jump.
 Touch controls provide four directions, a jump button,
 and a dedicated held drill button.
 An active mushroom pickup reverses horizontal and vertical directional input before simulation.
 
-The jump meter shows the quarter-second hold progress and a distinct MAX JUMP label at maximum.
-A second bar immediately above the player fills during upward assistance and changes appearance at maximum.
-Both clear on release, cancellation, ceiling contact, or the end of ascent.
+There is no jump meter and no bar above the player.
+After each player step, `stepWallJumpPuff(run, dt)` ages any burst and starts `run.wallPuff` from a step whose `jumpKind` is wall, so wall-grace jumps are included and floor or double jumps are not.
+The burst lasts `WALL_PUFF_SECONDS` (0.3 seconds), `createRun` initializes it to null so every reset clears it, and `drawWallJumpPuff` draws four fading dust squares that spread toward the wall side and are clamped inside the image.
 The original character drawing shall scale from 8 by 12 to 6 by 9 cells with the collision footprint.
 Keyboard and pointer press/release transitions are queued so a quick
 tap between animation frames is not lost. Blur, pointer cancellation,
-visibility changes, and restart clear charge without launching.
+visibility changes, and restart clear buffered jump input without launching.
 
 ## Favicon (`src/favicon.svg`, `index.html`)
 
@@ -234,16 +235,16 @@ Its position remains fixed after drilling and completion requires rectangle over
 No terrain is protected or added beneath it.
 The canvas caption occupies normal flow below the playfield so it cannot obscure a gate at any sampled edge.
 Reset during play or after completion creates a fresh run from the unmodified
-original terrain, retains the photo, both player names, selected option, and scores, clears controls, and resets timer, charge, pickups, platforms, and enemies.
+original terrain, retains the photo, both player names, selected option, and scores, clears controls, and resets timer, double jump, wall-jump burst, pickups, platforms, and enemies.
 Enemy contact and bottom-edge contact use the same full-run reset path, leave the next run unstarted, and never write a score.
 One cancellable animation-frame handle prevents parallel loops after resetting.
-Charging and background-climbing movement start race time.
+Any floor, wall, or double jump launch (`jumpKind` not null) and background-climbing movement start race time.
 The completion panel offers the second player selection for the next round while retaining the exact chosen option.
 Existing per-variant leaderboard entries are retained.
 
 ## Prominent controls and biome character pose (`index.html`, `src/app.js`, `src/scene.js`, `src/styles.css`)
 
-REQ-SYS-16 presents control guidance in a high-contrast grouped panel with a prominent heading, desktop key mapping, charge meter, and touch controls.
+REQ-SYS-16 presents control guidance in a high-contrast grouped panel with a prominent heading, desktop key mapping, and touch controls.
 Responsive styles preserve visibility and usability on narrow screens.
 REQ-CHR-05 draws an animated swimming-themed player pose in underwater levels only.
 The pose stays inside the unchanged six-by-nine collision footprint and does not change physics, input, or timer behavior.
