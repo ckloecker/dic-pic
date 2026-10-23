@@ -26,7 +26,7 @@ storage, and cryptographic level identifiers.
 | Movement simulation | Charged floor/wall jumps, press-to-drop climbing, tolerant surface contact and press buffering, temporary speed effects, moving-platform collision, air movement, and directional tunnel drilling | REQ-MOV-01 through REQ-MOV-10, REQ-CHR-02, REQ-LVL-18/19 |
 | Run lifecycle | Validate safe non-border spawns and non-walking placements, reset the complete run on enemy or bottom contact, and restore pickups, platforms, terrain, timer, and enemies | REQ-SYS-04/08/09/10/14, REQ-LVL-07/15/18/19 |
 | Player session controller | Retain two player names and one selected generated option across sequential rounds, then attribute each completed score to the selected player | REQ-SYS-05/06/15, REQ-LVL-12/17 |
-| Enemy simulation | Generate clear protected patrol corridors, reflect bounded motion, and detect swept contact | REQ-LVL-15, REQ-SYS-10 |
+| Enemy simulation | Generate clear protected flight areas, follow seeded waypoint loops, and detect two-axis swept contact | REQ-LVL-15/21, REQ-SYS-10/14 |
 | Local leaderboard | Persist the top ten with stable ties and identify the exact current attempt, including an unsaved unranked footer | REQ-SYS-06 |
 | Page identity | Declare a local pixel-art player-character favicon available before game setup | REQ-CHR-03 |
 
@@ -86,6 +86,7 @@ REQ-SYS-06 distinguishes the exact current attempt from stored top-ten entries a
 REQ-LVL-07 assigns conservative walking-only reachability validation to the run-lifecycle component and edge-prioritized route endpoints to the route planner.
 REQ-LVL-14 assigns shared photo filtering and noncolliding terrain halos to the scene renderer, without changing image analysis.
 REQ-LVL-15 assigns bounded clear-corridor generation, deterministic flying patrols, and contact detection to `src/enemies.js`.
+REQ-LVL-21 extends these patrols to seeded two-axis waypoint loops retained in the selected option and replayed from their initial state on reset.
 The level-options component includes patrol definitions in previews and exact-option leaderboard identities.
 REQ-SYS-10/14 assigns full-run reset on enemy contact or bottom-edge fall to the run lifecycle, with control clearing and no score write.
 Enemy simulation runs only after the race starts and enemy contact takes priority over completion.

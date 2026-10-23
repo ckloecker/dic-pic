@@ -13,7 +13,7 @@ Verification covers the supplied portrait and sparse, disconnected, busy, horizo
 
 ## Requirements covered
 
-This design elaborates REQ-SYS-01 through REQ-SYS-06, REQ-SYS-08 through REQ-SYS-16, REQ-LVL-01 through REQ-LVL-20, REQ-CHR-01/02/03/04/05, and REQ-MOV-01 through REQ-MOV-10.
+This design elaborates REQ-SYS-01 through REQ-SYS-06, REQ-SYS-08 through REQ-SYS-16, REQ-LVL-01 through REQ-LVL-21, REQ-CHR-01/02/03/04/05, and REQ-MOV-01 through REQ-MOV-10.
 
 ## Terrain (`src/terrain.js`)
 
@@ -123,14 +123,15 @@ Legacy standalone `placeRun` also retains alternative supported-edge placement f
 REQ-LVL-14 uses a shared photo renderer with 35% saturation and 55% brightness before cosmetic effects and terrain.
 Draw a one-cell dark four-neighbor terrain halo behind the unchanged terrain mask in previews and gameplay.
 Keep photo analysis unfiltered and preserve the current terrain alpha channels.
-REQ-LVL-15 uses two 10-by-6-cell enemies per option with horizontal patrols spanning at least 24 cells at 18 cells per second.
+REQ-LVL-15/21 uses two 10-by-6-cell enemies per option with seeded looping waypoint paths spanning at least 24 horizontal cells at 18 cells per second.
+Each flight varies in both axes inside a checked clear rectangle, including avoidance of moving-platform swept areas.
 Choose complete clear corridors outside the reference clearance, separated from each other and at least twelve cells from the spawn and gate.
 If two patrols cannot fit, reject the option with a clear generation message instead of adding overlapping or stuck enemies.
 Patrol definitions are serialized in the level identity and cloned into independent runtime state.
-Analytic reflected motion stays inside the corridor even after a large timestep.
+Distance-based path phase stays inside the checked area even after a large timestep.
 Patrols remain stationary before the timer starts and have no cosmetic motion under reduced motion.
 Use swept player/enemy contact to prevent tunneling at the maximum frame interval.
-Split patrol sweeps at reflection endpoints so contact during a reversal cannot be missed.
+Split patrol sweeps at every waypoint and track both axes so contact during vertical flight or a turn cannot be missed.
 REQ-SYS-10/14 resets the full run on enemy contact, restoring terrain, patrols, pickups, platforms, player, controls, and timer.
 Resolve enemy contact before checking completion and never save a score for contact alone.
 Manual and failure resets restore the original patrol states.

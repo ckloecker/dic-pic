@@ -145,7 +145,7 @@ Image analysis shall continue to use the unfiltered original photo.
 Status: Approved.
 
 Levels shall include predictable flying patrol enemies with wasp artwork in jungle, hovering scarab artwork in desert, and jellyfish artwork underwater.
-Patrols shall reverse within checked, obstacle-free corridors without chasing, becoming stuck, leaving the image, or passing through terrain.
+Patrols shall follow the reproducibly randomized flying paths in REQ-LVL-21 within checked, obstacle-free areas without chasing, becoming stuck, leaving the image, or passing through terrain.
 The entire swept enemy footprint shall avoid the spawn and finish with a safety margin.
 Thumbnails shall show the initial enemies and selecting or resetting an option shall retain its exact patrol definitions.
 Enemy motion shall begin with the race timer, leaving the initial previewed scene and idle player safe.
@@ -214,3 +214,12 @@ Exposed terrain edges shall have sufficient contrast against the displayed photo
 Interior terrain filling shall use a uniform color per biome without checker or alternating tile patterns.
 Interior opacity shall remain as specified by REQ-LVL-06.
 Decorative design elements shall be occasional, photo-compatible, and shall not obscure the terrain or the photo.
+
+## REQ-LVL-21: Reproducible Random Flying Paths
+
+Status: Approved.
+
+Enemy flight paths shall be randomly generated rather than limited to horizontal back-and-forth movement.
+Paths shall vary both horizontal and vertical position while preserving the safe-area and route-clearance constraints in REQ-LVL-15/16.
+The selected option shall retain each enemy's path and initial motion state so that resetting the level replays the same flight.
+Path generation shall use the reproducible random sequence required by REQ-LVL-17.

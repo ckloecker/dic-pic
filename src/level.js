@@ -278,7 +278,7 @@ export function createSuggestions(rgba, width, height, random = createRandom()) 
 
 export function levelIdentity(level) {
   return JSON.stringify({
-    revision: 8, width: level.width, height: level.height,
+    revision: 9, width: level.width, height: level.height,
     biome: level.biome, layout: level.layout, spawn: level.spawn, flag: level.flag,
     solid: Array.from(level.solid), details: Array.from(level.details), accents: level.accents,
     pickups: level.pickups,
