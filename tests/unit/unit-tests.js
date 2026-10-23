@@ -1116,6 +1116,7 @@ if (runApi) {
     const terrain = flatTerrain(100, 80, 80);
     for (let y = 25; y < 30; y += 1) terrain.solid.fill(1, y * 100, y * 100 + 24);
     for (let y = 45; y < 50; y += 1) terrain.solid.fill(1, y * 100 + 76, y * 100 + 100);
+    for (let y = 0; y < 80; y += 1) terrain.solid[y * 100 + 50] = 1;
     const placements = Object.fromEntries(["left", "right", "top", "bottom"].map((edge) => (
       [edge, runApi.placeRun(terrain, edge)]
     )));
