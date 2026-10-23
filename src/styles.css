@@ -217,7 +217,8 @@ button,
   font-weight: 600;
 }
 
-#player-name {
+#player-name,
+#second-player-name {
   width: 100%;
   height: 46px;
   padding: 0 13px;
@@ -229,13 +230,19 @@ button,
   font-size: 13px;
 }
 
-#player-name:focus {
+#player-name:focus,
+#second-player-name:focus {
   border-color: var(--mint);
   box-shadow: 0 0 0 2px rgb(159 228 193 / 12%);
 }
 
-#player-name[aria-invalid="true"] {
+#player-name[aria-invalid="true"],
+#second-player-name[aria-invalid="true"] {
   border-color: var(--orange);
+}
+
+.second-player-label {
+  margin-top: 17px;
 }
 
 .field-message,
@@ -594,6 +601,29 @@ kbd {
 
 .complete-copy .primary-button {
   max-width: 280px;
+}
+
+.next-round-picker {
+  display: grid;
+  max-width: 280px;
+  gap: 8px;
+  margin-top: 18px;
+  color: #dbe4df;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.next-round-picker select {
+  min-height: 43px;
+  padding: 0 12px;
+  border: 1px solid #58716c;
+  color: var(--paper);
+  background: #20363d;
+}
+
+.next-round-picker .primary-button {
+  max-width: none;
+  margin-top: 0;
 }
 
 .leaderboard-card {

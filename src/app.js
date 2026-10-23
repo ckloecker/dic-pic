@@ -17,7 +17,9 @@ const gameScreen = document.querySelector("#game-screen");
 const completePanel = document.querySelector("#complete-panel");
 const setupForm = document.querySelector("#setup-form");
 const nameInput = document.querySelector("#player-name");
+const secondNameInput = document.querySelector("#second-player-name");
 const nameMessage = document.querySelector("#name-message");
+const secondNameMessage = document.querySelector("#second-name-message");
 const setupMessage = document.querySelector("#setup-message");
 const startButton = document.querySelector("#start-button");
 const uploadInput = document.querySelector("#upload-input");
@@ -39,6 +41,8 @@ const state = {
   imageRequest: 0,
   levelId: null,
   playerName: "",
+  playerNames: [],
+  playerIndex: 0,
   terrain: null,
   player: null,
   originalTerrain: null,
@@ -65,14 +69,20 @@ function setMessage(element, text, isError = false) {
 }
 
 function updateNameValidity() {
-  const valid = isValidPlayerName(nameInput.value);
-  nameInput.setAttribute("aria-invalid", String(!valid && nameInput.value.length > 0));
-  nameMessage.textContent = valid || nameInput.value.length === 0
-    ? "Letters and spaces only."
-    : "Use letters and spaces only (maximum 32 characters).";
-  nameMessage.classList.toggle("invalid", !valid && nameInput.value.length > 0);
-  startButton.disabled = !valid || !state.image || !state.photoId;
-  return valid;
+  const validFirst = isValidPlayerName(nameInput.value);
+  const validSecond = isValidPlayerName(secondNameInput.value);
+  for (const [input, message, valid] of [
+    [nameInput, nameMessage, validFirst],
+    [secondNameInput, secondNameMessage, validSecond],
+  ]) {
+    input.setAttribute("aria-invalid", String(!valid && input.value.length > 0));
+    message.textContent = valid || input.value.length === 0
+      ? "Letters and spaces only."
+      : "Use letters and spaces only (maximum 32 characters).";
+    message.classList.toggle("invalid", !valid && input.value.length > 0);
+  }
+  startButton.disabled = !validFirst || !validSecond || !state.image || !state.photoId;
+  return validFirst && validSecond;
 }
 
 function hashBytes(buffer) {
@@ -145,6 +155,7 @@ async function selectImage(file) {
 }
 
 nameInput.addEventListener("input", updateNameValidity);
+secondNameInput.addEventListener("input", updateNameValidity);
 uploadInput.addEventListener("change", () => {
   selectImage(uploadInput.files?.[0]);
   uploadInput.value = "";
@@ -230,6 +241,8 @@ async function chooseOption(option, button) {
     state.originalTerrain = option;
     state.levelId = levelId;
     state.playerName = nameInput.value.trim();
+    state.playerNames = [nameInput.value.trim(), secondNameInput.value.trim()];
+    state.playerIndex = 0;
     if (!updateNameValidity()) throw new Error("Enter a valid runner name before playing.");
     setUpGame();
   } catch (error) {
@@ -460,6 +473,14 @@ function finishLevel() {
   timerValue.textContent = elapsedLabel(state.elapsedMs);
   document.querySelector("#winner-name").textContent = state.playerName;
   document.querySelector("#final-time").textContent = `${elapsedLabel(state.elapsedMs)} seconds`;
+  const nextPlayer = document.querySelector("#next-player");
+  nextPlayer.replaceChildren(...state.playerNames.map((name, index) => {
+    const option = document.createElement("option");
+    option.value = String(index);
+    option.textContent = name;
+    return option;
+  }));
+  nextPlayer.value = String((state.playerIndex + 1) % state.playerNames.length);
   gameScreen.hidden = true;
   completePanel.hidden = false;
   const current = { id: crypto.randomUUID(), name: state.playerName, timeMs: state.elapsedMs };
@@ -567,6 +588,11 @@ function goToSetup() {
 
 document.querySelector("#new-photo-button").addEventListener("click", goToSetup);
 document.querySelector("#again-button").addEventListener("click", goToSetup);
+document.querySelector("#next-round-button").addEventListener("click", () => {
+  state.playerIndex = Number(document.querySelector("#next-player").value);
+  state.playerName = state.playerNames[state.playerIndex];
+  restartRun();
+});
 document.querySelector("#reset-button").addEventListener("click", restartRun);
 document.querySelector("#replay-button").addEventListener("click", restartRun);
 

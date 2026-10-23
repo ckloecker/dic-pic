@@ -33,7 +33,7 @@
             <span class="step-number">01</span>
             <div>
               <h2>Make your level</h2>
-              <p>Pick a photo and choose your runner name.</p>
+              <p>Pick a photo and enter both runner names.</p>
             </div>
           </div>
 
@@ -41,6 +41,10 @@
           <input id="player-name" name="playerName" type="text" maxlength="32"
             autocomplete="nickname" placeholder="Letters and spaces, up to 32" required>
           <p id="name-message" class="field-message" aria-live="polite">Letters and spaces only.</p>
+          <label class="field-label second-player-label" for="second-player-name">Second runner name</label>
+          <input id="second-player-name" name="secondPlayerName" type="text" maxlength="32"
+            autocomplete="off" placeholder="Letters and spaces, up to 32" required>
+          <p id="second-name-message" class="field-message" aria-live="polite">Letters and spaces only.</p>
 
           <div class="field-label photo-label">Your level photo</div>
           <div class="photo-actions">
@@ -131,6 +135,11 @@
           <p>Your time: <strong id="final-time"></strong></p>
           <p id="score-message" class="status-message" role="status" aria-live="polite"></p>
           <button id="replay-button" class="primary-button" type="button">Reset run <span aria-hidden="true">↻</span></button>
+          <div class="next-round-picker">
+            <label for="next-player">Next runner</label>
+            <select id="next-player"></select>
+            <button id="next-round-button" class="primary-button" type="button">Start next round <span aria-hidden="true">→</span></button>
+          </div>
           <button id="again-button" class="primary-button" type="button">Build another level <span aria-hidden="true">→</span></button>
         </div>
         <div class="leaderboard-card">
