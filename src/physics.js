@@ -7,6 +7,8 @@ const PLAYER_WIDTH = 6;
 const PLAYER_HEIGHT = 9;
 const CONTACT_DISTANCE = 3;
 const JUMP_BUFFER_SECONDS = 0.15;
+const FLOOR_GRACE_DISTANCE = 3;
+const WALL_GRACE_DISTANCE = 4;
 export const DRILL_REACH = 10;
 export const JUMP_HOLD_SECONDS = 0.25;
 
@@ -32,7 +34,13 @@ export function createPlayer(x, y) {
     upHeld: false,
     dropJumpHeld: false,
     jumpBufferSeconds: -1,
+    floorGrace: null,
+    wallGrace: null,
   };
+}
+
+function withinGrace(player, grace, distance) {
+  return Boolean(grace) && Math.hypot(player.x - grace.x, player.y - grace.y) <= distance + 1e-9;
 }
 
 export function jumpSpeedForHold(seconds, dt) {
@@ -240,13 +248,27 @@ export function stepPlayer(player, input, terrain, dt) {
   const nearSurface = !player.climbing && (contact.floorDistance !== null || contact.wall !== 0);
   player.grounded = !player.climbing && contact.floorDistance !== null;
   if (player.grounded) snapToFloor(player, terrain);
+  if (player.climbing) {
+    player.floorGrace = null;
+    player.wallGrace = null;
+  } else if (player.grounded) {
+    player.floorGrace = { x: player.x, y: player.y };
+    player.wallGrace = null;
+  } else if (contact.wall) {
+    player.wallGrace = { x: player.x, y: player.y, side: contact.wall };
+  }
+  const floorGrace = !nearSurface && withinGrace(player, player.floorGrace, FLOOR_GRACE_DISTANCE);
+  const wallGrace = !nearSurface && !floorGrace && withinGrace(player, player.wallGrace, WALL_GRACE_DISTANCE);
   player.jumpBufferSeconds = input.jumpPressed && !dropJump && !player.charging
     ? JUMP_BUFFER_SECONDS
     : Math.max(-1, player.jumpBufferSeconds - elapsed);
   let wallLaunch = 0;
   if (!dropJump && !player.charging && player.jumpBufferSeconds >= -1e-9
-    && nearSurface && (input.jumpHeld || input.jumpPressed)) {
-    if (!player.grounded) wallLaunch = -contact.wall;
+    && (nearSurface || floorGrace || wallGrace) && (input.jumpHeld || input.jumpPressed)) {
+    if (wallGrace) wallLaunch = -player.wallGrace.side;
+    else if (!player.grounded && !floorGrace) wallLaunch = -contact.wall;
+    player.floorGrace = null;
+    player.wallGrace = null;
     player.jumpOriginY = player.y;
     player.vy = -jumpSpeedForHold(0, elapsed);
     player.charging = Boolean(input.jumpHeld && !input.jumpReleased);

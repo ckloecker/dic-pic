@@ -1,5 +1,14 @@
 # Requirements traceability
 
+## Distance-based jump grace revision
+
+The user approved distance-based grace: three terrain cells after losing floor contact and four cells after losing wall contact.
+REQ-MOV-07 specifies straight-line grace distances, floor-over-wall precedence, consumption on launch, and clearing on background attachment; REQ-MOV-02 references wall grace.
+The [movement design](../design/detailed/game-components.md#movement-srcphysicsjs) allocates last-contact positions and distance checks to `stepPlayer` in [physics](../src/physics.js).
+Four [unit regressions](../tests/unit/unit-tests.js) initially failed: floor-grace distances, walking off a cliff at 30/60/144 Hz, wall grace on both sides, and no extra airborne or post-attachment jumps.
+Verification on 2026-10-23 passed **94/94 unit checks** and **23/23 browser system checks** in Chromium.
+[ST-12](../tests/system/system-tests.md) and [AT-08/18](../tests/acceptance/test-cases.md) specify integrated verification.
+
 ## Immediate variable-height jumps and horizontal drilling revision
 
 The user approved immediate floor/wall launch with the existing minimum impulse, a 250-millisecond hold window, and maximum rise of twice the normal height.
@@ -217,12 +226,12 @@ Physical mobile, camera, and simultaneous touch verification remain outstanding.
 | REQ-CHR-02 | [Player dimensions](../src/physics.js), [scaled renderer](../src/app.js), [flag anchoring](../src/run.js) | Unit verifies 6-by-9 collision dimensions and normal speed; browser sprite bounds and bar-following checks; ST-11/AT-19. |
 | REQ-CHR-04 | [Biome headwear renderer](../src/scene.js), [walking and climbing integration](../src/app.js) | Unit all three headwear images distinct and confined to the six-by-nine footprint; browser preview/live checks across all biomes; ST-15/AT-22. |
 | REQ-MOV-01 | [Input mapping](../src/app.js), [four-way touch controls](../index.html) | Browser verifies Space charge/release, W/up background climbing without drilling, and downward drill input; physical simultaneous touch-button testing remains outstanding. |
-| REQ-MOV-02 | [Floor/wall probes and immediate launch](../src/physics.js) | Unit verifies terrain-wall and image-border launches up/away on press despite opposing input, hold assistance, and no unattached air jumps; ST-12/AT-08. |
+| REQ-MOV-02 | [Floor/wall probes, wall grace, and immediate launch](../src/physics.js) | Unit verifies terrain-wall and image-border launches up/away on press despite opposing input, four-cell wall grace away from the last wall, hold assistance, and no unattached air jumps; ST-12/AT-08. |
 | REQ-MOV-03 | [Active-excavation probe, speed selection, and directional cutter](../src/physics.js), [drill renderer/input](../src/app.js) | Unit verifies 20-cell/s active excavation at 30/60/120 Hz, 80-cell/s open drilling, eight-direction cuts, persistent tunnels, gravity/hold assistance, upward/downward drilling, and repeated level horizontal excavation at fractional heights and floating-point floor boundaries; ST-05/AT-09. |
 | REQ-MOV-04 | [Normal air movement](../src/physics.js) | Unit verifies normal horizontal airborne speed with and without drilling, with quarter-speed climbing tested separately. |
 | REQ-MOV-05 | [Immediate launch and held-ascent simulation](../src/physics.js), [HUD and character bars/input](../src/app.js) | Unit measures normal tap rise, intermediate holds, twice-normal maximum, 250 ms cap, no repeated held jumps, ceiling/airborne rejection, and drilling preservation; browser immediate launch, meter/bar, timer, release, and blur; ST-08/AT-12. |
 | REQ-MOV-06 | [Ceiling collision](../src/physics.js), [fixed scene](../src/app.js) | Unit verifies y >= 0, stopped upward velocity, and subsequent gravity. |
-| REQ-MOV-07 | [Shared contact probes, snapping, and press buffer](../src/physics.js) | Unit verifies three-cell floor/wall tolerance including image borders, walking on slopes, 150 ms still-held press buffering, assistance after leaving support, release cancellation, and no upward snapping or top/bottom boundary wall jumps; ST-12/AT-08/18. |
+| REQ-MOV-07 | [Shared contact probes, snapping, press buffer, and contact-loss grace](../src/physics.js) | Unit verifies three-cell floor/wall tolerance including image borders, walking on slopes, 150 ms still-held press buffering, three-cell floor and four-cell wall grace including cliff walk-off at 30/60/144 Hz, grace consumption and attachment clearing, assistance after leaving support, release cancellation, and no upward snapping or top/bottom boundary wall jumps; ST-12/AT-08/18. |
 | REQ-MOV-08 | [Boundary-aware floor probes and bottom clamp](../src/physics.js), [game loop](../src/app.js) | Unit empty-mask landing/walking/charging/jumping, nearest terrain above bottom, descending climber landing, and drilling to indestructible bottom; browser drill-down/standing/jump check; ST-09/AT-14. |
 | REQ-MOV-09 | Superseded by REQ-MOV-01/02/05/07 immediate variable-height jumps. | See the immediate-jump verification above. |
 | REQ-MOV-10 | [Immediate drop and consumed-press latch](../src/physics.js), [input and drop HUD](../src/app.js) | Unit immediate downward velocity, no charge/release launch even after landing, held-Up suppression, fresh-Up attachment, and unchanged floor jumps; browser drop-on-press and drill-release grip; ST-13/AT-20. |

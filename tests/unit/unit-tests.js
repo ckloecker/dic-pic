@@ -1172,6 +1172,80 @@ if (physicsApi) {
     }
   });
 
+  test("REQ-MOV-07: floor grace launches within three cells of the last floor contact", () => {
+    for (const [dx, dy, expected] of [[0, 1, true], [3, 0, true], [0, 3, true], [1.8, 2.4, true], [0, 3.1, false], [2.4, 2, false]]) {
+      const terrain = flatTerrain(100, 100, 70);
+      const player = physicsApi.createPlayer(40, 61);
+      physicsApi.stepPlayer(player, {}, terrain, 0);
+      terrain.solid.fill(0);
+      player.x += dx;
+      player.y += dy;
+      player.vy = 50;
+      physicsApi.stepPlayer(player, { move: 1, jumpPressed: true, jumpHeld: true }, terrain, 0);
+      assert(player.charging === expected && (player.vy < 0) === expected, `incorrect floor grace at ${dx},${dy}`);
+      if (expected) assert(player.vx === 80, "floor grace did not keep normal floor-jump movement");
+    }
+  });
+
+  test("REQ-MOV-07: walking off a cliff can still jump just after the edge", () => {
+    for (const frameDuration of [1 / 30, 1 / 60, 1 / 144]) {
+      for (const [pressX, expected] of [[40, true], [48, false]]) {
+        const terrain = flatTerrain(100, 100, 70);
+        for (let y = 70; y < 100; y += 1) terrain.solid.fill(0, y * 100 + 40, (y + 1) * 100);
+        const player = physicsApi.createPlayer(20, 61);
+        physicsApi.stepPlayer(player, {}, terrain, 0);
+        let frames = 0;
+        while (player.x < pressX && frames < 200) {
+          physicsApi.stepPlayer(player, { move: 1 }, terrain, frameDuration);
+          frames += 1;
+        }
+        assert(!player.grounded && player.vy >= 0, `player did not walk off the cliff at ${frameDuration}`);
+        physicsApi.stepPlayer(player, { move: 1, jumpPressed: true, jumpHeld: true }, terrain, frameDuration);
+        assert((player.vy < 0) === expected, `incorrect walk-off grace at x ${pressX}, frame ${frameDuration}`);
+      }
+    }
+  });
+
+  test("REQ-MOV-02/07: wall grace launches away within four cells of the last wall contact", () => {
+    for (const side of [-1, 1]) {
+      const away = -side;
+      for (const [dx, dy, expected] of [[1, 0, true], [4, 0, true], [2.4, 3.2, true], [4.1, 0, false], [3, 3, false]]) {
+        const terrain = flatTerrain(100, 200, 200);
+        const wallX = side < 0 ? 30 : 50;
+        for (let y = 1; y < 190; y += 1) terrain.solid[y * 100 + wallX] = 1;
+        const player = physicsApi.createPlayer(side < 0 ? wallX + 4 : wallX - 9, 40);
+        physicsApi.stepPlayer(player, {}, terrain, 0);
+        player.x += away * dx;
+        player.y += dy;
+        physicsApi.stepPlayer(player, { move: side, jumpPressed: true, jumpHeld: true }, terrain, 0);
+        assert(player.charging === expected && (player.vy < 0) === expected, `incorrect wall grace on side ${side} at ${dx},${dy}`);
+        if (expected) assert(player.vx === away * 80, "wall grace did not launch away from the last wall");
+      }
+    }
+  });
+
+  test("REQ-MOV-07/10: grace is consumed by a launch and cleared by background attachment", () => {
+    const terrain = flatTerrain(100, 100, 70);
+    const player = physicsApi.createPlayer(40, 61);
+    physicsApi.stepPlayer(player, {}, terrain, 0);
+    terrain.solid.fill(0);
+    player.y += 1;
+    physicsApi.stepPlayer(player, { jumpPressed: true, jumpReleased: true }, terrain, 0);
+    assert(player.vy < 0, "grace jump did not launch");
+    const afterLaunch = player.vy;
+    physicsApi.stepPlayer(player, { jumpPressed: true, jumpReleased: true }, terrain, 0.01);
+    assert(player.vy > afterLaunch, "grace granted an additional airborne jump");
+    const climber = physicsApi.createPlayer(40, 61);
+    terrain.solid.fill(1, 70 * 100);
+    physicsApi.stepPlayer(climber, {}, terrain, 0);
+    terrain.solid.fill(0);
+    physicsApi.stepPlayer(climber, { moveY: -1 }, terrain, 0);
+    physicsApi.stepPlayer(climber, { jumpPressed: true, jumpHeld: true }, terrain, 0);
+    physicsApi.stepPlayer(climber, { jumpReleased: true }, terrain, 0);
+    physicsApi.stepPlayer(climber, { jumpPressed: true, jumpHeld: true }, terrain, 0);
+    assert(!climber.charging && climber.vy >= 0, "grace survived background attachment");
+  });
+
   test("REQ-MOV-02/07: rising jumps are not snapped or recharged; image side borders are jumpable", () => {
     const terrain = flatTerrain(100, 100, 70);
     const player = physicsApi.createPlayer(10, 61);

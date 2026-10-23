@@ -25,7 +25,8 @@ While background climbing, pressing either jump control shall drop immediately i
 
 The character shall jump immediately on pressing the jump control within three terrain cells of a floor, either side of a terrain wall, or either vertical image side border (REQ-MOV-07).
 A wall jump shall launch upward and away from the wall at normal horizontal movement speed, using the same hold window and vertical height range as a floor jump.
-Outside the surface-distance tolerance, a press shall not launch unless buffered until contact under REQ-MOV-07.
+Outside the surface-distance tolerance, a press shall not launch unless buffered until contact or still within the contact-loss grace distance under REQ-MOV-07.
+A wall-grace jump shall launch upward and away from the last-contacted wall.
 There shall be no free additional airborne jumps.
 While background climbing, the jump control drops instead, as specified by REQ-MOV-10.
 While actively excavating, horizontal travel uses the limit in REQ-MOV-03.
@@ -82,6 +83,12 @@ Floor and wall contact for launching shall allow a distance of up to three terra
 Jump presses shall be buffered for 150 milliseconds before contact, allowing a still-held control to launch immediately on arrival.
 A release before contact shall cancel the buffered press rather than queue a later launch.
 After launch, upward assistance shall depend on the hold window rather than continued surface contact.
+
+After walking off a cliff, having support removed, or otherwise losing floor contact, a jump press shall still launch a floor jump while the character remains within three terrain cells of its position at the last floor contact.
+After losing wall contact, a jump press shall still launch a wall jump while the character remains within four terrain cells of its position at the last wall contact.
+Grace distances shall be straight-line distances, so falling straight down cannot extend grace indefinitely.
+Floor grace shall take precedence over wall grace, and current contact shall take precedence over both.
+A launch shall consume both graces, and background attachment shall clear them, so grace never grants an additional airborne jump.
 
 Walking shall follow inclines and declines, including descending floor snapping within three cells.
 Floor snapping shall never pull a rising jump back onto the floor.

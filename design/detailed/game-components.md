@@ -163,6 +163,9 @@ Ceiling contact and the end of ascent cancel assistance; landing never repeats a
 Presses are buffered for 150 ms; a still-held press launches upon contact, while release clears the buffer.
 A negative remaining-buffer value represents no pending press; zero is the inclusive boundary with a numerical epsilon.
 Blur and reset clear assistance and buffered input.
+Each non-climbing step records the player position as floor grace while grounded, clearing wall grace, or as wall grace with the wall side while touching only a wall.
+Without current contact, a press may launch a floor jump within a 3-cell straight-line distance of the floor-grace position, otherwise a wall jump away from the recorded side within 4 cells of the wall-grace position.
+Launching consumes both graces, background attachment clears them, and a new run creates a player without grace.
 The horizontal drill excludes the first row below the footprint using an epsilon-adjusted ceiling cutoff.
 The collision footprint uses the same bottom-edge tolerance so floating-point boundary rounding cannot excavate support or falsely block horizontal travel.
 Vertical gravity substeps do not excavate for a purely horizontal drill direction, so falling collision probes cannot lower the tunnel floor before detecting it.
