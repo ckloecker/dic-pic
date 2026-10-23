@@ -6,7 +6,7 @@ import { getLeaderboard, isValidPlayerName, leaderboardRows, submitScore } from 
 import { NoUsableEdgeError } from "./terrain.js";
 import { BIOMES, LAYOUTS, createSuggestions, levelIdentity } from "./level.js";
 import { drawBiomeEffects, drawEnemies, drawGate, drawHeadwear, drawPhoto, drawPreview,
-  drawMovingPlatforms, drawPickups, paintTerrain, paintTerrainShadow } from "./scene.js";
+  drawMovingPlatforms, drawPickups, drawSwimmingPlayer, paintTerrain, paintTerrainShadow } from "./scene.js";
 
 const WORLD_WIDTH = 320;
 const WORLD_HEIGHT = 180;
@@ -315,6 +315,10 @@ function drawExit() {
 }
 
 function drawPlayer() {
+  if (state.terrain.biome === "underwater") {
+    drawSwimmingPlayer(context, state.player, state.effectSeconds);
+    return;
+  }
   const { x, y, facing } = state.player;
   if (state.player.climbing) {
     const stride = Math.sin(state.player.climbPhase) * 1.5;

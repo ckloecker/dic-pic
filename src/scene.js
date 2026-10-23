@@ -227,6 +227,33 @@ export function drawHeadwear(context, player, biome) {
   }
 }
 
+export function drawSwimmingPlayer(context, player, seconds = 0) {
+  const { x, y, width, height, facing = 1 } = player;
+  const kick = Math.round(Math.sin(seconds * Math.PI / 2));
+  context.save();
+  context.translate(facing < 0 ? x + width : x, y);
+  if (facing < 0) context.scale(-1, 1);
+  context.fillStyle = "#173b42";
+  context.fillRect(1, 1, 4, 1);
+  context.fillStyle = "#e9bd91";
+  context.fillRect(2, 1, 3, 2);
+  context.fillStyle = "#8de0ec";
+  context.fillRect(2, 2, 3, 1);
+  context.fillStyle = "#d6e8c3";
+  context.fillRect(4, 2, 1, 1);
+  context.fillStyle = "#247f7b";
+  context.fillRect(1, 3, 4, 3);
+  context.fillStyle = "#f5a15f";
+  context.fillRect(1, 4, 5, 1);
+  context.fillStyle = "#8de0ec";
+  context.fillRect(0, 4 + kick, 1, 2);
+  context.fillRect(5, 4 - kick, 1, 2);
+  context.fillStyle = "#344b52";
+  context.fillRect(1, 6 + kick, 2, Math.max(1, height - 7 - kick));
+  context.fillRect(3, 6 - kick, 2, Math.max(1, height - 7 + kick));
+  context.restore();
+}
+
 export function drawPreview(context, image, option) {
   drawPhoto(context, image, option.width, option.height);
   const layer = document.createElement("canvas");
