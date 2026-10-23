@@ -124,8 +124,7 @@ export function paintTerrain(context, terrain) {
       const top = y === 0 || !solid[cell - width];
       const exposed = top || y === height - 1 || !solid[cell + width]
         || x === 0 || !solid[cell - 1] || x === width - 1 || !solid[cell + 1];
-      let color = exposed ? biome.surface : biome.fill[(Math.floor(x / 5) + Math.floor(y / 4)) % 2];
-      if (terrain.biome === "desert" && !exposed && x % 11 < 3 && y % 7 === 0) color = [239, 226, 187];
+      let color = exposed ? biome.surface : biome.fill[0];
       const part = terrain.details?.[cell];
       if (part === 1) color = [101 + (x % 3) * 12, 112 + y % 3 * 9, 107];
       if (part === 2) color = x % 3 === 0 ? biome.surface : biome.element;
