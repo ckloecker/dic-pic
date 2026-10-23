@@ -136,30 +136,36 @@ function addElements(terrain, random) {
 
 function addPickups(terrain, random) {
   const { width, height, solid } = terrain;
-  const candidates = [];
-  for (let y = 1; y <= height - 5; y += 1) {
-    for (let x = 1; x <= width - 5; x += 1) {
-      let clear = true;
-      for (let row = y; row < y + 4 && clear; row += 1) {
-        for (let column = x; column < x + 4; column += 1) {
-          const cell = row * width + column;
-          if (solid[cell] || terrain.route.protected[cell]) {
-            clear = false;
-            break;
+  const pickups = [];
+  for (const type of ["speed", "reverse"]) {
+    const candidates = [];
+    for (let y = 1; y <= height - 5; y += 1) {
+      for (let x = 1; x <= width - 5; x += 1) {
+        let clear = true;
+        for (let row = y; row < y + 4 && clear; row += 1) {
+          for (let column = x; column < x + 4; column += 1) {
+            const cell = row * width + column;
+            if (solid[cell] || terrain.route.protected[cell]) {
+              clear = false;
+              break;
+            }
           }
         }
+        if (!clear || pickups.some((pickup) => (
+          x < pickup.x + pickup.width && x + 4 > pickup.x
+            && y < pickup.y + pickup.height && y + 4 > pickup.y
+        ))) continue;
+        candidates.push({ x, y, width: 4, height: 4, type });
       }
-      if (clear) candidates.push({ x, y, width: 4, height: 4, type: "speed" });
     }
-  }
-  if (!candidates.length) {
-    throw new RouteGenerationError("no room for a speed pickup outside the required route");
-  }
-  const count = Math.min(candidates.length, 1 + Math.floor(random() * 3));
-  const pickups = [];
-  for (let index = 0; index < count; index += 1) {
-    const candidateIndex = Math.floor(random() * candidates.length);
-    pickups.push(candidates.splice(candidateIndex, 1)[0]);
+    if (!candidates.length) {
+      throw new RouteGenerationError(`no room for a ${type} pickup outside the required route`);
+    }
+    const count = Math.min(candidates.length, 1 + Math.floor(random() * 3));
+    for (let index = 0; index < count; index += 1) {
+      const candidateIndex = Math.floor(random() * candidates.length);
+      pickups.push(candidates.splice(candidateIndex, 1)[0]);
+    }
   }
   terrain.pickups = pickups;
 }

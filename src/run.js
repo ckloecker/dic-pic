@@ -191,21 +191,25 @@ export function resetRun(run) {
 
 export function collectPickups(run) {
   let collected = false;
+  const collectedTypes = new Set();
   const remaining = [];
   for (const pickup of run.pickups) {
     const overlaps = run.player.x < pickup.x + pickup.width
       && run.player.x + run.player.width > pickup.x
       && run.player.y < pickup.y + pickup.height
       && run.player.y + run.player.height > pickup.y;
-    if (!overlaps) {
+    if (!overlaps || collectedTypes.has(pickup.type)) {
       remaining.push(pickup);
       continue;
     }
-    if (pickup.type !== "speed") {
+    const effect = pickup.type === "speed" ? "speedSeconds"
+      : pickup.type === "reverse" ? "reverseSeconds" : null;
+    if (!effect) {
       remaining.push(pickup);
       continue;
     }
-    run.effects.speedSeconds = 5;
+    run.effects[effect] = 5;
+    collectedTypes.add(pickup.type);
     collected = true;
   }
   if (collected) {
@@ -220,10 +224,15 @@ export function stepRunEffects(run, dt) {
     throw new RangeError("Effect duration must be a non-negative number.");
   }
   run.effects.speedSeconds = Math.max(0, run.effects.speedSeconds - dt);
+  run.effects.reverseSeconds = Math.max(0, run.effects.reverseSeconds - dt);
 }
 
 export function applyRunEffects(input, run) {
   const adjusted = { ...input };
+  if (run.effects.reverseSeconds > 0) {
+    adjusted.move = -Math.sign(adjusted.move || 0);
+    adjusted.moveY = -Math.sign(adjusted.moveY || 0);
+  }
   if (run.effects.speedSeconds > 0) adjusted.speedMultiplier = 2;
   return adjusted;
 }

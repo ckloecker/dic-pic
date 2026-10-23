@@ -55,15 +55,26 @@ export function drawEnemies(context, enemies, biome) {
 
 export function drawPickups(context, pickups, seconds = 0) {
   for (const pickup of pickups) {
-    if (pickup.type !== "speed") continue;
     const { x, y } = pickup;
-    context.fillStyle = "#38251f";
-    context.fillRect(x, y + 1, 4, 2);
-    context.fillStyle = "#ffd166";
-    context.fillRect(x + 1, y, 2, 1);
-    context.fillRect(x + 1, y + 1, 1, 1);
-    context.fillRect(x + 2, y + 2, 1, 1);
-    context.fillRect(x + 1, y + 3, 2, 1);
+    if (pickup.type === "speed") {
+      context.fillStyle = "#38251f";
+      context.fillRect(x, y + 1, 4, 2);
+      context.fillStyle = "#ffd166";
+      context.fillRect(x + 1, y, 2, 1);
+      context.fillRect(x + 1, y + 1, 1, 1);
+      context.fillRect(x + 2, y + 2, 1, 1);
+      context.fillRect(x + 1, y + 3, 2, 1);
+    } else if (pickup.type === "reverse") {
+      context.fillStyle = "#56374f";
+      context.fillRect(x, y, 4, 2);
+      context.fillStyle = "#d983c1";
+      context.fillRect(x + 1, y, 2, 2);
+      context.fillStyle = "#f0cfb2";
+      context.fillRect(x + 1, y + 2, 2, 2);
+      context.fillStyle = "#ffffff";
+      context.fillRect(x + 1, y, 1, 1);
+      context.fillRect(x + 3, y + 1, 1, 1);
+    }
   }
 }
 
