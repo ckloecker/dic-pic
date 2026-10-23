@@ -40,7 +40,8 @@ python -m http.server 8000
 ```
 
 Open <http://localhost:8000/> in a browser.
-Select a photo, enter a name, choose **Suggest three levels**, then select a thumbnail to play.
+Select a photo, enter both runner names, choose **Suggest three levels**, then select a thumbnail to play.
+After each completed round, choose which runner plays the next round on the same exact course.
 The camera option is available on devices and
 browsers that support file-input photo capture; **Upload photo** remains
 available as a fallback.
@@ -99,11 +100,17 @@ The live GitHub form must include the branch and commit fields from the latest t
   UP enters background climbing; directions also aim the drill.
 - **Reset run** restores the same photo's original terrain, spawn, and timer;
   saved leaderboard entries remain.
-  The solid image bottom supports walking and jumping even after drilling.
+  Falling to the image bottom also resets the entire run.
   The checkered finish gate remains fixed if its support is drilled.
 - Avoid flying patrols: wasps in jungle, hovering scarabs in desert, and jellyfish underwater.
-  Enemy contact returns you to the selected spawn and clears held controls, but keeps the running timer, drilled tunnels, and enemy progress.
-  Manual reset also restores the enemies to their original positions.
+  Enemy contact resets the whole run without saving a score, just like bottom contact.
+  Terrain, timer, held controls, pickups, platforms, and enemy motion all return to their initial state.
+  Seeded flying paths vary in both axes and repeat exactly after reset.
+- Speed pickups double movement speed for five seconds.
+  Mushrooms reverse horizontal and vertical controls, including directional drilling, for five seconds.
+  Recollecting the same type refreshes its timer without stacking effects.
+- Two moving platforms provide optional shortcuts outside the required route.
+  Drilling away blocking terrain can extend their horizontal travel.
 
 The runner is 25% smaller (6-by-9 terrain cells), without changing movement
 speed or jump height.
@@ -122,6 +129,7 @@ No freestanding vertical walls are invented.
 A photo without vertical edges may not supply walls for wall jumping.
 
 Each batch offers jungle, desert, and underwater biomes with shuffled horizontal, vertical, and balanced layouts.
+Every batch starts with the same random seed, so uploading the same image reproduces the same three suggestions in the same order.
 Biomes change terrain surfaces, filling, drillable roots/cacti/coral and rocks, and the runner's cosmetic explorer hat/fedora/diving bell.
 Jungle scenery includes large layered trees three to five runner heights tall, grass, climbing plants, and hanging vines.
 Desert adds branching cacti, layered rocks, and bone clusters; underwater adds branching coral, kelp, and layered rocks.

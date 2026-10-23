@@ -32,7 +32,7 @@ Completion checks temporarily write only their exact fixture score key and resto
 | ST-18 | REQ-LVL-01/06/11 | Use raw mixed-orientation and large-region/noise unit fixtures; compare masks and alpha channels. | Horizontal and vertical preferred-region cell ratios exceed two; balanced retains both; tiny fragments are absent; source photo filling precedes protected route clearance; exposed outlines have alpha 255 and interiors 204. |
 | ST-19 | REQ-LVL-07 | Test flat floors, the empty solid bottom, slopes, downward walking routes, and elevated alternatives; generate seeded options. | Walk-only pairs are rejected regardless of distance, alternatives remain distant and in bounds, and unsatisfiable generation shows a clear error. |
 | ST-20 | REQ-LVL-06/14 | Sample filtered photo colors and terrain halo pixels; compare thumbnails/live scenes and excavate. | Photo darkens/desaturates without affecting image analysis or artwork, the halo has no collision, and opaque outlines/translucent interiors persist. |
-| ST-21 | REQ-LVL-12/15, REQ-SYS-08/10/14 | Observe each biome's enemies idle and moving; cross patrols while drilling and holding controls, then manually reset. | Two clear, bounded, separated patrols reverse safely; contact fully resets terrain, timer, enemies, pickups, platforms, player state, and held input without a score write. |
+| ST-21 | REQ-LVL-12/15/21, REQ-SYS-08/10/14 | Observe each biome's enemies idle and moving; cross patrols while drilling and holding controls, then manually reset. | Two clear, bounded, separated patrols follow their seeded flight paths safely; contact fully resets terrain, timer, enemies, pickups, platforms, player state, and held input without a score write. |
 | ST-22 | REQ-LVL-01/08/09/11/16 | Generate diverse seeded photos and replay final physics/enemies; tamper with duration evidence, clearance, and drilling. | Numeric target misses do not reject valid options; no-drill, clear endpoints/corridors, movement variety, and non-walking completion remain mandatory. |
 | ST-23 | REQ-LVL-08/16 | Test twelve/eighteen/nineteen-cell supported gaps, missing edge evidence, and sparse-source supplemental shelves. | Longer bridges are allowed; natural-edge bridges retain real anchors; supplemental horizontal platforms need not attach at both ends and remain drillable/resettable without obstructing clearance. |
 | ST-24 | REQ-SYS-06, REQ-LVL-16 | Replay the same selected route to actual completion twice; populate ten faster entries and replay; simulate storage failure. | Exact current attempt alone is outlined/labeled, stable ties retain the older entry, an unranked footer has no place and does not persist, and failed saves remain visible with an explicit error. |
@@ -46,6 +46,21 @@ Completion checks temporarily write only their exact fixture score key and resto
 | ST-32 | REQ-LVL-19 | Record platform positions over time, ride a platform, drill a path barrier, and inspect route replay/reset. | Both collidable platforms move at 18 cells/s, reverse at clear boundaries, extend into newly drilled space, remain outside the required reference route, and return to preview positions on reset. |
 | ST-33 | REQ-SYS-15/REQ-LVL-17 | Start with two names, complete a round, select the next player, and restart the selected option; compare generation across reloads. | Both players play the same deterministic ordered suggestions and selected course; next-round selection changes score attribution while restoring the course and timer. |
 | ST-34 | REQ-CHR-05 | Compare underwater player pixels across different animation phases and compare with a non-underwater biome. | Swimming artwork visibly animates only underwater and remains inside the unchanged 6-by-9 collision footprint. |
+| ST-35 | REQ-LVL-15/17/21 | Observe two-axis enemy flight, reset and replay identical timed inputs, and cross vertical path segments and waypoint turns. | Paths and motion repeat, stay clear of terrain and protected areas, and swept contact resets the full run without tunneling or bounding-box false positives. |
+
+## Current voted-issue verification
+
+Execution on 2026-10-23 passed **88/88 unit checks** and **23/23 browser system checks** in Chromium.
+ST-09/21 verify full failure resets, including timer, drilled terrain, held controls, initial enemies, and no saved score.
+ST-29/30 cover prominent controls and uniform terrain filling without changing outline/interior opacity.
+ST-31/32 have unit coverage for pickup counts, five-second non-stacking effects, refresh, reversal, moving-platform collision, path extension, and full reset.
+ST-33 verifies the second player receives the same initial course with a zero timer and that their completed round is saved under their own name.
+ST-34/35 have unit coverage for animated swimming within the unchanged footprint and reproducible two-axis flying paths with swept contact across vertical segments and turns.
+The integrated enemy-contact check restores an actually excavated cell and verifies the reset player remains idle with cleared controls.
+Rendering comparisons isolate opaque gameplay artwork from swimming animation and browser-dependent filtered-photo rasterization.
+Setup and gameplay fit 320-, 390-, and 1280-pixel viewports without horizontal overflow, retaining all six touch buttons during play.
+The existing leaderboard, movement, feedback, preview, timer, and animation-loop checks also pass.
+Physical mobile, camera, deployment, and independent-browser acceptance checks remain outstanding.
 
 ## Deployed feedback version verification
 

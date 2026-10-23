@@ -15,10 +15,11 @@ The [architecture](../design/system/game-architecture.md#approved-random-option-
 
 | Requirement | Implementation surface | Verification |
 |---|---|---|
-| REQ-LVL-17, derived from REQ-SYS-03 and REQ-LVL-12 | [Option assembler](../src/level.js), including downstream random choices; implementation pending. | [AT-33](../tests/acceptance/test-cases.md) specifies repeated-image, intervening-image, reload, and new-session comparisons; execution pending. |
+| REQ-LVL-17, derived from REQ-SYS-03 and REQ-LVL-12 | [Option assembler](../src/level.js) creates a fresh fixed-seed random engine for every batch and shares it across downstream generation. | [Unit tests](../tests/unit/unit-tests.js) compare serialized default-generated suggestions; [AT-33](../tests/acceptance/test-cases.md) covers repeat uploads and independent sessions. |
 
-This revision updates requirements, design, and acceptance criteria only.
-Runtime behavior has not been changed or verified against REQ-LVL-17.
+The fixed-seed implementation is included in commit `e975781` for issue #14 and retained for issue #17 flight paths.
+Default-generation reproducibility passes in the automated unit suite.
+Independent-browser acceptance under AT-33 remains a manual check.
 
 ## Approved deployed feedback version revision
 
@@ -99,6 +100,47 @@ The twelve failures reproduced the missing speed boost, pickup state, moving-pla
 The browser runner reproduced the missing prominent control treatment.
 Further failures in the baseline browser run were analyzed separately and are not attributed to these requirements without retesting.
 
+### Final automated verification and local commits
+
+Verification on 2026-10-23 passed **88/88 unit checks** and **23/23 browser system checks** in Chromium.
+The [unit runner](../tests/unit/runner.html) covers pickup counts and timed effects, moving-platform collision and extension, complete reset state, safe spawns, deterministic suggestions after an intervening different image, uniform filling, swimming artwork, and flying paths.
+The [browser runner](../tests/system/runner.html) verifies actual bottom/enemy resets, restored excavated terrain, cleared held input, no failure score writes, prominent controls, identical initial courses for both players, and correct next-player score attribution.
+Existing movement, preview, feedback, timer, reset-loop, stable-score-tie, unranked-score, and storage-error regressions also pass.
+The reset rendering check compares opaque gameplay geometry and initial patrol/platform/pickup artwork separately from animated swimming and browser-dependent filtered-photo rasterization.
+The placement fixtures now require safe inset supports instead of relying on starts at the image bottom.
+The vertical-photo geometry check includes approved supplemental platform cells, which the changed random sequence can select during route repair.
+VS Code reports no diagnostics in the changed JavaScript implementation and test files.
+Setup and gameplay checks at 320-, 390-, and 1280-pixel viewport widths found no horizontal overflow and retained all six touch controls during play.
+
+| Issue | Resolving implementation commit | Verification |
+|---|---|---|
+| [#3](https://github.com/ckloecker/dic-pic/issues/3) | `61fe766` | REQ-LVL-18 speed, duration, refresh, collection, and reset unit checks. |
+| [#5](https://github.com/ckloecker/dic-pic/issues/5) | `28c1f7d` | REQ-LVL-18 horizontal/vertical input and drill reversal unit checks. |
+| [#9](https://github.com/ckloecker/dic-pic/issues/9) | `e215399`, `a96f1ba` | REQ-SYS-16 setup/gameplay guidance and browser visibility checks. |
+| [#10](https://github.com/ckloecker/dic-pic/issues/10) | `c4876b7` | REQ-LVL-06/20 uniform RGB, opaque outlines, translucent interiors, and browser compositing checks. |
+| [#11](https://github.com/ckloecker/dic-pic/issues/11) | `6c21cf3` | REQ-SYS-14 exact run-state restoration and actual browser bottom/enemy contact checks. |
+| [#14](https://github.com/ckloecker/dic-pic/issues/14) | `e975781` | REQ-LVL-17/19 reproducible suggestions, platform movement, collision, path extension, and reset checks. |
+| [#15](https://github.com/ckloecker/dic-pic/issues/15) | `821dd69` | REQ-SYS-15 browser round selection, unchanged course, correct names, and stable tied attempts. |
+| [#16](https://github.com/ckloecker/dic-pic/issues/16) | `3be4ffe` | REQ-CHR-05 animated swimming pixels inside the unchanged collision footprint. |
+| [#17](https://github.com/ckloecker/dic-pic/issues/17) | `8b66f7a` | REQ-LVL-21 deterministic flight paths, clear bounds, reset replay, and two-axis swept contact. |
+
+The issue-workflow rules are persisted in [AGENTS.md](../AGENTS.md) by non-closing commit `8e16cfe`.
+No eligible issue conflict was found, and the previously excluded issue #6 was not implemented.
+The resolving commits are local and use `Fixes #N`; GitHub issue closure has not occurred or been verified.
+SSH access failed host-key verification, and noninteractive HTTPS push authorization failed because no usable credentials were available.
+Physical Android/iOS, camera permissions, simultaneous real touch input, and GitHub deployment remain unverified.
+
+### Random flying paths: issue #17
+
+Issue [#17](https://github.com/ckloecker/dic-pic/issues/17) had one thumbs-up when rechecked before implementation and had no implementation comments.
+[REQ-LVL-21](../requirements/level-design-requirements.md#req-lvl-21-reproducible-random-flying-paths) and revised REQ-LVL-15 allocate seeded two-axis flight to the [enemy design](../design/detailed/game-components.md#nontrivial-placement-readability-and-enemies).
+The [enemy simulator](../src/enemies.js) generates looping waypoint paths inside clear flight rectangles, avoiding terrain, reference clearance, spawn/finish margins, other enemies, and initial moving-platform sweeps.
+Distance-based phase and two-axis sweeps preserve constant speed and detect contact across waypoint turns.
+The [option identity](../src/level.js) advances to revision 9 and includes the retained path and initial phase.
+Before implementation, the [unit suite](../tests/unit/unit-tests.js) passed 86/88 checks, failing specifically for missing waypoint paths and missed vertical swept contact.
+After implementation, all 88 unit checks pass, including large timesteps, path bounds, terrain clearance, deterministic generation, reset replay, vertical contact, turn contact, and false-positive rejection.
+[AT-40](../tests/acceptance/test-cases.md) defines integrated flying-path acceptance.
+
 ## Historical approved strict route-first revision
 
 The user approved slower intact-ground excavation at twenty cells per second, open movement at eighty, optional digging, and unrestricted climbing and full-height jumping.
@@ -130,8 +172,8 @@ Physical mobile, camera, and simultaneous touch verification remain outstanding.
 | REQ-SYS-05 | [Validation](../src/leaderboard.js), [setup](../src/app.js) | Unit name tests and automated browser invalid-name check. |
 | REQ-SYS-06 | [Attempt identities and row projection](../src/leaderboard.js), [result UI](../src/app.js), [current-run outline](../src/styles.css) | Unit exact-attempt/tied-name-time highlighting and transient footer; actual browser completion, stable ties, top-ten-only persistence, outline/aria label, and storage failure; ST-24/AT-06. |
 | REQ-SYS-08 | [Run cloning](../src/run.js), [reset UI and animation cancellation](../src/app.js) | Unit terrain/timer restoration; browser reset checks name, timer, charge, held input, no score write, and exactly one native animation loop across five resets. |
-| REQ-SYS-09 | [Solid bottom](../src/physics.js) supersedes bottom-edge respawning; [game loop](../src/app.js) no longer triggers it | Unit bottom landing/walking/jumping and excavated-bottom tests; browser drill-down test confirms no respawn. |
-| REQ-SYS-10 | [Enemy contact](../src/enemies.js), [player-only respawn](../src/run.js), [contact priority and control clearing](../src/app.js) | Unit swept/reversal contact and preservation of terrain/time/enemy state; browser real contact, no score writes, held-input clearing, and manual reset; ST-21/AT-28. |
+| REQ-SYS-09 | Superseded by REQ-SYS-14; [game loop](../src/app.js) resets the full run on bottom contact. | Unit reset-state checks and browser bottom-contact reset, including a zero timer and cleared held controls. |
+| REQ-SYS-10/14 | [Enemy contact](../src/enemies.js), [full reset](../src/run.js), [contact priority and control clearing](../src/app.js) | Unit full-state restoration and swept contact; browser real contact, no score writes, held-input clearing, and manual reset; ST-21/AT-28. |
 | REQ-SYS-11 | [Root entry page](../index.html), [root browser runner](../tests/system/runner.html); [root hosting design](../design/detailed/game-components.md#root-entry-point-and-feedback-indexhtml-srcappjs) | Browser root setup, module/style paths, live CSS, and root-runner checks; ST-01/AT-01. |
 | REQ-SYS-12 | [Feedback UI](../index.html), [severity, version metadata, and input isolation](../src/app.js), [issue form](../.github/ISSUE_TEMPLATE/feedback.yml); [feedback design](../design/detailed/game-components.md#root-entry-point-and-feedback-indexhtml-srcappjs) | Browser twelve category/severity URLs, injected and local version values, form field contracts, no private parameters, keyboard isolation, and setup/play/completion availability; ST-26/27/28, AT-31/32. |
 | REQ-SYS-13 | [Pages workflow](../.github/workflows/pages.yml), [HTML stamping](../scripts/stamp-build.mjs), [metadata consumers](../src/app.js); [deployment design](../design/detailed/game-components.md#deployment-version-injection) | Six script integration tests, injected-document browser checks, and ST-28/AT-32 version/deployment acceptance checks. |
