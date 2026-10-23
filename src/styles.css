@@ -350,6 +350,31 @@ button,
   color: var(--mint);
 }
 
+.setup-controls {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #66827b;
+  border-radius: 8px;
+  background: #20363d;
+}
+
+.setup-controls h3 {
+  margin: 0 0 10px;
+  color: var(--mint);
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.setup-controls p {
+  margin: 7px 0 0;
+  color: #dbe4df;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .game-screen {
   padding: 28px 0 44px;
 }
