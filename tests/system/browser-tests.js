@@ -118,6 +118,15 @@ test("REQ-SYS-11: the project root serves the game with project-relative assets"
 });
 
 test("REQ-SYS-16: controls are prominently presented during play", async () => {
+  const setupGuide = find(".setup-controls");
+  const setupTitle = find("#setup-controls-title");
+  assert(setupGuide && setupTitle && setupTitle.textContent.trim() === "Controls",
+    "setup screen does not explain the controls");
+  const setupStyle = app.getComputedStyle(setupGuide);
+  const setupTitleStyle = app.getComputedStyle(setupTitle);
+  assert(setupStyle.backgroundColor !== "rgba(0, 0, 0, 0)"
+    && parseFloat(setupStyle.paddingTop) >= 16
+    && parseFloat(setupTitleStyle.fontSize) >= 14, "setup controls are not prominent");
   const panel = find(".controls-panel");
   const title = find(".control-title");
   assert(panel && title, "controls panel or title is missing");
@@ -793,7 +802,9 @@ test("REQ-LVL-16 / REQ-SYS-06: no-drill replay finishes and outlines the exact r
     assert(saved.length===1&&saved[0].id,"ranked attempt was not persisted with an identity");
     app.localStorage.setItem(storageKey,JSON.stringify(saved));
     const initialScene=canvasPixels();
-    find("#next-player").value="Second Runner";
+    const secondPlayer=[...find("#next-player").options].find(option=>option.textContent==="Second Runner");
+    assert(secondPlayer,"next-round selector omitted the second player");
+    find("#next-player").value=secondPlayer.value;
     find("#next-round-button").click();
     await until(()=>!find("#game-screen").hidden);
     assert(find("#level-title").textContent.includes("Second Runner"),"next round did not select the second player");
