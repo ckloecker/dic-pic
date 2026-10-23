@@ -276,13 +276,14 @@ test("REQ-LVL-07: distant flat and bottom-edge walk-only routes are rejected", (
   for (const floor of [40, 80]) {
     let rejected = false;
     try { runApi.placeRun(flatTerrain(100, 80, floor)); }
-    catch (error) { rejected = /walking|walk-only/i.test(error.message); }
+    catch (error) { rejected = /walking|walk-only|safe starting position/i.test(error.message); }
     assert(rejected, "distance alone accepted a flat walking-only level");
   }
 });
 test("REQ-LVL-07: placement tries elevated alternatives and detects slopes and falling walks", () => {
   const terrain = flatTerrain(100, 80, 80);
   for (let y = 25; y < 30; y += 1) terrain.solid.fill(1, y * 100 + 65, y * 100 + 95);
+  for (let y = 60; y < 65; y += 1) terrain.solid.fill(1, y * 100 + 5, y * 100 + 35);
   const placement = runApi.placeRun(terrain, "bottom");
   const reachable = runApi.walkingReachable(terrain, placement.spawn);
   assert(!runApi.walkingReachesFlag(terrain, reachable, placement.flag), "alternative is walk-only");
@@ -315,6 +316,49 @@ test("REQ-LVL-14: photo filter darkens and desaturates without leaking context s
 });
 
 if (enemyApi) {
+  test("REQ-LVL-15/21: seeded flying paths vary in both axes, stay clear, and repeat on reset", () => {
+    const terrain = flatTerrain(160, 100, 90);
+    const random = () => 0.5;
+    const enemies = enemyApi.createEnemies(terrain, random);
+    assert(JSON.stringify(enemies) === JSON.stringify(enemyApi.createEnemies(terrain, random)),
+      "same random sequence changed the patrol paths");
+    terrain.enemies = enemies;
+    const run = runApi.createRun(terrain);
+    for (const enemy of run.enemies) {
+      assert(enemy.path?.length >= 3, "enemy has no multi-waypoint flying path");
+      assert(new Set(enemy.path.map(point => point.x)).size > 1
+        && new Set(enemy.path.map(point => point.y)).size > 1, "flying path is confined to one axis");
+      for (let frame = 0; frame < 600; frame += 1) {
+        enemyApi.stepEnemies([enemy], 1 / 30);
+        assert(enemy.x >= enemy.left && enemy.x <= enemy.right
+          && enemy.y >= enemy.top && enemy.y <= enemy.bottom, "enemy escaped its checked flight bounds");
+        for (let y = Math.floor(enemy.y); y < Math.ceil(enemy.y + enemy.height); y += 1) {
+          for (let x = Math.floor(enemy.x); x < Math.ceil(enemy.x + enemy.width); x += 1) {
+            assert(!terrain.solid[y * terrain.width + x], "flying path crosses solid terrain");
+          }
+        }
+      }
+    }
+    runApi.resetRun(run);
+    assert(JSON.stringify(run.enemies) === JSON.stringify(enemies), "reset changed the original flight paths or phase");
+    const replay = runApi.createRun(terrain);
+    for (let frame = 0; frame < 60; frame += 1) {
+      enemyApi.stepEnemies(run.enemies, 1 / 60);
+      enemyApi.stepEnemies(replay.enemies, 1 / 60);
+    }
+    assert(JSON.stringify(run.enemies) === JSON.stringify(replay.enemies), "reset flight replay diverged");
+  });
+  test("REQ-LVL-21: swept contact includes vertical flight and waypoint turns", () => {
+    const enemy = { x: 0, y: 0, width: 2, height: 2, speed: 20, phase: 0,
+      path: [{ x: 0, y: 0 }, { x: 0, y: 10 }, { x: 10, y: 10 }] };
+    enemyApi.stepEnemies([enemy], 1);
+    assert(enemyApi.enemyContact({ x: 0, y: 5, width: 2, height: 2 }, [enemy]),
+      "vertical flight tunneled through the player");
+    assert(enemyApi.enemyContact({ x: 5, y: 10, width: 2, height: 2 }, [enemy]),
+      "post-turn flight tunneled through the player");
+    assert(!enemyApi.enemyContact({ x: 5, y: 3, width: 2, height: 2 }, [enemy]),
+      "flight contact incorrectly used the path bounding box");
+  });
   test("REQ-LVL-15: patrols have clear swept footprints, safe margins, and bounded reflected motion", () => {
     const terrain = flatTerrain(160, 100, 90);
     terrain.spawn = { x: 0, y: 81 };

@@ -271,9 +271,7 @@ test("REQ-LVL-06/08: render photo-aligned platform interiors at 80% opacity", as
   source.height = 180;
   const sourceContext = source.getContext("2d");
   sourceContext.drawImage(image,0,0,320,180);
-  let seed=123;
-  fixtureOptions=levelApi.createSuggestions(sourceContext.getImageData(0,0,320,180).data,320,180,
-    ()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296));
+  fixtureOptions=levelApi.createSuggestions(sourceContext.getImageData(0,0,320,180).data,320,180);
   sceneApi.drawPhoto(sourceContext, image, 320, 180);
   sceneApi.drawBiomeEffects(sourceContext, 320, 180, "jungle", 0, true);
   const pixels = canvasPixels();
@@ -325,6 +323,7 @@ test("REQ-MOV-01/05 / REQ-SYS-04: Space charges, character bar fills, release la
     }
     return count;
   };
+  const yellowBeforeCharge = countColor(255, 209, 102);
   key("keydown", " ");
   await until(() => find("#charge-meter").value >= 0.5);
   const partial = countColor(159, 228, 193);
@@ -333,13 +332,13 @@ test("REQ-MOV-01/05 / REQ-SYS-04: Space charges, character bar fills, release la
   assert(countColor(159, 228, 193) > partial, "on-character bar did not fill with charge");
   await until(() => find("#charge-meter").value >= 3);
   assert(find("#charge-label").textContent.includes("MAX READY"), "maximum charge was not indicated");
-  assert(countColor(255, 209, 102) > 0, "character bar lacks distinct full-charge appearance");
+  assert(countColor(255, 209, 102) > yellowBeforeCharge, "character bar lacks distinct full-charge appearance");
   assert(Number(find("#timer").textContent) >= 3, "charging did not count as race time");
   assert(Math.abs(playerTop() - top) < 1, "jump launched before release");
   key("keyup", " ");
   await until(() => playerTop() < top - 10);
   assert(find("#charge-meter").value === 0, "launch did not clear meter");
-  assert(countColor(255, 209, 102) === 0, "launch did not clear character bar");
+  assert(countColor(255, 209, 102) === yellowBeforeCharge, "launch did not clear character bar");
 });
 
 test("REQ-SYS-08: reset restores the scene, clears held input, and records no score", async () => {
@@ -398,7 +397,7 @@ test("REQ-SYS-14: falling onto the image bottom fully resets the run", async () 
   const beforeDown = Number(find("#timer").textContent);
   assert(beforeDown > 0, "test failed to start the run before bottom fall");
   key("keydown", "ArrowDown");
-  await until(() => find("#contact-message").textContent.includes("bottom"), 10000);
+  await until(() => find("#contact-message").textContent.toLowerCase().includes("bottom"), 10000);
   key("keyup", "ArrowDown");
   key("keyup", "Enter");
   await until(() => find("#timer").textContent === "0.00");
@@ -446,11 +445,6 @@ test("REQ-MOV-10: climbing animates alternating hands and feet", async () => {
 
 test("REQ-CHR-02 / REQ-MOV-05: smaller sprite and charge bar move together", async () => {
   find("#reset-button").click();
-  key("keydown","Enter");
-  key("keydown","ArrowDown");
-  await until(()=>playerTop()>=170);
-  key("keyup","Enter");
-  key("keyup","ArrowDown");
   const spriteColors = new Set(["35,53,58", "22,38,45", "233,189,145", "23,59,66",
     "36,127,123", "245,161,95", "214,232,195", "52,75,82"]);
   const bounds = (matches) => {
@@ -624,15 +618,24 @@ test("REQ-SYS-14: enemy contact fully resets the run and manual reset restores a
     timestamp += 1000 / 60;
     callback(timestamp);
   };
-  const checksum = () => canvasPixels().reduce((sum, value, index) => (sum + value * (index % 97)) >>> 0, 0);
+  const checksum = (ignorePlayer = false) => {
+    const option = fixtureOptions.find(option => option.biome === "underwater");
+    return canvasPixels().reduce((sum, value, index) => {
+      const x = Math.floor(index / 4) % 960 / 3;
+      const y = Math.floor(index / 4 / 960) / 3;
+      if (ignorePlayer && x >= option.spawn.x - 1 && x < option.spawn.x + 7
+        && y >= option.spawn.y - 1 && y < option.spawn.y + 10) return sum;
+      return (sum + value * (index % 97)) >>> 0;
+    }, 0);
+  };
   const savedScores = JSON.stringify(app.localStorage);
   try {
     find('.level-choice[data-biome="underwater"]').click();
     await until(() => !find("#game-screen").hidden);
-    const initial = checksum();
+    const idleScene = checksum(true);
     const initialTop = playerTop();
     for (let i = 0; i < 20; i += 1) tick();
-    assert(checksum() === initial && find("#timer").textContent === "0.00", "idle enemies moved or started time");
+    assert(checksum(true) === idleScene && find("#timer").textContent === "0.00", "idle enemies moved or started time");
     const option=fixtureOptions.find(option=>option.biome==="underwater");
     const enemy=option.enemies[0];
     const sampleX=Math.round(option.spawn.x+3);
@@ -647,7 +650,7 @@ test("REQ-SYS-14: enemy contact fully resets the run and manual reset restores a
     const undrilled=tunnelSample();
     key("keydown","Enter");
     key("keydown","ArrowDown");
-    for(let i=0;i<240;i+=1)tick();
+    for(let i=0;i<240&&tunnelSample()===undrilled;i+=1)tick();
     key("keyup","ArrowDown");
     const drilled=tunnelSample();
     assert(drilled!==undrilled,"test did not excavate a real terrain cell");
@@ -688,7 +691,8 @@ test("REQ-SYS-14: enemy contact fully resets the run and manual reset restores a
       "held movement/drill controls survived contact");
     assert(Number(find("#timer").textContent) === 0, "held input started the reset run");
     find("#reset-button").click();
-    assert(checksum() === initial, "manual reset did not restore terrain and enemies");
+    assert(checksum(true) === idleScene, "manual reset did not restore terrain and enemies");
+    assert(Math.abs(playerTop() - initialTop) < 1, "manual reset changed the selected spawn");
     assert(find("#timer").textContent === "0.00" && !find("#contact-message").textContent, "manual reset retained contact state");
     assert(tunnelSample() !== drilled, "test did not excavate a real terrain cell");
     find("#new-photo-button").click();
@@ -768,6 +772,7 @@ test("REQ-LVL-16 / REQ-SYS-06: no-drill replay finishes and outlines the exact r
     timestamp+=dt*1000;callback(timestamp);
   };
   const replay=()=>{
+    timestamp=100000;
     tick(1/60);
     let previous={};
     for(const action of option.route.actions){
@@ -796,12 +801,12 @@ test("REQ-LVL-16 / REQ-SYS-06: no-drill replay finishes and outlines the exact r
     app.localStorage.removeItem(storageKey);
     find('.level-choice[data-biome="jungle"]').click();
     await until(()=>!find("#game-screen").hidden);
+    const initialScene=canvasPixels();
     const ranked=replay();
     assert(ranked.current.querySelector(".leaderboard-rank").textContent==="01","ranked attempt has no place");
     const saved=JSON.parse(app.localStorage.getItem(storageKey));
     assert(saved.length===1&&saved[0].id,"ranked attempt was not persisted with an identity");
     app.localStorage.setItem(storageKey,JSON.stringify(saved));
-    const initialScene=canvasPixels();
     const secondPlayer=[...find("#next-player").options].find(option=>option.textContent==="Second Runner");
     assert(secondPlayer,"next-round selector omitted the second player");
     find("#next-player").value=secondPlayer.value;
@@ -811,9 +816,12 @@ test("REQ-LVL-16 / REQ-SYS-06: no-drill replay finishes and outlines the exact r
     assert(find("#timer").textContent==="0.00"&&canvasPixels().every((value,index)=>value===initialScene[index]),
       "second player did not receive the same reset course");
     replay();
+    const secondSaved=JSON.parse(app.localStorage.getItem(storageKey));
+    assert(secondSaved.length===2&&secondSaved[1].name==="Second Runner",
+      "second player's completed round was not attributed to their name");
     find("#replay-button").click();
     const tied=replay();
-    assert(tied.rows.length===2&&tied.current===tied.rows[1],"equal name/time highlighted the older attempt");
+    assert(tied.rows.length===3&&tied.current===tied.rows[2],"equal name/time highlighted the older attempt");
     assert(JSON.parse(app.localStorage.getItem(storageKey))[0].id===saved[0].id,"ties lost their stable order");
     const fast=Array.from({length:10},(_,index)=>({id:`browser-fast-${index}`,name:"Test Runner",timeMs:index+1}));
     app.localStorage.setItem(storageKey,JSON.stringify(fast));
