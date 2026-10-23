@@ -103,7 +103,11 @@ function supportedPositions(terrain, width, height) {
 
 export function placeRun(terrain, edge = "right", random = () => 0) {
   const gates = supportedPositions(terrain, 12, 18);
-  const starts = supportedPositions(terrain, 6, 9);
+  const starts = supportedPositions(terrain, 6, 9).filter((start) => (
+    start.x > 0 && start.y > 0
+      && start.x + 6 < terrain.width
+      && start.y + 9 < terrain.height
+  ));
   if (!gates.length || !starts.length) {
     throw new Error("No safe starting position or finish gate fits. Please choose another photo.");
   }
@@ -161,15 +165,28 @@ export function createRun(original) {
   const placement = original.spawn && original.flag ? original : placeRun(terrain);
   const spawn = { ...placement.spawn };
   const flag = { ...placement.flag };
-  return {
+  const run = {
+    originalTerrain: original,
     terrain,
     spawn,
     flag,
     player: createPlayer(spawn.x, spawn.y),
     enemies: (original.enemies || []).map((enemy) => ({ ...enemy })),
+    pickups: (original.pickups || []).map((pickup) => ({ ...pickup })),
+    movingPlatforms: (original.movingPlatforms || []).map((platform) => ({ ...platform })),
+    effects: { speedSeconds: 0, reverseSeconds: 0 },
     startedAt: null,
     elapsedMs: 0,
   };
+  terrain.pickups = run.pickups;
+  terrain.movingPlatforms = run.movingPlatforms;
+  return run;
+}
+
+export function resetRun(run) {
+  const fresh = createRun(run.originalTerrain);
+  Object.assign(run, fresh);
+  return run;
 }
 
 export function respawnPlayer(run) {

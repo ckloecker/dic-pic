@@ -1,5 +1,5 @@
 import { cancelCharge, DRILL_REACH, stepPlayer } from "./physics.js";
-import { createRun, reachedFlag, respawnPlayer } from "./run.js";
+import { createRun, reachedFlag, resetRun } from "./run.js";
 import { enemyContact, stepEnemies } from "./enemies.js";
 import { getLeaderboard, isValidPlayerName, leaderboardRows, submitScore } from "./leaderboard.js";
 import { NoUsableEdgeError } from "./terrain.js";
@@ -510,14 +510,20 @@ function gameFrame(timestamp) {
   }
 
   const hitEnemy = enemyContact(state.player, state.enemies, previousPlayer);
-  if (hitEnemy) {
-    respawnPlayer(state);
+  const hitBottom = state.player.y + state.player.height >= WORLD_HEIGHT - 1e-9;
+  if (hitEnemy || hitBottom) {
+    resetRun(state);
     clearControls();
-    document.querySelector("#contact-message").textContent = "Enemy contact — back to start. Time and tunnels kept.";
+    state.effectSeconds = 0;
+    state.terrainLayerVersion = -1;
+    document.querySelector("#contact-message").textContent = hitEnemy
+      ? "Enemy contact — run reset."
+      : "Bottom contact — run reset.";
+    timerValue.textContent = "0.00";
   }
   updateChargeIndicator();
   drawScene();
-  if (!hitEnemy && reachedFlag(state)) {
+  if (!hitEnemy && !hitBottom && reachedFlag(state)) {
     finishLevel();
     return;
   }

@@ -601,7 +601,7 @@ test("REQ-LVL-06/11/12: validated photo previews expose all three layout choices
   assert(errors.length === 0, `browser errors: ${errors.join(", ")}`);
 });
 
-test("REQ-LVL-15 / REQ-SYS-10: live enemy contact keeps time and tunnels, clears controls, and manual reset restores all", async () => {
+test("REQ-SYS-14: enemy contact fully resets the run and manual reset restores all", async () => {
   const nativeRequest = app.requestAnimationFrame;
   const nativeCancel = app.cancelAnimationFrame;
   let pending;
