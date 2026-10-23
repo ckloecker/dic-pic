@@ -144,14 +144,15 @@ function addElements(terrain, random) {
 
 function addPickups(terrain, random) {
   const { width, height, solid } = terrain;
+  const size = 8;
   const pickups = [];
   for (const type of ["speed", "reverse"]) {
     const candidates = [];
-    for (let y = 1; y <= height - 5; y += 1) {
-      for (let x = 1; x <= width - 5; x += 1) {
+    for (let y = 1; y <= height - size - 1; y += 1) {
+      for (let x = 1; x <= width - size - 1; x += 1) {
         let clear = true;
-        for (let row = y; row < y + 4 && clear; row += 1) {
-          for (let column = x; column < x + 4; column += 1) {
+        for (let row = y; row < y + size && clear; row += 1) {
+          for (let column = x; column < x + size; column += 1) {
             const cell = row * width + column;
             if (solid[cell] || terrain.route.protected[cell]) {
               clear = false;
@@ -160,10 +161,10 @@ function addPickups(terrain, random) {
           }
         }
         if (!clear || pickups.some((pickup) => (
-          x < pickup.x + pickup.width && x + 4 > pickup.x
-            && y < pickup.y + pickup.height && y + 4 > pickup.y
+          x < pickup.x + pickup.width && x + size > pickup.x
+            && y < pickup.y + pickup.height && y + size > pickup.y
         ))) continue;
-        candidates.push({ x, y, width: 4, height: 4, type });
+        candidates.push({ x, y, width: size, height: size, type });
       }
     }
     if (!candidates.length) {

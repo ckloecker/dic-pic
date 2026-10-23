@@ -284,6 +284,8 @@ test("REQ-LVL-06/08: render photo-aligned platform interiors at 80% opacity", as
   const samples=[];
   for(let y=4;y<176;y+=1)for(let x=4;x<316;x+=1){
     if(layerPixels[(y*320+x)*4+3]===204&&!option.details[y*320+x]
+      && !option.pickups.some(pickup => x >= pickup.x - 4 && x < pickup.x + 12
+        && y >= pickup.y - 4 && y < pickup.y + 12)
       &&!samples.some(point=>Math.hypot(point[0]-x,point[1]-y)<30))samples.push([x,y]);
   }
   assert(samples.length>=3,"not enough substantial interiors to sample");
@@ -449,7 +451,7 @@ test("REQ-CHR-02 / REQ-MOV-05: smaller sprite and charge bar move together", asy
   find("#reset-button").click();
   const spriteColors = new Set(["35,53,58", "22,38,45", "233,189,145", "23,59,66",
     "36,127,123", "245,161,95", "214,232,195", "52,75,82"]);
-  const bounds = (matches) => {
+  const bounds = (matches, label) => {
     const pixels = canvasPixels();
     let left = 960;
     let right = -1;
@@ -465,18 +467,18 @@ test("REQ-CHR-02 / REQ-MOV-05: smaller sprite and charge bar move together", asy
         bottom = Math.max(bottom, y);
       }
     }
-    assert(right >= left, "expected player/bar pixels were not drawn");
+    assert(right >= left, `${label} pixels were not drawn (hold meter ${find("#charge-meter").value})`);
     return { left, right, top, bottom };
   };
   const sprite = () => {
     const top = Math.floor(playerTop() * 3);
-    return bounds((r, g, b, y) => y >= top && y < top + 27 && spriteColors.has(`${r},${g},${b}`));
+    return bounds((r, g, b, y) => y >= top && y < top + 27 && spriteColors.has(`${r},${g},${b}`), "Player");
   };
   const bar = () => {
     const body = sprite();
     return bounds((r, g, b, y, x) => y < body.top && y >= body.top - 18
       && x >= body.left - 20 && x <= body.right + 20
-      && ((r === 159 && g === 228 && b === 193) || (r === 255 && g === 209 && b === 102)));
+      && ((r === 159 && g === 228 && b === 193) || (r === 255 && g === 209 && b === 102)), "Hold bar");
   };
   key("keydown", " ");
   await until(() => find("#charge-meter").value >= 0.05);

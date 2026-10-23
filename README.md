@@ -108,6 +108,8 @@ The live GitHub form must include the branch and commit fields from the latest t
   Seeded flying paths vary in both axes and repeat exactly after reset.
 - Speed pickups double movement speed for five seconds.
   Mushrooms reverse horizontal and vertical controls, including directional drilling, for five seconds.
+  Look for large bright-yellow lightning bolts and magenta spotted mushrooms with soft colored auras.
+  Touch the item itself to collect it; its aura does not collect or block you.
   Recollecting the same type refreshes its timer without stacking effects.
 - Two moving platforms provide optional shortcuts outside the required route.
   Drilling away blocking terrain can extend their horizontal travel.

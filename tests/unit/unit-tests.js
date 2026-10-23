@@ -174,6 +174,24 @@ test("REQ-LVL-19: moving platforms reverse at clear path ends and extend after d
     "platform escaped its expanded path bounds");
 });
 
+test("REQ-LVL-18: eight-cell items collect at their edges but their aura never collects or blocks", () => {
+  for (const type of ["speed", "reverse"]) {
+    const terrain = flatTerrain(80, 70, 60);
+    terrain.pickups = [{ type, x: 20, y: 30, width: 8, height: 8 }];
+    const run = runApi.createRun(terrain);
+    run.player.x = 28;
+    run.player.y = 30;
+    runApi.collectPickups(run);
+    assert(run.pickups.length === 1 && run.effects.speedSeconds === 0 && run.effects.reverseSeconds === 0,
+      "touching only the aura collected an item");
+    physicsApi.stepPlayer(run.player, { move: -1 }, run.terrain, 0.025);
+    assert(run.player.x === 26, "pickup or aura blocked movement");
+    runApi.collectPickups(run);
+    assert(run.pickups.length === 0 && run.effects[type === "speed" ? "speedSeconds" : "reverseSeconds"] === 5,
+      "outer half of the enlarged item did not collect");
+  }
+});
+
 test("REQ-LVL-16: bridges connect detected supported surfaces beyond eighteen cells", () => {
   for(const [gap,anchored,evidence] of [[12,true,true],[18,true,true],[19,true,true],
     [12,false,true],[12,true,false]]){
@@ -214,6 +232,7 @@ test("REQ-LVL-18: generated levels have one to three pickups of each type outsid
       const pickups = option.pickups.filter((pickup) => pickup.type === type);
       assert(pickups.length >= 1 && pickups.length <= 3, `invalid ${type} pickup count`);
       for (const pickup of pickups) {
+        assert(pickup.width === 8 && pickup.height === 8, "pickup artwork and collection bounds must be eight cells");
         assert(pickup.x >= 0 && pickup.y >= 0 && pickup.x + pickup.width <= width
           && pickup.y + pickup.height <= height, "pickup is outside the level");
         for (let y = pickup.y; y < pickup.y + pickup.height; y += 1) {
@@ -1343,23 +1362,63 @@ if (runApi) {
           }
         }
       });
-      test("REQ-LVL-18/19: pickup and moving-platform artwork stays visible within the world", () => {
+      test("REQ-LVL-18: enlarged pickup silhouettes have vivid colors, dark outlines, and soft auras", () => {
+        for (const [type, color] of [["speed", [255, 230, 0]], ["reverse", [255, 45, 117]]]) {
+          const canvas = document.createElement("canvas");
+          canvas.width = 32;
+          canvas.height = 32;
+          const context = canvas.getContext("2d");
+          context.fillStyle = "#123456";
+          sceneApi.drawPickups(context, [{ type, x: 12, y: 12, width: 8, height: 8 }]);
+          assert(context.fillStyle === "#123456", "pickup drawing leaked canvas state");
+          const pixels = context.getImageData(0, 0, 32, 32).data;
+          let bright = 0, outline = 0, aura = 0;
+          const body = [];
+          for (let y = 0; y < 32; y += 1) for (let x = 0; x < 32; x += 1) {
+            const [r, g, b, alpha] = pixels.slice((y * 32 + x) * 4, (y * 32 + x) * 4 + 4);
+            if (alpha === 255) {
+              assert(x >= 12 && x < 20 && y >= 12 && y < 20, "solid artwork exceeds collection bounds");
+              body.push([x, y]);
+              if (r === color[0] && g === color[1] && b === color[2]) bright += 1;
+              if (r < 50 && g < 50 && b < 50) outline += 1;
+            } else if (alpha > 0 && (x < 12 || x >= 20 || y < 12 || y >= 20)) {
+              aura += 1;
+              assert(x >= 8 && x < 24 && y >= 8 && y < 24, "aura exceeds its decorative radius");
+            }
+          }
+          assert(bright >= 10 && outline >= 10, "item lacks a vivid fill or dark outline");
+          assert(aura > 20, "item lacks a soft aura beyond its collection bounds");
+          assert(Math.max(...body.map(([x]) => x)) - Math.min(...body.map(([x]) => x)) === 7
+            && Math.max(...body.map(([, y]) => y)) - Math.min(...body.map(([, y]) => y)) === 7,
+          "item silhouette is not eight by eight cells");
+          const scaled = document.createElement("canvas");
+          scaled.width = 96;
+          scaled.height = 96;
+          const scaledContext = scaled.getContext("2d");
+          scaledContext.scale(3, 3);
+          sceneApi.drawPickups(scaledContext, [{ type, x: 12, y: 12, width: 8, height: 8 }]);
+          const scaledPixels = scaledContext.getImageData(0, 0, 96, 96).data;
+          for (let y = 0; y < 32; y += 1) for (let x = 0; x < 32; x += 1) {
+            for (let channel = 0; channel < 4; channel += 1) {
+              assert(pixels[(y * 32 + x) * 4 + channel] === scaledPixels[(y * 3 * 96 + x * 3) * 4 + channel],
+                "pickup artwork or aura differs between preview and gameplay scales");
+            }
+          }
+        }
+      });
+      test("REQ-LVL-19: moving-platform artwork stays within its collision bounds", () => {
         const canvas = document.createElement("canvas");
         canvas.width = 40;
         canvas.height = 30;
         const context = canvas.getContext("2d");
-        sceneApi.drawPickups(context, [
-          { type: "speed", x: 3, y: 4, width: 4, height: 4 },
-          { type: "reverse", x: 10, y: 4, width: 4, height: 4 },
-        ], 0);
         sceneApi.drawMovingPlatforms(context, [
           { x: 20, y: 10, width: 12, height: 3 },
         ]);
         const pixels = context.getImageData(0, 0, 40, 30).data;
-        assert(pixels.some(Boolean), "pickup or platform artwork is not visible");
+        assert(pixels.some(Boolean), "platform artwork is not visible");
         for (let y = 0; y < 30; y += 1) for (let x = 0; x < 40; x += 1) {
           if (pixels[(y * 40 + x) * 4 + 3]) {
-            assert(x >= 3 && x < 32 && y >= 4 && y < 13, "pickup or platform artwork exceeds its declared bounds");
+            assert(x >= 20 && x < 32 && y >= 10 && y < 13, "platform artwork exceeds its declared bounds");
           }
         }
       });

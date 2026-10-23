@@ -54,28 +54,40 @@ export function drawEnemies(context, enemies, biome) {
 }
 
 export function drawPickups(context, pickups, seconds = 0) {
+  context.save();
+  const palette = { D: "#211526", Y: "#ffe600", R: "#ff2d75", W: "#ffffff", S: "#fff1cc" };
   for (const pickup of pickups) {
     const { x, y } = pickup;
+    let rows;
     if (pickup.type === "speed") {
-      context.fillStyle = "#38251f";
-      context.fillRect(x, y + 1, 4, 2);
-      context.fillStyle = "#ffd166";
-      context.fillRect(x + 1, y, 2, 1);
-      context.fillRect(x + 1, y + 1, 1, 1);
-      context.fillRect(x + 2, y + 2, 1, 1);
-      context.fillRect(x + 1, y + 3, 2, 1);
+      rows = ["....DDD.", "...DYYD.", "..DYYD..", ".DYYYYDD",
+        "DDDYYYD.", "..DYYD..", "..DYD...", "..DD...."];
     } else if (pickup.type === "reverse") {
-      context.fillStyle = "#56374f";
-      context.fillRect(x, y, 4, 2);
-      context.fillStyle = "#d983c1";
-      context.fillRect(x + 1, y, 2, 2);
-      context.fillStyle = "#f0cfb2";
-      context.fillRect(x + 1, y + 2, 2, 2);
-      context.fillStyle = "#ffffff";
-      context.fillRect(x + 1, y, 1, 1);
-      context.fillRect(x + 3, y + 1, 1, 1);
+      rows = ["..DDDD..", ".DRRRRD.", "DRWWRRRD", "DRWRRWRD",
+        "DRRRWWRD", ".DDDDDD.", "..DSSD..", "..DDDD.."];
+    } else {
+      continue;
+    }
+    // Cell-aligned falloff keeps preview and scaled gameplay pixels identical.
+    for (let row = -4; row < 12; row += 1) {
+      for (let column = -4; column < 12; column += 1) {
+        const opacity = 0.6 * Math.max(0, 1 - Math.hypot(column - 3.5, row - 3.5) / 8);
+        if (!opacity) continue;
+        context.fillStyle = pickup.type === "speed"
+          ? `rgba(255,230,0,${opacity})` : `rgba(255,45,117,${opacity})`;
+        context.fillRect(x + column, y + row, 1, 1);
+      }
+    }
+    for (let row = 0; row < rows.length; row += 1) {
+      for (let column = 0; column < rows[row].length; column += 1) {
+        const color = palette[rows[row][column]];
+        if (!color) continue;
+        context.fillStyle = color;
+        context.fillRect(x + column, y + row, 1, 1);
+      }
     }
   }
+  context.restore();
 }
 
 export function drawMovingPlatforms(context, platforms) {
@@ -265,9 +277,9 @@ export function drawPreview(context, image, option) {
   paintTerrain(layerContext, option);
   paintTerrainShadow(layerContext, option);
   context.drawImage(layer, 0, 0);
+  drawMovingPlatforms(context, option.movingPlatforms || []);
   drawEnemies(context, option.enemies || [], option.biome);
   drawPickups(context, option.pickups || []);
-  drawMovingPlatforms(context, option.movingPlatforms || []);
   drawGate(context, option.flag);
   const player = { ...option.spawn, width: 6 };
   context.fillStyle = "#247f7b";

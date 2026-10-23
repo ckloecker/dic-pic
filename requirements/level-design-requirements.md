@@ -193,6 +193,10 @@ Touching a mushroom pickup shall reverse the horizontal and vertical directional
 Pickup effects shall not stack.
 Collecting another pickup of an active effect type shall refresh that effect's five-second duration.
 Pickups shall be visible, collectible, and outside the required no-drill route clearance.
+Pickup artwork and collection bounds shall measure eight by eight terrain cells, twice the former width and height.
+Speed pickups shall be recognizable bright-yellow lightning bolts, and reversal pickups shall be vivid magenta/red mushrooms with contrasting spots, stems, and dark outlines.
+Both types shall have a soft colored aura in previews and gameplay.
+The aura shall be decorative only: touching it shall neither collect an item nor block movement, and pickups themselves shall not be solid obstacles.
 Run reset shall restore collected pickups and clear active effects.
 
 ## REQ-LVL-19: Optional Moving Platforms

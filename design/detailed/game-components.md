@@ -98,11 +98,16 @@ Options retain their original mask, spawn, gate, biome, and layout.
 A SHA-256 digest of photo identity and serialized exact option geometry, pickups, and moving platforms identifies leaderboard scores.
 Reset clones the selected option rather than regenerating or resampling randomness.
 Each option contains one to three speed pickups and one to three control-reversal mushrooms outside the required route clearance.
+Pickup placement checks the full eight-by-eight-cell artwork and collection footprint against terrain, image bounds, and protected route cells.
+The shared pickup renderer draws an outlined bright-yellow lightning bolt or magenta/red spotted mushroom inside that footprint.
+A sixteen-by-sixteen-cell colored aura extends four cells beyond each side, using cell-aligned radial opacity falloff so previews and scaled gameplay match.
+The aura is renderer-only and never enters collection checks or the solid terrain mask; pickup bodies are collectible but not solid.
 It also contains two collidable twelve-by-three-cell platforms at eighteen terrain cells per second on bounded horizontal clear paths outside the required route.
 Platform path bounds extend into adjacent cells only after those cells become clear, including when drilling removes blocking terrain.
 Pickup effects last five seconds, never stack, and refresh when another pickup of the same type is collected.
 Run reset restores pickup availability and initial moving-platform positions.
 Thumbnails and gameplay draw the same pickups and initial platform positions.
+Both draw moving platforms before enemies and pickups so decorative auras composite consistently.
 REQ-LVL-13 adds a shared background-effects renderer between the photo and terrain.
 Desert sunshine/rays, underwater bubbles/light shafts, and jungle sunbeams/leaf motes use deterministic positions with time-varying cosmetic motion.
 The reduced-motion preference freezes this layer without changing gameplay or the timer.

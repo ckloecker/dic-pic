@@ -1,5 +1,18 @@
 # Requirements traceability
 
+## Enlarged, high-contrast pickup revision
+
+The user approved eight-by-eight-cell pickup artwork and collection bounds, vivid yellow lightning bolts and magenta/red mushrooms, dark outlines, and soft decorative auras.
+[REQ-LVL-18](../requirements/level-design-requirements.md#req-lvl-18-temporary-pickups) records the revised appearance and explicitly excludes aura contact from collection and collision.
+The [detailed design](../design/detailed/game-components.md) allocates full-footprint placement to [level generation](../src/level.js) and cell-aligned aura and silhouette drawing to the [shared scene renderer](../src/scene.js).
+The existing [collection code](../src/run.js) uses the enlarged generated bounds without treating either pickups or auras as solid terrain.
+The [unit checks](../tests/unit/unit-tests.js) first failed on four-cell generation and the old artwork, then reproduced the preview/gameplay gradient-rasterization mismatch before the cell-aligned falloff fix.
+Coverage verifies eight-cell placement clear of terrain and the protected route, collection in the enlarged outer half, aura-only contact without collection or blocking, vivid fills and dark outlines, bounded translucent auras, canvas-state restoration, and pixel parity at preview and gameplay scales.
+The [browser terrain-opacity check](../tests/system/browser-tests.js) samples outside decorative pickup auras, while existing preview/live comparisons and full reference-route replays remain active.
+Verification on 2026-10-23 passed **96/96 unit checks** and **23/23 browser system checks** in Chromium on a fresh local origin to avoid stale imported application modules.
+A visual check confirmed the larger silhouettes and soft auras against biome-colored backgrounds.
+[ST-31](../tests/system/system-tests.md) and [AT-36](../tests/acceptance/test-cases.md) describe the integrated appearance, collection, and unchanged five-second effect behavior.
+
 ## Distance-based jump grace revision
 
 The user approved distance-based grace: three terrain cells after losing floor contact and four cells after losing wall contact.
