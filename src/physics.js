@@ -203,6 +203,7 @@ export function stepPlayer(player, input, terrain, dt) {
     throw new RangeError("Frame duration must be a non-negative number.");
   }
   const elapsed = Math.min(dt, 0.05);
+  const speedMultiplier = Number.isFinite(input.speedMultiplier) ? Math.max(1, input.speedMultiplier) : 1;
   const direction = Math.sign(input.move || 0);
   const vertical = Math.sign(input.moveY || 0);
   if (direction) player.facing = direction;
@@ -262,8 +263,8 @@ export function stepPlayer(player, input, terrain, dt) {
 
   if (player.climbing) {
     const magnitude = Math.max(1, Math.hypot(direction, vertical));
-    player.vx = direction * CLIMB_SPEED / magnitude;
-    player.vy = vertical * CLIMB_SPEED / magnitude;
+    player.vx = direction * CLIMB_SPEED * speedMultiplier / magnitude;
+    player.vy = vertical * CLIMB_SPEED * speedMultiplier / magnitude;
     const beforeX = player.x;
     const beforeY = player.y;
     if (!moveAxis(player, player.vx * elapsed, "x", terrain)) player.vx = 0;
@@ -294,7 +295,7 @@ export function stepPlayer(player, input, terrain, dt) {
     player.facing = direction;
   }
 
-  const speed = player.excavating ? CLIMB_SPEED : NORMAL_SPEED;
+  const speed = (player.excavating ? CLIMB_SPEED : NORMAL_SPEED) * speedMultiplier;
   const horizontalDistance = (wallLaunch || direction) * speed * elapsed;
   player.vx = (wallLaunch || direction) * speed;
   if (wallLaunch) player.facing = wallLaunch;

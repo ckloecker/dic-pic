@@ -134,6 +134,36 @@ function addElements(terrain, random) {
     .map(({ x, y, cell }) => ({ x, y, anchor: cell }));
 }
 
+function addPickups(terrain, random) {
+  const { width, height, solid } = terrain;
+  const candidates = [];
+  for (let y = 1; y <= height - 5; y += 1) {
+    for (let x = 1; x <= width - 5; x += 1) {
+      let clear = true;
+      for (let row = y; row < y + 4 && clear; row += 1) {
+        for (let column = x; column < x + 4; column += 1) {
+          const cell = row * width + column;
+          if (solid[cell] || terrain.route.protected[cell]) {
+            clear = false;
+            break;
+          }
+        }
+      }
+      if (clear) candidates.push({ x, y, width: 4, height: 4, type: "speed" });
+    }
+  }
+  if (!candidates.length) {
+    throw new RouteGenerationError("no room for a speed pickup outside the required route");
+  }
+  const count = Math.min(candidates.length, 1 + Math.floor(random() * 3));
+  const pickups = [];
+  for (let index = 0; index < count; index += 1) {
+    const candidateIndex = Math.floor(random() * candidates.length);
+    pickups.push(candidates.splice(candidateIndex, 1)[0]);
+  }
+  terrain.pickups = pickups;
+}
+
 export function createSuggestions(rgba, width, height, random = Math.random) {
   const biomes = shuffle(Object.keys(BIOMES), random);
   const layouts = shuffle(Object.keys(LAYOUTS), random);
@@ -147,6 +177,7 @@ export function createSuggestions(rgba, width, height, random = Math.random) {
         const source = connectPhotoEdges(attempt ? strongestTerrainEdges({ ...photo, layout }) : photo);
         terrain = planReferenceRoute({ ...source, biome, layout }, random, attempt > 0);
         addElements(terrain, random);
+        addPickups(terrain, random);
         if (!terrain.elements.length) {
           throw new RouteGenerationError("no room for collidable biome scenery outside the main corridor");
         }
@@ -173,9 +204,10 @@ export function createSuggestions(rgba, width, height, random = Math.random) {
 
 export function levelIdentity(level) {
   return JSON.stringify({
-    revision: 6, width: level.width, height: level.height,
+    revision: 7, width: level.width, height: level.height,
     biome: level.biome, layout: level.layout, spawn: level.spawn, flag: level.flag,
     solid: Array.from(level.solid), details: Array.from(level.details), accents: level.accents,
+    pickups: level.pickups,
     enemies: level.enemies,
     connectors: level.connectors,
     platforms: level.platforms,

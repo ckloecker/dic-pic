@@ -1,11 +1,11 @@
 import { cancelCharge, DRILL_REACH, stepPlayer } from "./physics.js";
-import { createRun, reachedFlag, resetRun } from "./run.js";
+import { applyRunEffects, collectPickups, createRun, reachedFlag, resetRun, stepRunEffects } from "./run.js";
 import { enemyContact, stepEnemies } from "./enemies.js";
 import { getLeaderboard, isValidPlayerName, leaderboardRows, submitScore } from "./leaderboard.js";
 import { NoUsableEdgeError } from "./terrain.js";
 import { BIOMES, LAYOUTS, createSuggestions, levelIdentity } from "./level.js";
 import { drawBiomeEffects, drawEnemies, drawGate, drawHeadwear, drawPhoto, drawPreview,
-  paintTerrain, paintTerrainShadow } from "./scene.js";
+  drawPickups, paintTerrain, paintTerrainShadow } from "./scene.js";
 
 const WORLD_WIDTH = 320;
 const WORLD_HEIGHT = 180;
@@ -388,6 +388,7 @@ function drawScene() {
   clearTerrainLayer();
   context.drawImage(state.terrainLayer, 0, 0);
   drawEnemies(context, state.enemies, state.terrain.biome);
+  drawPickups(context, state.pickups, state.effectSeconds);
   drawExit();
   drawPlayer();
   drawDrill();
@@ -483,15 +484,17 @@ function gameFrame(timestamp) {
   const dt = Math.max(0, Math.min(frameDelta, 0.05));
   state.previousFrame = timestamp;
   state.effectSeconds += dt;
+  stepRunEffects(state, dt);
   const beforeX = state.player.x;
   const beforeY = state.player.y;
   const previousPlayer = { ...state.player };
   const wasClimbing = state.player.climbing;
-  const input = getInput();
+  const input = applyRunEffects(getInput(), state);
   if (state.startedAt === null && input.jumpPressed && state.player.grounded) {
     state.startedAt = timestamp;
   }
   stepPlayer(state.player, input, state.terrain, dt);
+  collectPickups(state);
   state.jumpPressed = false;
   state.jumpReleased = false;
 

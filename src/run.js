@@ -189,6 +189,45 @@ export function resetRun(run) {
   return run;
 }
 
+export function collectPickups(run) {
+  let collected = false;
+  const remaining = [];
+  for (const pickup of run.pickups) {
+    const overlaps = run.player.x < pickup.x + pickup.width
+      && run.player.x + run.player.width > pickup.x
+      && run.player.y < pickup.y + pickup.height
+      && run.player.y + run.player.height > pickup.y;
+    if (!overlaps) {
+      remaining.push(pickup);
+      continue;
+    }
+    if (pickup.type !== "speed") {
+      remaining.push(pickup);
+      continue;
+    }
+    run.effects.speedSeconds = 5;
+    collected = true;
+  }
+  if (collected) {
+    run.pickups = remaining;
+    run.terrain.pickups = remaining;
+  }
+  return collected;
+}
+
+export function stepRunEffects(run, dt) {
+  if (!Number.isFinite(dt) || dt < 0) {
+    throw new RangeError("Effect duration must be a non-negative number.");
+  }
+  run.effects.speedSeconds = Math.max(0, run.effects.speedSeconds - dt);
+}
+
+export function applyRunEffects(input, run) {
+  const adjusted = { ...input };
+  if (run.effects.speedSeconds > 0) adjusted.speedMultiplier = 2;
+  return adjusted;
+}
+
 export function respawnPlayer(run) {
   run.player = createPlayer(run.spawn.x, run.spawn.y);
 }

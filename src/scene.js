@@ -53,6 +53,20 @@ export function drawEnemies(context, enemies, biome) {
   context.restore();
 }
 
+export function drawPickups(context, pickups, seconds = 0) {
+  for (const pickup of pickups) {
+    if (pickup.type !== "speed") continue;
+    const { x, y } = pickup;
+    context.fillStyle = "#38251f";
+    context.fillRect(x, y + 1, 4, 2);
+    context.fillStyle = "#ffd166";
+    context.fillRect(x + 1, y, 2, 1);
+    context.fillRect(x + 1, y + 1, 1, 1);
+    context.fillRect(x + 2, y + 2, 1, 1);
+    context.fillRect(x + 1, y + 3, 2, 1);
+  }
+}
+
 export function drawBiomeEffects(context, width, height, biome, seconds = 0, reducedMotion = false) {
   const time = reducedMotion ? 0 : seconds;
   context.save();
@@ -199,6 +213,7 @@ export function drawPreview(context, image, option) {
   paintTerrainShadow(layerContext, option);
   context.drawImage(layer, 0, 0);
   drawEnemies(context, option.enemies || [], option.biome);
+  drawPickups(context, option.pickups || []);
   drawGate(context, option.flag);
   const player = { ...option.spawn, width: 6 };
   context.fillStyle = "#247f7b";
