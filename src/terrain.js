@@ -3,9 +3,9 @@ import { closeAndFill } from "./morphology.js";
 export const TERRAIN_OPACITY = 0.8;
 
 export function strongestTerrainEdges(terrain) {
-  const score = (feature) => feature.strength
-    * (terrain.layout === "balanced" || feature.vertical === (terrain.layout === "vertical") ? 1.5 : 1);
-  const selected = [...terrain.features].sort((first, second) => score(second) - score(first)).slice(0, 12);
+  const selected = [...terrain.features]
+    .sort((first, second) => second.strength - first.strength)
+    .slice(0, 12);
   const photoSolid = new Uint8Array(terrain.solid.length);
   const edgeDirections = new Uint8Array(terrain.solid.length);
   for (const feature of selected) for (const { along, across } of feature.points) {

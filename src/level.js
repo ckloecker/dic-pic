@@ -288,7 +288,8 @@ export function createSuggestions(rgba, width, height, random = createRandom()) 
     let verification;
     for (let attempt = 0; attempt < 4; attempt += 1) {
       try {
-        const source = connectPhotoEdges(attempt ? strongestTerrainEdges({ ...photo, layout }) : photo);
+        const prioritized = attempt === 3 ? photo : strongestTerrainEdges({ ...photo, layout });
+        const source = connectPhotoEdges(prioritized);
         terrain = planReferenceRoute({ ...source, biome, layout }, random, attempt > 0);
         addElements(terrain, random);
         addPickups(terrain, random);
