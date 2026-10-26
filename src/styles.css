@@ -375,6 +375,15 @@ button,
   text-transform: uppercase;
 }
 
+.setup-controls h4 {
+  margin: 14px 0 0;
+  color: var(--mint);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .setup-controls p {
   margin: 7px 0 0;
   color: #dbe4df;
@@ -480,11 +489,12 @@ button,
 }
 
 .controls-panel {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   min-height: 64px;
   align-items: center;
-  justify-content: space-between;
-  gap: 20px;
+  column-gap: 20px;
+  row-gap: 12px;
   margin-top: 16px;
   padding: 18px 20px;
   border: 1px solid #66827b;
@@ -493,12 +503,26 @@ button,
 }
 
 .control-instructions {
+  grid-column: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 11px;
   color: #bdc9c3;
   font-size: 10px;
+}
+
+.level-element-guide {
+  grid-column: 1;
+  padding-top: 10px;
+  border-top: 1px solid rgb(233 245 236 / 14%);
+  color: #bdc9c3;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.level-element-guide p {
+  margin: 3px 0;
 }
 
 .control-title {
@@ -536,6 +560,8 @@ kbd {
 }
 
 .touch-controls {
+  grid-column: 2;
+  grid-row: 1 / span 2;
   touch-action: none;
 }
 
@@ -866,18 +892,25 @@ kbd {
   }
 
   .controls-panel {
-    align-items: flex-start;
-    flex-direction: column;
+    grid-template-columns: 1fr;
+    align-items: start;
     gap: 12px;
     padding: 16px;
   }
 
   .control-instructions {
+    grid-column: 1;
     gap: 8px;
     line-height: 1.7;
   }
 
+  .level-element-guide {
+    grid-column: 1;
+  }
+
   .touch-controls {
+    grid-column: 1;
+    grid-row: auto;
     width: 100%;
     justify-content: space-between;
   }

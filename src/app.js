@@ -519,7 +519,7 @@ function gameFrame(timestamp) {
     state.startedAt = timestamp;
   }
   if (state.startedAt !== null) {
-    state.elapsedMs = timestamp - state.startedAt;
+    state.elapsedMs = timestamp - state.startedAt + state.elapsedOffsetMs;
     timerValue.textContent = elapsedLabel(state.elapsedMs);
     stepEnemies(state.enemies, dt);
     stepMovingPlatforms(state, dt);

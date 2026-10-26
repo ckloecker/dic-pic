@@ -146,7 +146,7 @@ function addPickups(terrain, random) {
   const { width, height, solid } = terrain;
   const size = 8;
   const pickups = [];
-  for (const type of ["speed", "reverse"]) {
+  for (const type of ["speed", "mushroom"]) {
     const candidates = [];
     for (let y = 1; y <= height - size - 1; y += 1) {
       for (let x = 1; x <= width - size - 1; x += 1) {

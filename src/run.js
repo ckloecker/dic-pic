@@ -175,10 +175,11 @@ export function createRun(original) {
     pickups: (original.pickups || []).map((pickup) => ({ ...pickup })),
     checkpoints: (original.checkpoints || []).map((checkpoint) => ({ ...checkpoint, reached: false })),
     movingPlatforms: (original.movingPlatforms || []).map((platform) => ({ ...platform })),
-    effects: { speedSeconds: 0, reverseSeconds: 0 },
+    effects: { speedSeconds: 0 },
     wallPuff: null,
     startedAt: null,
     elapsedMs: 0,
+    elapsedOffsetMs: 0,
   };
   terrain.pickups = run.pickups;
   terrain.movingPlatforms = run.movingPlatforms;
@@ -200,17 +201,21 @@ export function collectPickups(run) {
       && run.player.x + run.player.width > pickup.x
       && run.player.y < pickup.y + pickup.height
       && run.player.y + run.player.height > pickup.y;
-    if (!overlaps || collectedTypes.has(pickup.type)) {
+    if (!overlaps || (pickup.type !== "mushroom" && collectedTypes.has(pickup.type))) {
       remaining.push(pickup);
       continue;
     }
-    const effect = pickup.type === "speed" ? "speedSeconds"
-      : pickup.type === "reverse" ? "reverseSeconds" : null;
-    if (!effect) {
+    if (pickup.type === "mushroom") {
+      run.elapsedMs -= 2000;
+      run.elapsedOffsetMs -= 2000;
+      collected = true;
+      continue;
+    }
+    if (pickup.type !== "speed") {
       remaining.push(pickup);
       continue;
     }
-    run.effects[effect] = 5;
+    run.effects.speedSeconds = 5;
     collectedTypes.add(pickup.type);
     collected = true;
   }
@@ -242,7 +247,6 @@ export function stepRunEffects(run, dt) {
     throw new RangeError("Effect duration must be a non-negative number.");
   }
   run.effects.speedSeconds = Math.max(0, run.effects.speedSeconds - dt);
-  run.effects.reverseSeconds = Math.max(0, run.effects.reverseSeconds - dt);
 }
 
 export const WALL_PUFF_SECONDS = 0.3;
@@ -260,10 +264,6 @@ export function stepWallJumpPuff(run, dt) {
 
 export function applyRunEffects(input, run) {
   const adjusted = { ...input };
-  if (run.effects.reverseSeconds > 0) {
-    adjusted.move = -Math.sign(adjusted.move || 0);
-    adjusted.moveY = -Math.sign(adjusted.moveY || 0);
-  }
   if (run.effects.speedSeconds > 0) adjusted.speedMultiplier = 2;
   return adjusted;
 }

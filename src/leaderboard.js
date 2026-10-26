@@ -31,7 +31,6 @@ function readScores(levelId, storage) {
     !score
     || !isValidPlayerName(score.name)
     || !Number.isFinite(score.timeMs)
-    || score.timeMs < 0
     || (score.id !== undefined && (typeof score.id !== "string" || !score.id))
   ))) {
     throw new Error("Saved leaderboard data has an invalid format.");
@@ -51,8 +50,8 @@ export function submitScore(levelId, entry, storage = globalThis.localStorage) {
   if (!isValidPlayerName(name)) {
     throw new TypeError("Player name must contain only letters and spaces (maximum 32 characters).");
   }
-  if (!Number.isFinite(timeMs) || timeMs < 0) {
-    throw new TypeError("Score time must be a non-negative number.");
+  if (!Number.isFinite(timeMs)) {
+    throw new TypeError("Score time must be a finite number.");
   }
 
   const scores = readScores(levelId, storage);

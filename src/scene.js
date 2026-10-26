@@ -62,7 +62,7 @@ export function drawPickups(context, pickups, seconds = 0) {
     if (pickup.type === "speed") {
       rows = ["....DDD.", "...DYYD.", "..DYYD..", ".DYYYYDD",
         "DDDYYYD.", "..DYYD..", "..DYD...", "..DD...."];
-    } else if (pickup.type === "reverse") {
+    } else if (pickup.type === "mushroom") {
       rows = ["..DDDD..", ".DRRRRD.", "DRWWRRRD", "DRWRRWRD",
         "DRRRWWRD", ".DDDDDD.", "..DSSD..", "..DDDD.."];
     } else {
