@@ -5,7 +5,7 @@ import { enemyContact, resolveCombat, stepEnemies, stepProjectiles } from "./ene
 import { completionFeedback, getLeaderboard, isValidPlayerName, leaderboardRows, submitScore } from "./leaderboard.js";
 import { NoUsableEdgeError } from "./terrain.js";
 import { BIOMES, LAYOUTS, createSuggestions, levelIdentity } from "./level.js";
-import { drawBiomeEffects, drawCheckpoints, drawEnemies, drawGate, drawGun, drawHeadwear, drawPhoto, drawPreview,
+import { cameraView, drawBiomeEffects, drawCheckpoints, drawEnemies, drawGate, drawGun, drawHeadwear, drawPhoto, drawPreview,
   drawMovingPlatforms, drawPickups, drawProjectiles, drawSwimmingPlayer, drawWallJumpPuff,
   paintTerrain, paintTerrainShadow } from "./scene.js";
 
@@ -58,6 +58,7 @@ const state = {
   jumpPressed: false,
   jumpReleased: false,
   shootPressed: false,
+  mobileCameraFollowing: false,
   frameHandle: null,
   previousFrame: 0,
   terrainLayer: null,
@@ -66,7 +67,6 @@ const state = {
 };
 
 context.imageSmoothingEnabled = false;
-context.setTransform(3, 0, 0, 3, 0, 0);
 
 function setMessage(element, text, isError = false) {
   element.textContent = text;
@@ -232,6 +232,7 @@ function setUpGame() {
   Object.assign(state, run);
   state.previousFrame = 0;
   state.effectSeconds = 0;
+  state.mobileCameraFollowing = false;
   state.terrainLayer = document.createElement("canvas");
   state.terrainLayer.width = WORLD_WIDTH;
   state.terrainLayer.height = WORLD_HEIGHT;
@@ -425,7 +426,11 @@ function drawDrill() {
 }
 
 function drawScene() {
-  context.clearRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+  context.setTransform(1, 0, 0, 1, 0, 0);
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  const view = cameraView(state.player, WORLD_WIDTH, WORLD_HEIGHT, state.mobileCameraFollowing);
+  const scale = 3 * view.scale;
+  context.setTransform(scale, 0, 0, scale, -view.x * scale, -view.y * scale);
   drawPhoto(context, state.image, WORLD_WIDTH, WORLD_HEIGHT);
   const effectContext = state.effectLayer.getContext("2d");
   effectContext.clearRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
@@ -583,6 +588,9 @@ function gameFrame(timestamp) {
     || shoot;
   if (state.startedAt === null && movedByPlayer) {
     state.startedAt = timestamp;
+  }
+  if (movedByPlayer && (window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0)) {
+    state.mobileCameraFollowing = true;
   }
   if (state.startedAt !== null) {
     state.elapsedMs = timestamp - state.startedAt + state.elapsedOffsetMs;

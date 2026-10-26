@@ -8,6 +8,22 @@ export function drawPhoto(context, image, width, height) {
   context.restore();
 }
 
+export function cameraView(player, width, height, following) {
+  if (![width, height].every(Number.isFinite) || width <= 0 || height <= 0) {
+    throw new RangeError("Camera dimensions must be positive.");
+  }
+  const scale = following ? 1.5 : 1;
+  const viewWidth = width / scale;
+  const viewHeight = height / scale;
+  const centeredX = player.x + player.width / 2 - viewWidth / 2;
+  const centeredY = player.y + player.height / 2 - viewHeight / 2;
+  return {
+    x: Math.max(0, Math.min(width - viewWidth, centeredX)),
+    y: Math.max(0, Math.min(height - viewHeight, centeredY)),
+    scale,
+  };
+}
+
 export function paintTerrainShadow(context, terrain) {
   const { width, height, solid } = terrain;
   context.save();
