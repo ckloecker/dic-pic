@@ -1,12 +1,13 @@
 import { cancelJumpInput, DRILL_REACH, stepPlayer } from "./physics.js";
 import { applyRunEffects, collectCheckpoints, collectPickups, createRun, reachedFlag, resetRun, stepMovingPlatforms,
   stepRunEffects, stepWallJumpPuff } from "./run.js";
-import { enemyContact, stepEnemies } from "./enemies.js";
+import { enemyContact, resolveCombat, stepEnemies, stepProjectiles } from "./enemies.js";
 import { completionFeedback, getLeaderboard, isValidPlayerName, leaderboardRows, submitScore } from "./leaderboard.js";
 import { NoUsableEdgeError } from "./terrain.js";
 import { BIOMES, LAYOUTS, createSuggestions, levelIdentity } from "./level.js";
-import { drawBiomeEffects, drawCheckpoints, drawEnemies, drawGate, drawHeadwear, drawPhoto, drawPreview,
-  drawMovingPlatforms, drawPickups, drawSwimmingPlayer, drawWallJumpPuff, paintTerrain, paintTerrainShadow } from "./scene.js";
+import { drawBiomeEffects, drawCheckpoints, drawEnemies, drawGate, drawGun, drawHeadwear, drawPhoto, drawPreview,
+  drawMovingPlatforms, drawPickups, drawProjectiles, drawSwimmingPlayer, drawWallJumpPuff,
+  paintTerrain, paintTerrainShadow } from "./scene.js";
 
 const WORLD_WIDTH = 320;
 const WORLD_HEIGHT = 180;
@@ -53,6 +54,7 @@ const state = {
   running: false,
   jumpPressed: false,
   jumpReleased: false,
+  shootPressed: false,
   frameHandle: null,
   previousFrame: 0,
   terrainLayer: null,
@@ -200,6 +202,7 @@ function setUpGame() {
   document.querySelector("#level-title").textContent = `${BIOMES[terrain.biome].label} finish, ${state.playerName}`;
   timerValue.textContent = "0.00";
   document.querySelector("#contact-message").textContent = "";
+  document.querySelector("#shoot-button").hidden = !state.combatEnabled;
   drawScene();
   state.frameHandle = requestAnimationFrame(gameFrame);
 }
@@ -392,6 +395,8 @@ function drawScene() {
   drawCheckpoints(context, state.checkpoints);
   drawExit();
   drawPlayer();
+  if (state.combatEnabled) drawGun(context, state.player);
+  drawProjectiles(context, state.projectiles);
   drawDrill();
   drawWallJumpPuff(context, state.wallPuff, WORLD_WIDTH);
 }
@@ -409,6 +414,7 @@ function getInput() {
     jumpReleased: state.jumpReleased,
     jumpHeld: jumpIsHeld(),
     drill: keyState.has("Enter") || touchState.drill,
+    shootPressed: state.shootPressed,
   };
 }
 
@@ -501,6 +507,19 @@ function gameFrame(timestamp) {
   const previousPlayer = { ...state.player };
   const wasClimbing = state.player.climbing;
   const input = applyRunEffects(getInput(), state);
+  const shoot = state.combatEnabled && input.shootPressed && state.shootCooldownSeconds <= 0;
+  if (shoot) {
+    const direction = state.player.facing < 0 ? -1 : 1;
+    state.projectiles.push({
+      x: direction > 0 ? state.player.x + state.player.width : state.player.x - 3,
+      y: state.player.y + state.player.height / 2,
+      direction,
+      speed: 240,
+      width: 3,
+      height: 2,
+    });
+    state.shootCooldownSeconds = 0.5;
+  }
   if (state.startedAt === null && input.jumpPressed && state.player.grounded) {
     state.startedAt = timestamp;
   }
@@ -510,11 +529,13 @@ function gameFrame(timestamp) {
   collectCheckpoints(state);
   state.jumpPressed = false;
   state.jumpReleased = false;
+  state.shootPressed = false;
 
   const movedByPlayer = (input.move !== 0 && state.player.x !== beforeX)
     || state.player.jumpKind !== null
     || (wasClimbing && input.jumpPressed)
-    || (input.moveY !== 0 && state.player.y !== beforeY);
+    || (input.moveY !== 0 && state.player.y !== beforeY)
+    || shoot;
   if (state.startedAt === null && movedByPlayer) {
     state.startedAt = timestamp;
   }
@@ -525,6 +546,10 @@ function gameFrame(timestamp) {
     stepMovingPlatforms(state, dt);
   }
 
+  if (state.combatEnabled) {
+    resolveCombat(state.player, previousPlayer, state.enemies);
+    stepProjectiles(state.projectiles, state.enemies, dt, WORLD_WIDTH);
+  }
   const hitEnemy = enemyContact(state.player, state.enemies, previousPlayer);
   const hitBottom = state.player.y + state.player.height >= WORLD_HEIGHT - 1e-9;
   if (hitEnemy || hitBottom) {
@@ -555,6 +580,7 @@ function clearControls() {
   touchState.jump = false;
   state.jumpPressed = false;
   state.jumpReleased = false;
+  state.shootPressed = false;
   if (state.player) {
     cancelJumpInput(state.player);
     state.player.upHeld = false;
@@ -609,12 +635,15 @@ window.addEventListener("keydown", (event) => {
   if (gameScreen.hidden || (event.target instanceof Element && feedbackPanel.contains(event.target))) {
     return;
   }
-  if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " ", "Enter"].includes(event.key)) {
+  if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " ", "Enter"].includes(event.key)
+    || event.key.toLowerCase() === "x") {
     event.preventDefault();
   }
   const heldBefore = jumpIsHeld();
+  const shootingBefore = keyState.has("x") || keyState.has("X");
   keyState.add(event.key);
   if (!heldBefore && jumpIsHeld()) state.jumpPressed = true;
+  if (!shootingBefore && (event.key === "x" || event.key === "X")) state.shootPressed = true;
 });
 
 window.addEventListener("keyup", (event) => {
@@ -681,6 +710,10 @@ bindHoldButton(
   () => { touchState.drill = true; },
   () => { touchState.drill = false; },
 );
+document.querySelector("#shoot-button").addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  state.shootPressed = true;
+});
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {

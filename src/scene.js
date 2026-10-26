@@ -53,6 +53,31 @@ export function drawEnemies(context, enemies, biome) {
   context.restore();
 }
 
+export function drawGun(context, player) {
+  const facing = player.facing < 0 ? -1 : 1;
+  const x = facing > 0 ? player.x + player.width - 2 : player.x - 3;
+  const y = player.y + 4;
+  context.save();
+  context.fillStyle = "#19232b";
+  context.fillRect(x, y, 5, 2);
+  context.fillRect(x + 2, y + 2, 2, 3);
+  context.fillStyle = "#ff9a65";
+  context.fillRect(x + 1, y, 3, 1);
+  context.fillRect(x + 2, y + 2, 1, 2);
+  context.restore();
+}
+
+export function drawProjectiles(context, projectiles) {
+  context.save();
+  for (const projectile of projectiles) {
+    context.fillStyle = "#fff3a6";
+    context.fillRect(projectile.x, projectile.y, projectile.width ?? 3, projectile.height ?? 2);
+    context.fillStyle = "#ff9a65";
+    context.fillRect(projectile.x - projectile.direction, projectile.y, 1, projectile.height ?? 2);
+  }
+  context.restore();
+}
+
 export function drawPickups(context, pickups, seconds = 0) {
   context.save();
   const palette = { D: "#211526", Y: "#ffe600", R: "#ff2d75", W: "#ffffff", S: "#fff1cc" };

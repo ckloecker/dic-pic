@@ -601,6 +601,15 @@ kbd {
   font-size: 9px;
 }
 
+.shoot-button {
+  min-width: 64px;
+  color: #16262d;
+  background: #ffe18c;
+  border-color: #ffe18c;
+  font-size: 9px;
+  font-weight: 700;
+}
+
 .complete-panel {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(310px, 440px);

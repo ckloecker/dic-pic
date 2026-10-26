@@ -322,6 +322,7 @@ export function createSuggestions(rgba, width, height, random = createRandom()) 
           throw new RouteGenerationError("no room for collidable biome scenery outside the main corridor");
         }
         terrain.enemies = createEnemies(terrain, random);
+        terrain.combatEnabled = terrain.enemies.combatEnabled;
         verification = verifyReferenceRoute(terrain);
         if (verification.valid) break;
         terrain = null;
@@ -344,13 +345,14 @@ export function createSuggestions(rgba, width, height, random = createRandom()) 
 
 export function levelIdentity(level) {
   return JSON.stringify({
-    revision: 9, width: level.width, height: level.height,
+    revision: 10, width: level.width, height: level.height,
     biome: level.biome, layout: level.layout, spawn: level.spawn, flag: level.flag,
     solid: Array.from(level.solid), undrillable: Array.from(level.undrillable || []),
     details: Array.from(level.details), accents: level.accents,
     pickups: level.pickups,
     movingPlatforms: level.movingPlatforms,
     enemies: level.enemies,
+    combatEnabled: level.combatEnabled,
     checkpoints: level.checkpoints,
     connectors: level.connectors,
     platforms: level.platforms,

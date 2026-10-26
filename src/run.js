@@ -165,13 +165,18 @@ export function createRun(original) {
   const placement = original.spawn && original.flag ? original : placeRun(terrain);
   const spawn = { ...placement.spawn };
   const flag = { ...placement.flag };
+  const enemies = (original.enemies || []).map((enemy) => ({ ...enemy }));
+  enemies.combatEnabled = Boolean(original.combatEnabled || original.enemies?.combatEnabled);
   const run = {
     originalTerrain: original,
     terrain,
     spawn,
     flag,
     player: createPlayer(spawn.x, spawn.y),
-    enemies: (original.enemies || []).map((enemy) => ({ ...enemy })),
+    enemies,
+    combatEnabled: enemies.combatEnabled,
+    projectiles: [],
+    shootCooldownSeconds: 0,
     pickups: (original.pickups || []).map((pickup) => ({ ...pickup })),
     checkpoints: (original.checkpoints || []).map((checkpoint) => ({ ...checkpoint, reached: false })),
     movingPlatforms: (original.movingPlatforms || []).map((platform) => ({ ...platform })),
@@ -247,6 +252,7 @@ export function stepRunEffects(run, dt) {
     throw new RangeError("Effect duration must be a non-negative number.");
   }
   run.effects.speedSeconds = Math.max(0, run.effects.speedSeconds - dt);
+  run.shootCooldownSeconds = Math.max(0, run.shootCooldownSeconds - dt);
 }
 
 export const WALL_PUFF_SECONDS = 0.3;

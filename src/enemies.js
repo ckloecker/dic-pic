@@ -1,4 +1,7 @@
 export class EnemyPlacementError extends Error {}
+const MIN_ENEMIES = 3;
+const MIN_COMBAT_ENEMIES = 4;
+const MAX_COMBAT_ENEMIES = 8;
 
 function overlaps(a, b, margin = 0) {
   return a.x < b.x + b.width + margin && a.x + a.width > b.x - margin
@@ -31,15 +34,23 @@ export function createEnemies(level, random = Math.random) {
       }
       if (clear && left < 0) left = x;
       if (!clear && left >= 0) {
-        if (x - left >= 24 + enemyWidth) {
-          candidates.push({ x: left, y, width: x - left, height: enemyHeight });
+        let start = left;
+        const end = x;
+        while (end - start >= 24 + enemyWidth) {
+          const corridorWidth = Math.min(44, end - start);
+          candidates.push({ x: start, y, width: corridorWidth, height: enemyHeight });
+          start += corridorWidth + 13;
         }
         left = -1;
       }
     }
   }
+  const combatEnabled = random() >= 0.8;
+  const requested = combatEnabled
+    ? MIN_COMBAT_ENEMIES + Math.floor(random() * (MAX_COMBAT_ENEMIES - MIN_COMBAT_ENEMIES + 1))
+    : MIN_ENEMIES;
   const enemies = [];
-  while (enemies.length < 2 && candidates.length) {
+  while (enemies.length < requested && candidates.length) {
     const index = Math.floor(random() * candidates.length);
     const corridor = candidates.splice(index, 1)[0];
     const right = corridor.x + Math.min(corridor.width, 58) - enemyWidth;
@@ -68,9 +79,10 @@ export function createEnemies(level, random = Math.random) {
     enemies.push({ ...path[0], left: corridor.x, right, top, bottom, path,
       width: enemyWidth, height: enemyHeight, speed: 18, phase: 0 });
   }
-  if (enemies.length !== 2) {
-    throw new EnemyPlacementError("Two safe flying patrol corridors could not fit. Please choose another photo.");
+  if (enemies.length < (combatEnabled ? MIN_COMBAT_ENEMIES : MIN_ENEMIES)) {
+    throw new EnemyPlacementError("The required safe flying patrol corridors could not fit. Please choose another photo.");
   }
+  enemies.combatEnabled = combatEnabled;
   return enemies;
 }
 
@@ -146,6 +158,59 @@ export function enemyContact(player, enemies, previous = player) {
       : [{ from: enemy.x, to: enemy.x, start: 0, end: 1 }];
     return sweeps.some((sweep) => sweptContact(player, previous, enemy, sweep));
   });
+}
+
+export function resolveCombat(player, previous, enemies) {
+  let defeated = 0;
+  const remaining = [];
+  for (const enemy of enemies) {
+    const crossedFromAbove = previous.y + previous.height <= enemy.y + 1
+      && player.y + player.height >= enemy.y
+      && player.vy > 0;
+    const overlapsHorizontally = player.x < enemy.x + enemy.width
+      && player.x + player.width > enemy.x;
+    if (crossedFromAbove && overlapsHorizontally) {
+      player.vy = -150;
+      player.grounded = false;
+      player.climbing = false;
+      defeated += 1;
+    } else {
+      remaining.push(enemy);
+    }
+  }
+  enemies.splice(0, enemies.length, ...remaining);
+  return { defeated };
+}
+
+export function stepProjectiles(projectiles, enemies, dt, worldWidth) {
+  if (!Number.isFinite(dt) || dt < 0) throw new RangeError("Projectile frame duration must be non-negative.");
+  if (!Number.isFinite(worldWidth) || worldWidth < 1) throw new RangeError("World width must be positive.");
+  let defeated = 0;
+  const remaining = [];
+  for (const projectile of projectiles) {
+    const { x, y, direction, speed } = projectile;
+    if (![x, y, direction, speed].every(Number.isFinite) || Math.abs(direction) !== 1 || speed <= 0) {
+      throw new TypeError("Projectiles require finite coordinates, a direction, and positive speed.");
+    }
+    const width = projectile.width ?? 3;
+    const height = projectile.height ?? 2;
+    const nextX = x + direction * speed * dt;
+    const left = Math.min(x, nextX);
+    const right = Math.max(x, nextX) + width;
+    const enemyIndex = enemies.findIndex((enemy) => (
+      left < enemy.x + enemy.width && right > enemy.x
+      && y < enemy.y + enemy.height && y + height > enemy.y
+    ));
+    if (enemyIndex >= 0) {
+      enemies.splice(enemyIndex, 1);
+      defeated += 1;
+      continue;
+    }
+    projectile.x = nextX;
+    if (nextX + width > 0 && nextX < worldWidth) remaining.push(projectile);
+  }
+  projectiles.splice(0, projectiles.length, ...remaining);
+  return { defeated };
 }
 
 function sweptContact(player, previous, enemy, sweep) {
