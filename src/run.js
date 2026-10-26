@@ -173,6 +173,7 @@ export function createRun(original) {
     player: createPlayer(spawn.x, spawn.y),
     enemies: (original.enemies || []).map((enemy) => ({ ...enemy })),
     pickups: (original.pickups || []).map((pickup) => ({ ...pickup })),
+    checkpoints: (original.checkpoints || []).map((checkpoint) => ({ ...checkpoint, reached: false })),
     movingPlatforms: (original.movingPlatforms || []).map((platform) => ({ ...platform })),
     effects: { speedSeconds: 0, reverseSeconds: 0 },
     wallPuff: null,
@@ -216,6 +217,22 @@ export function collectPickups(run) {
   if (collected) {
     run.pickups = remaining;
     run.terrain.pickups = remaining;
+  }
+  return collected;
+}
+
+export function collectCheckpoints(run) {
+  let collected = false;
+  for (const checkpoint of run.checkpoints) {
+    if (checkpoint.reached) continue;
+    const overlaps = run.player.x < checkpoint.x + checkpoint.width
+      && run.player.x + run.player.width > checkpoint.x
+      && run.player.y < checkpoint.y + checkpoint.height
+      && run.player.y + run.player.height > checkpoint.y;
+    if (overlaps) {
+      checkpoint.reached = true;
+      collected = true;
+    }
   }
   return collected;
 }
@@ -302,8 +319,9 @@ export function respawnPlayer(run) {
   run.player = createPlayer(run.spawn.x, run.spawn.y);
 }
 
-export function reachedFlag({ player, flag }) {
-  return player.x + player.width > flag.x
+export function reachedFlag({ player, flag, checkpoints = [] }) {
+  return checkpoints.every((checkpoint) => checkpoint.reached)
+    && player.x + player.width > flag.x
     && player.x < flag.x + flag.width
     && player.y + player.height > flag.y - flag.height
     && player.y < flag.y;

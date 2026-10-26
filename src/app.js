@@ -1,11 +1,11 @@
 import { cancelJumpInput, DRILL_REACH, stepPlayer } from "./physics.js";
-import { applyRunEffects, collectPickups, createRun, reachedFlag, resetRun, stepMovingPlatforms,
+import { applyRunEffects, collectCheckpoints, collectPickups, createRun, reachedFlag, resetRun, stepMovingPlatforms,
   stepRunEffects, stepWallJumpPuff } from "./run.js";
 import { enemyContact, stepEnemies } from "./enemies.js";
 import { getLeaderboard, isValidPlayerName, leaderboardRows, submitScore } from "./leaderboard.js";
 import { NoUsableEdgeError } from "./terrain.js";
 import { BIOMES, LAYOUTS, createSuggestions, levelIdentity } from "./level.js";
-import { drawBiomeEffects, drawEnemies, drawGate, drawHeadwear, drawPhoto, drawPreview,
+import { drawBiomeEffects, drawCheckpoints, drawEnemies, drawGate, drawHeadwear, drawPhoto, drawPreview,
   drawMovingPlatforms, drawPickups, drawSwimmingPlayer, drawWallJumpPuff, paintTerrain, paintTerrainShadow } from "./scene.js";
 
 const WORLD_WIDTH = 320;
@@ -299,7 +299,11 @@ function clearTerrainLayer() {
 }
 
 function drawExit() {
-  drawGate(context, state.flag);
+  const open = state.checkpoints.every((checkpoint) => checkpoint.reached);
+  drawGate(context, state.flag, open);
+  canvas.setAttribute("aria-label", open
+    ? "Game scene. Reach the checkered finish gate."
+    : "Game scene. The finish gate is closed until every glowing checkpoint is reached.");
 }
 
 function drawPlayer() {
@@ -385,6 +389,7 @@ function drawScene() {
   drawMovingPlatforms(context, state.movingPlatforms);
   drawEnemies(context, state.enemies, state.terrain.biome);
   drawPickups(context, state.pickups, state.effectSeconds);
+  drawCheckpoints(context, state.checkpoints);
   drawExit();
   drawPlayer();
   drawDrill();
@@ -500,6 +505,7 @@ function gameFrame(timestamp) {
   stepPlayer(state.player, input, state.terrain, dt);
   stepWallJumpPuff(state, dt);
   collectPickups(state);
+  collectCheckpoints(state);
   state.jumpPressed = false;
   state.jumpReleased = false;
 

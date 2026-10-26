@@ -221,7 +221,23 @@ export function paintTerrain(context, terrain) {
   context.restore();
 }
 
-export function drawGate(context, flag) {
+export function drawCheckpoints(context, checkpoints) {
+  context.save();
+  for (const checkpoint of checkpoints) {
+    context.shadowColor = "#7cf5ff";
+    context.shadowBlur = 8;
+    context.globalAlpha = checkpoint.reached ? 0.4 : 1;
+    context.fillStyle = "#173945";
+    context.fillRect(checkpoint.x - 1, checkpoint.y - 1, checkpoint.width + 2, checkpoint.height + 2);
+    context.fillStyle = "#7cf5ff";
+    context.fillRect(checkpoint.x, checkpoint.y, checkpoint.width, checkpoint.height);
+    context.fillStyle = "#ffffff";
+    context.fillRect(checkpoint.x + 2, checkpoint.y + 1, 1, checkpoint.height - 2);
+  }
+  context.restore();
+}
+
+export function drawGate(context, flag, open = true) {
   const { x, y, width, height } = flag;
   const top = y - height;
   context.fillStyle = "#14212b";
@@ -236,6 +252,13 @@ export function drawGate(context, flag) {
       context.fillStyle = (row + column) % 2 ? "#14212b" : "#ffffff";
       context.fillRect(x + column * 2, top + 1 + row * 2, 2, 2);
     }
+  }
+  if (!open) {
+    context.fillStyle = "#bd3c4b";
+    context.fillRect(x + 4, top + 10, width - 8, 6);
+    context.strokeStyle = "#ffe18c";
+    context.lineWidth = 1;
+    context.strokeRect(x + 5, top + 8, width - 10, 4);
   }
 }
 
@@ -297,7 +320,8 @@ export function drawPreview(context, image, option) {
   drawMovingPlatforms(context, option.movingPlatforms || []);
   drawEnemies(context, option.enemies || [], option.biome);
   drawPickups(context, option.pickups || []);
-  drawGate(context, option.flag);
+  drawCheckpoints(context, option.checkpoints || []);
+  drawGate(context, option.flag, !(option.checkpoints || []).length);
   const player = { ...option.spawn, width: 6 };
   context.fillStyle = "#247f7b";
   context.fillRect(player.x + 1, player.y + 3, 4, 4);

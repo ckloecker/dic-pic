@@ -278,6 +278,28 @@ function addUndrillableTerrain(terrain, random) {
   terrain.undrillable = undrillable;
 }
 
+function addCheckpoints(terrain, random) {
+  const points = terrain.route.points;
+  const count = Math.min(Math.floor(random() * 3), Math.max(0, points.length - 6));
+  const candidates = shuffle(points.slice(3, -3).map((point, index) => ({
+    index: index + 3,
+    x: Math.round(point.x + 1),
+    y: Math.round(point.y + 1),
+    width: 5,
+    height: 6,
+  })), random);
+  const checkpoints = [];
+  for (const candidate of candidates) {
+    if (checkpoints.length >= count) break;
+    if (checkpoints.some((checkpoint) => Math.hypot(
+      candidate.x - checkpoint.x, candidate.y - checkpoint.y,
+    ) < 15)) continue;
+    checkpoints.push(candidate);
+  }
+  checkpoints.sort((first, second) => first.index - second.index);
+  terrain.checkpoints = checkpoints.map(({ index, ...checkpoint }) => checkpoint);
+}
+
 export function createSuggestions(rgba, width, height, random = createRandom()) {
   const biomes = shuffle(Object.keys(BIOMES), random);
   const layouts = shuffle(Object.keys(LAYOUTS), random);
@@ -291,6 +313,7 @@ export function createSuggestions(rgba, width, height, random = createRandom()) 
         const prioritized = attempt === 3 ? photo : strongestTerrainEdges({ ...photo, layout });
         const source = connectPhotoEdges(prioritized);
         terrain = planReferenceRoute({ ...source, biome, layout }, random, attempt > 0);
+        addCheckpoints(terrain, random);
         addElements(terrain, random);
         addPickups(terrain, random);
         addMovingPlatforms(terrain, random);
@@ -328,6 +351,7 @@ export function levelIdentity(level) {
     pickups: level.pickups,
     movingPlatforms: level.movingPlatforms,
     enemies: level.enemies,
+    checkpoints: level.checkpoints,
     connectors: level.connectors,
     platforms: level.platforms,
   });
