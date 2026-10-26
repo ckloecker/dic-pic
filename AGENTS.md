@@ -19,7 +19,7 @@
   implement every issue with at least one 👍 reaction.
 - Re-check reaction counts before acting, and honor any explicit user exclusion
   even if the current issue has a 👍 reaction.
-- Treat comments beginning with `@AI` as specific implementation instructions
+- Treat comments beginning with `[AI]` as specific implementation instructions
   for their issue.
 - When eligible issues conflict, implement only the issue with the higher 👍
   count and close the conflicting issue with fewer 👍 reactions as a duplicate.

@@ -145,25 +145,29 @@ Image analysis shall continue to use the unfiltered original photo.
 Status: Approved.
 
 Levels shall include predictable flying patrol enemies with wasp artwork in jungle, hovering scarab artwork in desert, and jellyfish artwork underwater.
+Each level option shall contain either three avoidable patrols or four to eight combat patrols, selected reproducibly rather than increasing linearly across options.
+Combat options shall visibly identify their combat mode with a cartoonish gun in the player's hands.
 Patrols shall follow the reproducibly randomized flying paths in REQ-LVL-21 within checked, obstacle-free areas without chasing, becoming stuck, leaving the image, or passing through terrain.
 The entire swept enemy footprint shall avoid the spawn and finish with a safety margin.
 Thumbnails shall show the initial enemies and selecting or resetting an option shall retain its exact patrol definitions.
 Enemy motion shall begin with the race timer, leaving the initial previewed scene and idle player safe.
-Enemy contact shall reset the entire run as specified in REQ-SYS-10/14.
+Contact with a living patrol shall reset the entire run as specified in REQ-SYS-10/14.
+Patrols defeated by a stomp or permitted projectile shall no longer collide with the player.
 
 ## REQ-LVL-16: Photo-Aligned Reference Route
 
 Status: Approved.
 
-Generation shall plan a contiguous traversal corridor aligned to detected photo edges before finalizing filling, scenery, and enemies.
-Every offered option shall include a reference route verified with the actual movement and enemy simulation without drilling.
+Generation shall plan a contiguous traversal corridor aligned to the strongest detected photo edges before finalizing filling, scenery, checkpoints, and enemies.
+Every offered option shall include a reference route verified with the actual movement and enemy simulation without drilling and shall visit every generated checkpoint before reaching the exit.
 Four to six traversal sections and twenty to forty seconds are quality targets rather than rejection conditions.
 The route shall provide varied traversal and breathing room rather than a straight walk or continuous digging.
 Idle waiting shall not be used to inflate the reference duration.
 The corridor shall normally provide at least twelve cells of width and eighteen cells of height, with larger clearance for jump arcs.
 Generation shall progressively repair traversal by connecting useful edges, adding longer bridges, and adding horizontal stepping platforms where natural supports are missing.
 There is no universal eighteen-cell limit or two-ended attachment requirement for supplemental platforms.
-Photo geometry shall remain the primary guide, with additions serving specific route or safe-area needs rather than an arbitrary occupancy quota.
+The strongest usable photo edges shall take priority over secondary playability preferences, while safe endpoints, clear movement space, and a validated no-drill route remain mandatory.
+Additions shall serve specific route or safe-area needs rather than an arbitrary occupancy quota.
 Connectors and supplemental platforms shall be visible, collidable, drillable, previewed, and restored on reset.
 No unsupported freestanding vertical walls shall be invented to achieve verticality.
 Filling and scenery shall not obstruct the validated route, and enemy timing shall be included in final route verification.
@@ -178,8 +182,8 @@ Validation shall cover diverse sparse, busy, horizontal, and vertical images and
 Status: Approved.
 
 The random number engine used for level generation shall be initialized with the same fixed seed and initial state at the start of every generation of three suggestions.
-All random choices affecting the suggestions shall use this reproducible random sequence, including biome/layout assignment, route and endpoint selection, scenery, moving platforms, pickups, and initial enemy patrol definitions.
-The same input image shall always produce the very same three suggestions in the same order, with identical previews, terrain, biome/layout labels, start and finish positions, scenery, moving platforms, pickups, and initial enemy patrol definitions.
+All random choices affecting the suggestions shall use this reproducible random sequence, including biome/layout assignment, route and endpoint selection, scenery, checkpoints, non-drillable terrain, moving platforms, pickups, enemy mode, and initial patrol definitions.
+The same input image shall always produce the very same three suggestions in the same order, with identical previews, terrain, biome/layout labels, start and finish positions, checkpoints, scenery, moving platforms, pickups, enemy mode, and initial patrol definitions.
 Results shall not depend on previous generations, player name, current time, or browser session.
 Random biome, layout, and edge selection under REQ-LVL-07/10/11 shall remain pseudorandom within this reproducible sequence rather than being resampled unpredictably.
 
@@ -188,16 +192,34 @@ Random biome, layout, and edge selection under REQ-LVL-07/10/11 shall remain pse
 Status: Approved.
 
 Each generated level option shall contain one to three speed pickups and one to three mushroom pickups.
-Touching a speed pickup shall double the character's movement speed for five seconds.
-Touching a mushroom pickup shall reverse the horizontal and vertical directional controls, including directional drilling, for five seconds.
-Pickup effects shall not stack.
-Collecting another pickup of an active effect type shall refresh that effect's five-second duration.
+Touching a speed pickup shall double the character's movement speed in every locomotion mode for five seconds.
+Touching a mushroom pickup shall subtract two seconds from the player's elapsed time, and repeated mushrooms may produce negative times.
+Speed effects shall not stack, and collecting another speed pickup while the effect is active shall refresh its five-second duration.
+Each collected mushroom shall apply its own two-second time subtraction.
 Pickups shall be visible, collectible, and outside the required no-drill route clearance.
 Pickup artwork and collection bounds shall measure eight by eight terrain cells, twice the former width and height.
-Speed pickups shall be recognizable bright-yellow lightning bolts, and reversal pickups shall be vivid magenta/red mushrooms with contrasting spots, stems, and dark outlines.
+Speed pickups shall be recognizable bright-yellow lightning bolts, and mushrooms shall be vivid magenta/red with contrasting spots, stems, and dark outlines.
 Both types shall have a soft colored aura in previews and gameplay.
 The aura shall be decorative only: touching it shall neither collect an item nor block movement, and pickups themselves shall not be solid obstacles.
 Run reset shall restore collected pickups and clear active effects.
+
+## REQ-LVL-22: Non-Drillable Terrain
+
+Generated levels shall contain clearly visible stretches of non-drillable ground that look distinct from drillable terrain.
+Each option shall retain a drillable path to the exit, even when that path is longer than the most direct route.
+Non-drillable terrain shall not support or protect the finish gate or obstruct the validated no-drill route.
+
+## REQ-LVL-23: Required Checkpoints
+
+Each generated level option shall contain zero to two reproducibly placed intermediate checkpoints on the validated route.
+Every checkpoint shall be clearly visible with a glow and must be touched before the exit opens.
+The closed exit shall have a clear visual indicator, and touching all checkpoints shall visibly open it.
+Reset shall restore all checkpoint markers and close the exit.
+
+## REQ-LVL-24: Strongest-Edge Priority
+
+Terrain selection shall prioritize the strongest visible photo edges over weaker edges that better fit a preferred layout orientation.
+Strongest-edge selection shall remain subject to the safe-start, no-drill completion, clear-route, and in-bounds requirements in REQ-LVL-07/16.
 
 ## REQ-LVL-19: Optional Moving Platforms
 

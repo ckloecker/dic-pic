@@ -63,6 +63,16 @@ function playerTop() {
   }
   throw new Error("Player was not rendered.");
 }
+function readCookie(name) {
+  const entry = app.document.cookie.split("; ").find((cookie) => cookie.startsWith(`${name}=`));
+  return entry ? decodeURIComponent(entry.slice(name.length + 1)) : null;
+}
+function writeCookie(name, value) {
+  app.document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; SameSite=Lax; Max-Age=31536000`;
+}
+function deleteCookie(name) {
+  app.document.cookie = `${name}=; Path=/; SameSite=Lax; Max-Age=0`;
+}
 
 test("REQ-CHR-03: favicon loads before setup and depicts the player character", async () => {
   const link = find('link[rel="icon"]');
@@ -136,6 +146,57 @@ test("REQ-SYS-16: controls are prominently presented during play", async () => {
     && parseFloat(panelStyle.paddingTop) >= 16, "controls panel lacks a prominent background or spacing");
   assert(parseFloat(titleStyle.fontSize) >= 14 && Number(titleStyle.fontWeight) >= 700,
     "controls heading is not visually prominent");
+});
+
+test("REQ-SYS-18: gameplay exposes an accessible full-screen control", async () => {
+  const button = find("#fullscreen-button");
+  assert(button && button.type === "button", "full-screen control is missing");
+  assert(button.getAttribute("aria-label") === "Enter full screen", "full-screen control has no clear accessible label");
+  assert(find("#game-canvas").closest(".game-frame"), "full-screen control has no gameplay frame to target");
+});
+
+test("REQ-SYS-18: full-screen control enters and exits the gameplay frame", async () => {
+  const button = find("#fullscreen-button");
+  const frame = find(".game-frame");
+  const cookieDescriptor = Object.getOwnPropertyDescriptor(app.document, "fullscreenElement")
+    || Object.getOwnPropertyDescriptor(app.Document.prototype, "fullscreenElement");
+  let fullscreenElement = null;
+  const originalRequest = frame.requestFullscreen;
+  const originalExit = app.document.exitFullscreen;
+  Object.defineProperty(app.document, "fullscreenElement", {
+    configurable: true,
+    get: () => fullscreenElement,
+  });
+  frame.requestFullscreen = async () => {
+    fullscreenElement = frame;
+    app.document.dispatchEvent(new app.Event("fullscreenchange"));
+  };
+  app.document.exitFullscreen = async () => {
+    fullscreenElement = null;
+    app.document.dispatchEvent(new app.Event("fullscreenchange"));
+  };
+  try {
+    button.click();
+    await until(() => button.getAttribute("aria-label") === "Exit full screen");
+    assert(fullscreenElement === frame, "full-screen control targeted the wrong element");
+    button.click();
+    await until(() => button.getAttribute("aria-label") === "Enter full screen");
+  } finally {
+    if (originalRequest) frame.requestFullscreen = originalRequest;
+    else delete frame.requestFullscreen;
+    if (originalExit) app.document.exitFullscreen = originalExit;
+    else delete app.document.exitFullscreen;
+    delete app.document.fullscreenElement;
+    if (cookieDescriptor && Object.hasOwn(cookieDescriptor, "value")) {
+      Object.defineProperty(app.document, "fullscreenElement", cookieDescriptor);
+    }
+  }
+});
+
+test("REQ-SYS-06: leaderboard cookie use is disclosed to players", async () => {
+  const disclosure = find("#cookie-disclosure");
+  assert(disclosure && /leaderboard/i.test(disclosure.textContent)
+    && /cookie/i.test(disclosure.textContent), "leaderboard cookie disclosure is missing");
 });
 
 test("REQ-SYS-12: every category and severity opens a private-data-free GitHub form", async () => {
@@ -299,6 +360,35 @@ test("REQ-LVL-06/08: render photo-aligned platform interiors at 80% opacity", as
     }
   }
 });
+
+test("REQ-SYS-19: mobile camera starts in overview and follows after movement", async () => {
+  const originalMatchMedia = app.matchMedia;
+  const finePointerMatchMedia = (query) => query === "(pointer: coarse)"
+    ? { matches: false } : originalMatchMedia(query);
+  const cameraMatchMedia = (query) => query === "(pointer: coarse)"
+    ? { matches: true } : originalMatchMedia(query);
+  const transform = () => find("#game-canvas").getContext("2d").getTransform();
+  try {
+    find("#reset-button").click();
+    app.matchMedia = finePointerMatchMedia;
+    key("keydown", "d");
+    await delay(50);
+    key("keyup", "d");
+    assert(transform().a === 3, "fine-pointer device followed just because touch input is available");
+
+    app.matchMedia = cameraMatchMedia;
+    find("#reset-button").click();
+    assert(transform().a === 3 && transform().e === 0, "mobile camera did not start in overview");
+    key("keydown", "d");
+    await until(() => transform().a === 4.5);
+    key("keyup", "d");
+    find("#reset-button").click();
+    assert(transform().a === 3 && transform().e === 0, "run reset did not restore the overview");
+  } finally {
+    app.matchMedia = originalMatchMedia;
+  }
+});
+
 test("REQ-MOV-01/10: W and up climb without drilling or jumping", async () => {
   for (const value of ["w", "ArrowUp"]) {
     find("#reset-button").click();
@@ -316,7 +406,7 @@ test("REQ-MOV-01/10: W and up climb without drilling or jumping", async () => {
 });
 test("REQ-MOV-01/05 / REQ-SYS-04: Space jumps immediately, double jumps once, and shows no hold meter", async () => {
   find("#new-photo-button").click();
-  find('.level-choice[data-biome="desert"]').click();
+  find('.level-choice[data-biome="underwater"]').click();
   await delay(50);
   assert(!find("#charge-meter") && !find("#charge-label"), "obsolete hold meter is still present");
   const top = playerTop();
@@ -353,13 +443,13 @@ test("REQ-MOV-01/05 / REQ-SYS-04: Space jumps immediately, double jumps once, an
 });
 
 test("REQ-SYS-08: reset restores the scene, clears held input, and records no score", async () => {
-  const before = JSON.stringify(app.localStorage);
+  const before = app.document.cookie;
   key("keydown", "d");
   find("#reset-button").click();
   await delay(100);
   assert(find("#timer").textContent === "0.00", "reset did not clear timer or held input");
   assert(find("#level-title").textContent.includes("Test Runner"), "reset lost name");
-  assert(JSON.stringify(app.localStorage) === before, "abandoned run wrote a score");
+  assert(app.document.cookie === before, "abandoned run wrote a score");
   key("keyup", "d");
 });
 test("REQ-MOV-03/10: background holds after drill release, then jump press drops", async () => {
@@ -523,14 +613,18 @@ test("REQ-LVL-10/12 / REQ-CHR-04: all previews match play and reset retains each
       "HUD caption can obscure an edge finish gate");
     const live = canvasPixels();
     let different = 0;
+    const mismatchExamples = [];
     for (let y = 0; y < 180; y += 1) {
       for (let x = 0; x < 320; x += 1) {
         const a = (y * 320 + x) * 4;
-        const b = (y * 3 * 960 + x * 3) * 4;
-        if ([0, 1, 2].some((channel) => preview[a + channel] !== live[b + channel])) different += 1;
+        const b = ((y * 3 + 1) * 960 + x * 3 + 1) * 4;
+        if ([0, 1, 2].some((channel) => preview[a + channel] !== live[b + channel])) {
+          different += 1;
+          if (mismatchExamples.length < 12) mismatchExamples.push(`${x},${y}`);
+        }
       }
     }
-    assert(different <= 54, `preview/live geometry mismatch: ${different} cells`);
+    assert(different <= 54, `${biome} preview/live geometry mismatch: ${different} cells at ${mismatchExamples.join(" ")}`);
     find("#reset-button").click();
     const originalPixels = canvasPixels().slice();
     key("keydown", "Enter");
@@ -627,7 +721,7 @@ test("REQ-SYS-14: enemy contact fully resets the run and manual reset restores a
     }
     return sum;
   };
-  const savedScores = JSON.stringify(app.localStorage);
+  const savedScores = app.document.cookie;
   try {
     find('.level-choice[data-biome="underwater"]').click();
     await until(() => !find("#game-screen").hidden
@@ -681,7 +775,7 @@ test("REQ-SYS-14: enemy contact fully resets the run and manual reset restores a
     assert(find("#contact-message").textContent.includes("Enemy contact — run reset"),
       `enemy contact did not respawn at ${playerLeft()},${playerTop()} toward ${aimX},${aimY}`);
     assert(find("#complete-panel").hidden, "enemy contact completed or saved a run");
-    assert(JSON.stringify(app.localStorage) === savedScores, "enemy contact wrote a score");
+    assert(app.document.cookie === savedScores, "enemy contact wrote a score");
     assert(Number(find("#timer").textContent) === 0, "contact did not reset the timer");
     assert(tunnelSample() === undrilled, "contact did not restore excavated terrain");
     const returnedTop = playerTop();
@@ -712,6 +806,8 @@ test("REQ-SYS-12: keyboard feedback controls do not trigger gameplay", async () 
   const severity = find("#feedback-severity");
   const panel = find("#feedback-panel");
   assert(severity && panel, "feedback controls are missing during play");
+  let feedbackFocused = false;
+  panel.addEventListener("focusin", () => { feedbackFocused = true; }, { once: true });
   const nativeRequest = app.requestAnimationFrame;
   const nativeCancel = app.cancelAnimationFrame;
   let pending;
@@ -728,9 +824,13 @@ test("REQ-SYS-12: keyboard feedback controls do not trigger gameplay", async () 
     app.requestAnimationFrame = callback => { pending = callback; return 1; };
     find("#reset-button").click();
     tick();
+    find("#reset-button").focus();
+    assert(doc.activeElement === find("#reset-button"), "reset button did not receive focus");
     key("keydown", "ArrowRight");
     severity.focus();
     assert(doc.activeElement === severity, "severity selector is not focusable during play");
+    severity.dispatchEvent(new app.FocusEvent("focusin", { bubbles: true }));
+    assert(feedbackFocused, "feedback focus did not trigger its focus handler");
     const initial = canvasPixels().slice();
     for (const value of ["ArrowDown", "ArrowUp", " ", "Enter", "d"]) {
       const event = new app.KeyboardEvent("keydown", { key: value, bubbles: true, cancelable: true });
@@ -760,9 +860,10 @@ test("REQ-LVL-16 / REQ-SYS-06: no-drill replay finishes and outlines the exact r
   const photoId=await hash(bytes);
   const levelId=await hash(new TextEncoder().encode(`${photoId}:${levelApi.levelIdentity(option)}`));
   const storageKey=`dic-pic:leaderboard:${levelId}`;
-  const original=app.localStorage.getItem(storageKey);
+  const cookieName=storageKey.replace(/[^a-zA-Z0-9_-]/g,"_");
+  const original=readCookie(cookieName);
   const nativeRequest=app.requestAnimationFrame,nativeCancel=app.cancelAnimationFrame;
-  const nativeSet=app.Storage.prototype.setItem;
+  const cookieDescriptor=Object.getOwnPropertyDescriptor(app.Document.prototype,"cookie");
   let pending,timestamp=performance.now();
   app.requestAnimationFrame=callback=>{pending=callback;return 1;};
   app.cancelAnimationFrame=()=>{pending=null;};
@@ -798,15 +899,15 @@ test("REQ-LVL-16 / REQ-SYS-06: no-drill replay finishes and outlines the exact r
     return {rows,current:marked[0]};
   };
   try{
-    app.localStorage.removeItem(storageKey);
+    deleteCookie(cookieName);
     find('.level-choice[data-biome="jungle"]').click();
     await until(()=>!find("#game-screen").hidden);
     const initialScene=canvasPixels();
     const ranked=replay();
     assert(ranked.current.querySelector(".leaderboard-rank").textContent==="01","ranked attempt has no place");
-    const saved=JSON.parse(app.localStorage.getItem(storageKey));
+    const saved=JSON.parse(readCookie(cookieName));
     assert(saved.length===1&&saved[0].id,"ranked attempt was not persisted with an identity");
-    app.localStorage.setItem(storageKey,JSON.stringify(saved));
+    writeCookie(cookieName,JSON.stringify(saved));
     const secondPlayer=[...find("#next-player").options].find(option=>option.textContent==="Second Runner");
     assert(secondPlayer,"next-round selector omitted the second player");
     find("#next-player").value=secondPlayer.value;
@@ -816,33 +917,37 @@ test("REQ-LVL-16 / REQ-SYS-06: no-drill replay finishes and outlines the exact r
     assert(find("#timer").textContent==="0.00"&&canvasPixels().every((value,index)=>value===initialScene[index]),
       "second player did not receive the same reset course");
     replay();
-    const secondSaved=JSON.parse(app.localStorage.getItem(storageKey));
+    const secondSaved=JSON.parse(readCookie(cookieName));
     assert(secondSaved.length===2&&secondSaved[1].name==="Second Runner",
       "second player's completed round was not attributed to their name");
     find("#replay-button").click();
     const tied=replay();
     assert(tied.rows.length===3&&tied.current===tied.rows[2],"equal name/time highlighted the older attempt");
-    assert(JSON.parse(app.localStorage.getItem(storageKey))[0].id===saved[0].id,"ties lost their stable order");
+    assert(JSON.parse(readCookie(cookieName))[0].id===saved[0].id,"ties lost their stable order");
     const fast=Array.from({length:10},(_,index)=>({id:`browser-fast-${index}`,name:"Test Runner",timeMs:index+1}));
-    app.localStorage.setItem(storageKey,JSON.stringify(fast));
+    writeCookie(cookieName,JSON.stringify(fast));
     find("#replay-button").click();
     const slow=replay();
     assert(slow.rows.length===11&&slow.current===slow.rows[10]
       &&slow.current.querySelector(".leaderboard-rank").textContent==="","unranked attempt lacks its placeless footer");
-    assert(app.localStorage.getItem(storageKey)===JSON.stringify(fast),"unranked footer persisted an eleventh entry");
-    app.Storage.prototype.setItem=function(key,value){
-      if(key===storageKey)throw new app.DOMException("Test storage unavailable","QuotaExceededError");
-      return nativeSet.call(this,key,value);
-    };
+    assert(readCookie(cookieName)===JSON.stringify(fast),"unranked footer persisted an eleventh entry");
+    Object.defineProperty(app.document,"cookie",{
+      configurable:true,
+      get:()=>cookieDescriptor.get.call(app.document),
+      set:value=>{
+        if(value.startsWith(`${cookieName}=`))throw new app.DOMException("Test storage unavailable","QuotaExceededError");
+        cookieDescriptor.set.call(app.document,value);
+      },
+    });
     find("#replay-button").click();
     replay();
     assert(find("#score-message").textContent.includes("could not be saved"),"storage failure was hidden");
   }finally{
     find("#new-photo-button").click();
     app.requestAnimationFrame=nativeRequest;app.cancelAnimationFrame=nativeCancel;
-    app.Storage.prototype.setItem=nativeSet;
-    if(original===null)app.localStorage.removeItem(storageKey);
-    else app.localStorage.setItem(storageKey,original);
+    delete app.document.cookie;
+    if(original===null)deleteCookie(cookieName);
+    else writeCookie(cookieName,original);
   }
 });
 

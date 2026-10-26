@@ -84,6 +84,10 @@ REQ-LVL-17 requires a fresh random number engine initialized with the same fixed
 Biome/layout shuffles, route attempts and repairs, endpoint selection, scenery placement, pickup placement, platform placement, and initial enemy generation must consume that reproducible sequence rather than time-based or session-dependent randomness.
 Repeated generation of the same image must yield identical ordered options and initial previews, even after generating another image or starting a new browser session.
 Photo analysis and provisional closing/filling precede route planning; route clearance and optional fill removal precede biome scenery.
+Strongest photo-edge strength takes precedence over preferred layout orientation, subject to safe endpoints and the verified no-drill route.
+Each option marks some terrain as visibly non-drillable while preserving a drillable path to the exit and keeping the gate and validated route unobstructed.
+Each option places zero to two glowing checkpoints on its validated route; the gate stays visibly closed until all checkpoints are touched.
+Checkpoint progress, non-drillable cells, enemy mode, and combat permissions are retained in the exact selected option and restored on reset.
 Exterior flood fill distinguishes open background from enclosed photo-derived regions.
 Jungle trees use 27-to-45-cell silhouettes with trunks, roots, layered canopies, climbing plants, and hanging vines.
 Desert uses branching cacti, stratified rocks, and bone clusters.
@@ -97,14 +101,15 @@ Headwear stays within the original collision footprint in standing and climbing 
 Options retain their original mask, spawn, gate, biome, and layout.
 A SHA-256 digest of photo identity and serialized exact option geometry, pickups, and moving platforms identifies leaderboard scores.
 Reset clones the selected option rather than regenerating or resampling randomness.
-Each option contains one to three speed pickups and one to three control-reversal mushrooms outside the required route clearance.
+Each option contains one to three speed pickups and one to three time-penalty mushrooms outside the required route clearance.
 Pickup placement checks the full eight-by-eight-cell artwork and collection footprint against terrain, image bounds, and protected route cells.
 The shared pickup renderer draws an outlined bright-yellow lightning bolt or magenta/red spotted mushroom inside that footprint.
 A sixteen-by-sixteen-cell colored aura extends four cells beyond each side, using cell-aligned radial opacity falloff so previews and scaled gameplay match.
 The aura is renderer-only and never enters collection checks or the solid terrain mask; pickup bodies are collectible but not solid.
 It also contains two collidable twelve-by-three-cell platforms at eighteen terrain cells per second on bounded horizontal clear paths outside the required route.
 Platform path bounds extend into adjacent cells only after those cells become clear, including when drilling removes blocking terrain.
-Pickup effects last five seconds, never stack, and refresh when another pickup of the same type is collected.
+Speed pickups double movement in all locomotion modes for five seconds, never stack, and refresh on recollection.
+Each mushroom subtracts two seconds from run time, including allowing negative final times.
 Run reset restores pickup availability and initial moving-platform positions.
 Thumbnails and gameplay draw the same pickups and initial platform positions.
 Both draw moving platforms before enemies and pickups so decorative auras composite consistently.
@@ -128,7 +133,11 @@ Legacy standalone `placeRun` also retains alternative supported-edge placement f
 REQ-LVL-14 uses a shared photo renderer with 35% saturation and 55% brightness before cosmetic effects and terrain.
 Draw a one-cell dark four-neighbor terrain halo behind the unchanged terrain mask in previews and gameplay.
 Keep photo analysis unfiltered and preserve the current terrain alpha channels.
-REQ-LVL-15/21 uses two 10-by-6-cell enemies per option with seeded looping waypoint paths spanning at least 24 horizontal cells at 18 cells per second.
+REQ-LVL-15/21 uses either three avoidance-mode enemies or four to eight combat-mode enemies per option with seeded looping waypoint paths spanning at least 24 horizontal cells at 18 cells per second.
+Combat mode is enabled only for four-to-eight-enemy options and draws a cartoonish gun in the player's hands.
+Stomping a patrol from above defeats it and bounces the player upward.
+The X key or touch SHOOT button fires a straight projectile in the facing direction with unlimited ammunition and a 0.5-second cooldown; a hit defeats one patrol.
+Stomp and projectile resolution happen before living-enemy contact resets the run.
 Each flight varies in both axes inside a checked clear rectangle, including avoidance of moving-platform swept areas.
 Choose complete clear corridors outside the reference clearance, separated from each other and at least twelve cells from the spawn and gate.
 If two patrols cannot fit, reject the option with a clear generation message instead of adding overlapping or stuck enemies.
@@ -176,7 +185,7 @@ The horizontal drill excludes the first row below the footprint using an epsilon
 The collision footprint uses the same bottom-edge tolerance so floating-point boundary rounding cannot excavate support or falsely block horizontal travel.
 Vertical gravity substeps do not excavate for a purely horizontal drill direction, so falling collision probes cannot lower the tunnel floor before detecting it.
 The ceiling clamps the player's top
-to zero and stops upward velocity. The fixed camera never follows a jump.
+to zero and stops upward velocity. The camera remains fixed except for the touch-first mobile camera behavior under REQ-SYS-19.
 Normal movement speed is 80 cells/second.
 A fresh negative `moveY` edge enters persistent background climbing at 20 cells/second with normalized diagonals and no gravity.
 Player state retains the previous Up input, climbing mode, drill direction, and climbing animation phase.
@@ -194,11 +203,17 @@ For horizontal drilling, cells wholly below the player's feet shall remain solid
 The cutter runs before collision checks at each half-cell movement substep and while stationary.
 Probe the current cutter and its next-frame reach before excavation so rasterization cannot alternate normal and slow speeds at high frame rates.
 Active excavation limits horizontal normal-mode movement to twenty cells per second, while an empty cutter retains eighty.
-Excavation increments terrain version only when cells change and does not change gravity, jump velocity, or double-jump availability.
+Downward active excavation limits vertical movement to twenty cells per second instead of allowing gravity to accelerate drill descent.
+Drilling while airborne switches the player to background-climbing movement with gravity suspended while the drill remains active.
+Drilling ignores marked non-drillable terrain cells, and terrain rendering distinguishes those cells from drillable material.
+Excavation increments terrain version only when cells change and does not change double-jump availability.
 The renderer draws an oriented drill tip and alternates climbing hands and feet based on distance traveled.
 Air movement outside climbing and active excavation remains at normal speed.
-A speed pickup doubles horizontal movement for five seconds without changing jump height or stacking; a second pickup refreshes the timer.
-The mushroom effect reverses both directional axes, including drill aim, for five seconds; repeat collection refreshes its timer without stacking.
+A speed pickup doubles horizontal and vertical movement for five seconds without stacking; a second pickup refreshes the timer.
+A mushroom pickup subtracts two seconds from run time and does not reverse controls.
+Touching each glowing checkpoint records progress; the gate renders closed until every checkpoint is reached.
+Enemy stomps and permitted projectiles remove the contacted patrol, and a stomp also launches the player upward.
+The shooter uses X or touch SHOOT, fires straight in the facing direction, has unlimited ammunition, and observes a 0.5-second cooldown.
 Ground movement can step up small terrain edges; higher
 obstacles require a jump. Ground contact at any point below the player's
 footprint counts as support.
@@ -208,8 +223,14 @@ shape.
 W/up enters background climbing; W/S and up/down arrows control vertical climbing and drill aim.
 Space launches immediately and a second press in the air double jumps; W/up does not jump.
 Touch controls provide four directions, a jump button,
-and a dedicated held drill button.
-An active mushroom pickup reverses horizontal and vertical directional input before simulation.
+a dedicated held drill button, and a combat-only shoot button.
+An active speed pickup multiplies climbing and other player-controlled movement by two.
+Three-enemy options omit shooting controls; four-to-eight-enemy options show a cartoonish gun and expose X and touch SHOOT.
+REQ-SYS-19 keeps the full level in view on touch-first devices until player movement starts the timer, then follows the player at 1.5x zoom.
+The mobile camera clamps its viewport to the level bounds and does not modify world coordinates or physics.
+REQ-SYS-18 adds an accessible button that toggles browser full-screen mode for the gameplay frame.
+Full-screen API failures are surfaced through the status UI.
+REQ-SYS-16 places descriptions of functional pickups, enemies, checkpoints, and terrain below the controls explanation.
 
 There is no jump meter and no bar above the player.
 After each player step, `stepWallJumpPuff(run, dt)` ages any burst and starts `run.wallPuff` from a step whose `jumpKind` is wall, so wall-grace jumps are included and floor or double jumps are not.
@@ -257,11 +278,14 @@ storage)` reads the sorted local top ten. `submitScore(levelId, entry,
 storage)` validates, saves, sorts ascending by elapsed milliseconds, and
 retains at most ten entries.
 Keys are scoped by a SHA-256 digest of the image fingerprint and exact selected option.
+The default store serializes per-level score lists into browser cookies and discloses that persistence to players.
+Signed times are preserved so mushroom penalties may produce negative leaderboard entries.
 Storage errors are surfaced to the UI.
 New attempts receive a UUID, while existing entries without IDs remain readable.
 Stable sorting keeps existing equal-time attempts ahead of newer ties.
 `leaderboardRows` marks only the exact current attempt by ID and appends a transient unranked row if it is outside the stored top ten.
 The UI uses a two-pixel outline, a "Your run" label, and `aria-current`, with a blank rank for the footer.
+The completion panel chooses varied humorous feedback based on leaderboard placement when available.
 Storage failures still display and mark the unsaved current attempt.
 Completion retains the final animation-frame elapsed time rather than mixing animation timestamps with a separate clock read.
 

@@ -45,8 +45,10 @@ Excavated terrain shall remain removed for the current run, including terrain su
 While the drill is actively excavating intact terrain, normal horizontal movement shall be limited to background-climbing speed, twenty terrain cells per second.
 Holding the drill in already-open space shall retain normal eighty-cell-per-second horizontal movement.
 Background climbing shall remain twenty cells per second with normalized diagonals, including while drilling.
-Excavation shall not change gravity, double-jump availability, or vertical jump velocity, and shall not enable hovering outside background climbing.
+Excavation shall not change double-jump availability or vertical jump velocity, and shall not enable hovering outside background climbing.
 Movement limits shall hold across supported frame durations and repeated resets without duplicate animation loops.
+Drilling while airborne shall switch the player into background-climbing movement while the drill remains active.
+Downward drilling shall limit vertical travel to twenty terrain cells per second while actively excavating.
 
 ## REQ-MOV-04: Air Movement
 
@@ -76,7 +78,7 @@ The top boundary of the image shall act as a solid ceiling. The character
 shall remain inside that boundary; hitting it shall stop upward movement
 and allow the character to fall.
 An attached background climber shall instead remain gripping the wall under REQ-MOV-10.
-The camera shall remain fixed.
+The camera shall remain fixed except for the touch-first mobile follow behavior in REQ-SYS-19.
 
 ## REQ-MOV-07: Forgiving Surface Contact
 
@@ -124,3 +126,12 @@ After dropping, the restored double jump shall remain available for a fresh pres
 Held Up shall not automatically reattach after dropping; a new Up press shall be required.
 Climbing shall respect terrain collisions and the image boundaries unless the directional drill removes terrain.
 Climbing movement and immediate jumping shall count as elapsed race time.
+
+## REQ-MOV-11: Enemy Combat
+
+Jumping onto a flying patrol from above shall defeat that patrol and bounce the player upward.
+Combat level options with four to eight patrols shall allow shooting, while three-patrol options shall not.
+The player's hands shall visibly hold a cartoonish gun in combat options.
+Pressing X or the touch SHOOT control shall fire one straight projectile in the facing direction.
+Shooting shall have unlimited ammunition and a 0.5-second cooldown, and a projectile hit shall defeat one patrol.
+Enemy defeat and projectiles shall be cleared by run reset.

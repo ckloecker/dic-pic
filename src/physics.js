@@ -295,6 +295,7 @@ export function stepPlayer(player, input, terrain, dt) {
     const magnitude = Math.max(1, Math.hypot(direction, vertical));
     player.vx = direction * movementSpeed(CLIMB_SPEED) / magnitude;
     player.vy = vertical * movementSpeed(CLIMB_SPEED) / magnitude;
+    const animationDistance = Math.hypot(player.vx, player.vy) * elapsed;
     const beforeX = player.x;
     const beforeY = player.y;
     if (!moveAxis(player, player.vx * elapsed, "x", terrain)) player.vx = 0;
@@ -317,7 +318,8 @@ export function stepPlayer(player, input, terrain, dt) {
       player.climbing = false;
       player.grounded = true;
     }
-    player.climbPhase += Math.hypot(player.x - beforeX, player.y - beforeY) / 3;
+    const traveled = Math.hypot(player.x - beforeX, player.y - beforeY);
+    player.climbPhase += Math.max(traveled, animationDistance) / 3;
     player.airJumps = 1;
     return;
   }

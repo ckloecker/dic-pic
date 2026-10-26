@@ -124,22 +124,65 @@ test("REQ-LVL-18: pickup timers refresh without stacking and reset with the run"
   original.pickups = [
     { type: "speed", x: 10, y: 40, width: 4, height: 4 },
     { type: "speed", x: 10, y: 40, width: 4, height: 4 },
-    { type: "reverse", x: 10, y: 40, width: 4, height: 4 },
+    { type: "mushroom", x: 10, y: 40, width: 4, height: 4 },
   ];
   const run = runApi.createRun(original);
   run.player.x = 10;
   run.player.y = 40;
   runApi.collectPickups(run);
-  assert(run.effects.speedSeconds === 5 && run.effects.reverseSeconds === 5, "pickup did not activate a five-second effect");
+  assert(run.effects.speedSeconds === 5, "speed pickup did not activate a five-second effect");
   runApi.stepRunEffects(run, 2);
   runApi.collectPickups(run);
   assert(run.effects.speedSeconds === 5, "repeat pickup did not refresh its timer");
-  assert(runApi.applyRunEffects({ move: 1, moveY: -1, drill: true }, run).move === -1
-    && runApi.applyRunEffects({ move: 1, moveY: -1 }, run).moveY === 1,
-  "mushroom did not reverse all directional controls");
+  assert(run.elapsedMs === -2000, "mushroom did not subtract two seconds");
   const reset = runApi.createRun(original);
-  assert(reset.pickups.length === 3 && reset.effects.speedSeconds === 0 && reset.effects.reverseSeconds === 0,
-    "new run retained collected pickups or active effects");
+  assert(reset.pickups.length === 3 && reset.effects.speedSeconds === 0, "new run retained collected pickups or active effects");
+});
+
+test("REQ-LVL-18/REQ-SYS-06: mushrooms subtract two seconds and leaderboard accepts negative times", () => {
+  const terrain = flatTerrain(80, 70, 60);
+  terrain.pickups = [{ type: "mushroom", x: 10, y: 40, width: 8, height: 8 }];
+  const run = runApi.createRun(terrain);
+  run.player.x = 10;
+  run.player.y = 40;
+  run.elapsedMs = 500;
+  runApi.collectPickups(run);
+  assert(run.elapsedMs === -1500, `mushroom left ${run.elapsedMs} ms instead of -1500 ms`);
+  const storage = new Map();
+  const adapter = { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) };
+  const scores = leaderboardApi.submitScore("negative-time", { id: "mushroom-run", name: "Runner", timeMs: -1500 }, adapter);
+  assert(scores[0].timeMs === -1500, "negative mushroom-adjusted time was rejected");
+});
+
+test("REQ-SYS-06: leaderboard persistence uses browser cookies", () => {
+  assert(typeof leaderboardApi.createCookieStorage === "function", "cookie storage adapter is missing");
+  const cookies = new Map();
+  const document = {
+    get cookie() { return [...cookies].map(([name, value]) => `${name}=${value}`).join("; "); },
+    set cookie(value) {
+      const [pair, ...attributes] = value.split(";");
+      const separator = pair.indexOf("=");
+      const name = pair.slice(0, separator);
+      const content = pair.slice(separator + 1);
+      if (attributes.some(attribute => attribute.trim() === "Max-Age=0")) cookies.delete(name);
+      else cookies.set(name, content);
+    },
+  };
+  const storage = leaderboardApi.createCookieStorage(document);
+  storage.setItem("dic-pic:leaderboard:test", JSON.stringify([{ name: "Runner", timeMs: 1 }]));
+  assert(JSON.parse(storage.getItem("dic-pic:leaderboard:test"))[0].name === "Runner",
+    "cookie storage did not round-trip leaderboard data");
+  assert(leaderboardApi.createCookieStorage(document).getItem("dic-pic:leaderboard:test") !== null,
+    "leaderboard cookie did not persist across adapter instances");
+  storage.removeItem("dic-pic:leaderboard:test");
+  assert(storage.getItem("dic-pic:leaderboard:test") === null, "leaderboard cookie did not delete");
+});
+
+test("REQ-SYS-17: completion feedback varies by leaderboard placement", () => {
+  assert(typeof leaderboardApi.completionFeedback === "function", "completion feedback selector is missing");
+  const winner = leaderboardApi.completionFeedback(1, 10, () => 0);
+  const unranked = leaderboardApi.completionFeedback(null, 10, () => 0);
+  assert(winner && unranked && winner !== unranked, "completion message ignored leaderboard placement");
 });
 
 test("REQ-LVL-19: moving platforms reverse at clear path ends and extend after drilling", () => {
@@ -175,19 +218,19 @@ test("REQ-LVL-19: moving platforms reverse at clear path ends and extend after d
 });
 
 test("REQ-LVL-18: eight-cell items collect at their edges but their aura never collects or blocks", () => {
-  for (const type of ["speed", "reverse"]) {
+  for (const type of ["speed", "mushroom"]) {
     const terrain = flatTerrain(80, 70, 60);
     terrain.pickups = [{ type, x: 20, y: 30, width: 8, height: 8 }];
     const run = runApi.createRun(terrain);
     run.player.x = 28;
     run.player.y = 30;
     runApi.collectPickups(run);
-    assert(run.pickups.length === 1 && run.effects.speedSeconds === 0 && run.effects.reverseSeconds === 0,
+    assert(run.pickups.length === 1 && run.effects.speedSeconds === 0 && run.elapsedMs === 0,
       "touching only the aura collected an item");
     physicsApi.stepPlayer(run.player, { move: -1 }, run.terrain, 0.025);
     assert(run.player.x === 26, "pickup or aura blocked movement");
     runApi.collectPickups(run);
-    assert(run.pickups.length === 0 && run.effects[type === "speed" ? "speedSeconds" : "reverseSeconds"] === 5,
+    assert(run.pickups.length === 0 && (type === "speed" ? run.effects.speedSeconds === 5 : run.elapsedMs === -2000),
       "outer half of the enlarged item did not collect");
   }
 });
@@ -228,7 +271,18 @@ test("REQ-LVL-18: generated levels have one to three pickups of each type outsid
   let seed = 123;
   const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
   for (const option of levelApi.createSuggestions(pixels, width, height, random)) {
-    for (const type of ["speed", "reverse"]) {
+    assert(option.undrillable instanceof Uint8Array
+      && option.undrillable.some(Boolean), "generated level has no visibly protected terrain");
+    assert(option.undrillable.every((cell, index) => !cell || !option.route.clearance[index]),
+      "non-drillable terrain obstructed the required route");
+    assert(Array.isArray(option.checkpoints) && option.checkpoints.length <= 2,
+      "generated level did not contain zero to two checkpoints");
+    for (const checkpoint of option.checkpoints) {
+      assert(option.route.points.some(point => point.x + 6 > checkpoint.x && point.x < checkpoint.x + checkpoint.width
+        && point.y + 9 > checkpoint.y && point.y < checkpoint.y + checkpoint.height),
+      "checkpoint cannot be collected from the reference route");
+    }
+    for (const type of ["speed", "mushroom"]) {
       const pickups = option.pickups.filter((pickup) => pickup.type === type);
       assert(pickups.length >= 1 && pickups.length <= 3, `invalid ${type} pickup count`);
       for (const pickup of pickups) {
@@ -244,6 +298,56 @@ test("REQ-LVL-18: generated levels have one to three pickups of each type outsid
       }
     }
   }
+});
+
+test("REQ-LVL-23: checkpoints gate the exit and reset with the selected run", () => {
+  const original = flatTerrain(80, 70, 60);
+  original.checkpoints = [
+    { x: 20, y: 40, width: 6, height: 6 },
+    { x: 40, y: 40, width: 6, height: 6 },
+  ];
+  const run = runApi.createRun(original);
+  run.player.x = 70;
+  run.player.y = 40;
+  assert(!runApi.reachedFlag(run), "exit opened before checkpoints were reached");
+  run.player.x = 20;
+  runApi.collectCheckpoints(run);
+  assert(run.checkpoints[0].reached && !run.checkpoints[1].reached, "first checkpoint was not recorded independently");
+  run.player.x = 40;
+  runApi.collectCheckpoints(run);
+  run.player.x = 70;
+  assert(runApi.reachedFlag(run), "exit remained closed after every checkpoint");
+  runApi.resetRun(run);
+  assert(run.checkpoints.every(checkpoint => !checkpoint.reached), "checkpoint state survived run reset");
+});
+
+test("REQ-LVL-24: strongest photo edges outrank weaker orientation-matching edges", () => {
+  const features = Array.from({ length: 13 }, (_, index) => ({
+    vertical: index !== 0,
+    strength: index === 0 ? 101 : 100 - index,
+    points: [{ along: 5, across: 5 + index * 2 }],
+  }));
+  const result = terrainApi.strongestTerrainEdges({
+    width: 40, height: 30, layout: "vertical", solid: new Uint8Array(1200), features,
+  });
+  assert(result.photoSolid[5 * 40 + 5], "strongest visible edge was discarded for layout preference");
+});
+
+test("REQ-SYS-19: mobile camera stays overview until start and follows at 1.5x", () => {
+  assert(typeof sceneApi.cameraView === "function", "mobile camera view calculation is missing");
+  const player = { x: 150, y: 80, width: 6, height: 9 };
+  const overview = sceneApi.cameraView(player, 320, 180, false);
+  const following = sceneApi.cameraView(player, 320, 180, true);
+  assert(overview.scale === 1 && overview.x === 0 && overview.y === 0,
+    "camera zoomed before player movement");
+  assert(following.scale === 1.5 && Math.abs((following.x + 320 / following.scale / 2)
+    - (player.x + player.width / 2)) < 1e-9, "camera did not follow the player at 1.5x");
+  const leftEdge = sceneApi.cameraView({ x: 0, y: 0, width: 6, height: 9 }, 320, 180, true);
+  const rightEdge = sceneApi.cameraView({ x: 314, y: 171, width: 6, height: 9 }, 320, 180, true);
+  assert(leftEdge.x === 0 && leftEdge.y === 0
+    && Math.abs(rightEdge.x + 320 / rightEdge.scale - 320) < 1e-9
+    && Math.abs(rightEdge.y + 180 / rightEdge.scale - 180) < 1e-9,
+  "camera exposed space outside the level at its edges");
 });
 
 test("REQ-LVL-19: two optional moving platforms are bounded and clear of the reference route", () => {
@@ -335,6 +439,32 @@ test("REQ-LVL-14: photo filter darkens and desaturates without leaking context s
 });
 
 if (enemyApi) {
+  test("REQ-LVL-15/REQ-MOV-11: level enemy modes are seeded, vary between three and eight, and gate the gun", () => {
+    const terrain = flatTerrain(160, 100, 90);
+    terrain.spawn = { x: 20, y: 81 };
+    terrain.flag = { x: 128, y: 90, width: 12, height: 18 };
+    const low = enemyApi.createEnemies(terrain, () => 0);
+    const high = enemyApi.createEnemies(terrain, () => 0.99);
+    assert(low.length === 3 && !low.combatEnabled, "low-count level did not contain three enemies without a gun");
+    assert(high.length >= 4 && high.length <= 8 && high.combatEnabled,
+      "high-count level did not enable combat for four to eight enemies");
+    assert(JSON.stringify(high) === JSON.stringify(enemyApi.createEnemies(terrain, () => 0.99)),
+      "enemy mode was not reproducible from the seeded sequence");
+  });
+  test("REQ-MOV-11: stomping defeats and bounces while a projectile hit defeats one enemy", () => {
+    const stomped = { x: 20, y: 30, width: 10, height: 6 };
+    const player = { x: 21, y: 28, width: 6, height: 9, vy: 80 };
+    const previous = { ...player, y: 20 };
+    const stomp = enemyApi.resolveCombat(player, previous, [stomped], []);
+    assert(stomp.defeated === 1 && player.vy < 0, "stomp did not defeat the patrol and bounce the player");
+    const target = { x: 40, y: 30, width: 10, height: 6 };
+    const shot = { x: 35, y: 32, direction: 1, speed: 240 };
+    const bullets = [shot];
+    const enemies = [target];
+    const result = enemyApi.stepProjectiles(bullets, enemies, 0.05, 320);
+    assert(result.defeated === 1 && enemies.length === 0, "projectile did not defeat exactly one enemy");
+  });
+
   test("REQ-LVL-15/21: seeded flying paths vary in both axes, stay clear, and repeat on reset", () => {
     const terrain = flatTerrain(160, 100, 90);
     const random = () => 0.5;
@@ -384,7 +514,7 @@ if (enemyApi) {
     terrain.flag = { x: 148, y: 90, width: 12, height: 18 };
     terrain.biome = "jungle";
     const enemies = enemyApi.createEnemies(terrain, () => 0.5);
-    assert(enemies.length === 2, "expected two enemies");
+    assert(enemies.length >= 3 && enemies.length <= 8, "expected three to eight enemies");
     for (const enemy of enemies) {
       assert(enemy.right - enemy.left >= 24 && enemy.y >= 0 && enemy.y + enemy.height <= terrain.height,
         "patrol is too short or out of bounds");
@@ -830,7 +960,7 @@ if (physicsApi) {
     assert(player.grounded, "support at the footprint edge was missed");
   });
 
-  test("REQ-MOV-03: drilling preserves normal movement and gravity", () => {
+  test("REQ-MOV-03: airborne drilling switches to climbing speed", () => {
     const regularTerrain = flatTerrain();
     const drillTerrain = flatTerrain();
     const regular = physicsApi.createPlayer(4, 10);
@@ -840,8 +970,8 @@ if (physicsApi) {
     const regularDistance = regular.x - 4;
     const drillDistance = drilling.x - 4;
     assert(Math.abs(regularDistance - 4) < 0.1, `normal distance was ${regularDistance}`);
-    assert(Math.abs(drillDistance - regularDistance) < 0.001, `drill distance was ${drillDistance}`);
-    assert(drilling.vy === regular.vy && drilling.vy > 0, "drill changed gravity");
+    assert(Math.abs(drillDistance - 1) < 0.001, `airborne drill distance was ${drillDistance}`);
+    assert(drilling.climbing && drilling.vy === 0, "airborne drill did not switch to climbing");
   });
 
   test("REQ-MOV-10: background climbing holds and moves at normalized quarter speed", () => {
@@ -862,6 +992,11 @@ if (physicsApi) {
     physicsApi.stepPlayer(player, { moveY: -1 }, terrain, 0);
     physicsApi.stepPlayer(player, {}, terrain, 0.05);
     assert(player.x === 40 && player.y === 40 && player.climbing, "released controls did not hold the wall");
+    const blocked = physicsApi.createPlayer(40, 0);
+    physicsApi.stepPlayer(blocked, { moveY: -1 }, terrain, 0);
+    const blockedPhase = blocked.climbPhase;
+    physicsApi.stepPlayer(blocked, { moveY: -1 }, terrain, 0.05);
+    assert(blocked.climbPhase > blockedPhase, "blocked climbing input did not animate");
   });
 
   test("REQ-MOV-03: directional drill cuts only the aimed tunnel and persists", () => {
@@ -883,13 +1018,52 @@ if (physicsApi) {
     }
   });
 
-  test("REQ-MOV-03/05: drilling preserves jump velocity and the double jump", () => {
+  test("REQ-LVL-22: drilling preserves visibly marked non-drillable terrain", () => {
+    const terrain = flatTerrain(60, 60, 0);
+    terrain.undrillable = new Uint8Array(terrain.solid.length);
+    terrain.undrillable[29 * 60 + 36] = 1;
+    const player = physicsApi.createPlayer(25, 25);
+    physicsApi.stepPlayer(player, { drill: true }, terrain, 0);
+    assert(terrain.solid[29 * 60 + 36] === 1, "drill removed a protected terrain cell");
+  });
+
+  test("REQ-MOV-03: drilling while airborne switches to controlled climbing and drilling", () => {
+    const terrain = flatTerrain(100, 100, 90);
+    const player = physicsApi.createPlayer(40, 40);
+    player.vy = -100;
+    physicsApi.stepPlayer(player, { move: 1, drill: true }, terrain, 0.05);
+    assert(player.climbing && player.vy === 0, "airborne drilling retained jump velocity instead of climbing");
+    assert(Math.abs(player.x - 40) <= 20 * 0.05 + 1e-6, "airborne drilling exceeded climbing speed");
+  });
+
+  test("REQ-LVL-18/REQ-MOV-10: lightning doubles horizontal and vertical climbing movement", () => {
+    const terrain = flatTerrain(100, 100, 90);
+    const run = runApi.createRun(terrain);
+    run.player.x = 40;
+    run.player.y = 40;
+    physicsApi.stepPlayer(run.player, { moveY: -1 }, terrain, 0);
+    run.effects.speedSeconds = 5;
+    const input = runApi.applyRunEffects({ move: 1, moveY: 1 }, run);
+    physicsApi.stepPlayer(run.player, input, terrain, 0.05);
+    assert(Math.abs(Math.hypot(run.player.x - 40, run.player.y - 40) - 2) < 0.001,
+      "lightning did not double climbing movement in both axes");
+  });
+
+  test("REQ-MOV-03: downward drilling limits descent to drill movement speed", () => {
+    const terrain = flatTerrain(100, 100, 90);
+    const player = physicsApi.createPlayer(40, 40);
+    player.vy = 100;
+    const before = player.y;
+    physicsApi.stepPlayer(player, { moveY: 1, drill: true }, terrain, 0.05);
+    assert(player.y - before <= 20 * 0.05 + 1e-6, "downward drilling fell faster than its controlled speed");
+  });
+
+  test("REQ-MOV-03/05: airborne drilling switches to climbing without using the double jump", () => {
     const terrain = flatTerrain(60, 60, 40);
     const player = physicsApi.createPlayer(4, 31);
     physicsApi.stepPlayer(player, { jumpPressed: true, jumpHeld: true }, terrain, 0);
-    const launch = player.vy;
     physicsApi.stepPlayer(player, { drill: true, jumpHeld: true }, terrain, 0.05);
-    assert(Math.abs(player.vy - launch - physicsApi.GRAVITY * 0.05) < 1e-9, "drill changed jump velocity");
+    assert(player.climbing && player.vy === 0, "jumping drill did not switch to climbing");
     assert(player.airJumps === 1, "drill consumed the double jump");
   });
 
@@ -1469,7 +1643,7 @@ if (runApi) {
         assert(run.wallPuff === null, "reset did not clear the wall burst");
       });
       test("REQ-LVL-18: enlarged pickup silhouettes have vivid colors, dark outlines, and soft auras", () => {
-        for (const [type, color] of [["speed", [255, 230, 0]], ["reverse", [255, 45, 117]]]) {
+        for (const [type, color] of [["speed", [255, 230, 0]], ["mushroom", [255, 45, 117]]]) {
           const canvas = document.createElement("canvas");
           canvas.width = 32;
           canvas.height = 32;
@@ -1817,8 +1991,13 @@ if (runApi) {
               >= Math.hypot(width, height) * 0.4, "route is trivial");
             assert(!runApi.walkingReachesFlag(option, runApi.walkingReachable(option, option.spawn), option.flag),
               "seeded option has a walk-only finish");
-            assert(option.enemies.length === 2 && JSON.stringify(run.enemies) === JSON.stringify(option.enemies),
-              "preview enemies changed at game start");
+            const combatEnabled = Boolean(option.enemies.combatEnabled);
+            const minimumEnemies = combatEnabled ? 4 : 3;
+            const maximumEnemies = combatEnabled ? 8 : 3;
+            assert(option.enemies.length >= minimumEnemies && option.enemies.length <= maximumEnemies
+              && run.combatEnabled === combatEnabled
+              && JSON.stringify(run.enemies) === JSON.stringify(option.enemies),
+            "preview enemy mode or patrols changed at game start");
             assert(option.spawn.x > 0 && option.spawn.y > 0
               && option.spawn.x + run.player.width < width
               && option.spawn.y + run.player.height < height, "player spawn touches an image border");

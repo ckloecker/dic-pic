@@ -6,7 +6,7 @@ import { completionFeedback, getLeaderboard, isValidPlayerName, leaderboardRows,
 import { NoUsableEdgeError } from "./terrain.js";
 import { BIOMES, LAYOUTS, createSuggestions, levelIdentity } from "./level.js";
 import { cameraView, drawBiomeEffects, drawCheckpoints, drawEnemies, drawGate, drawGun, drawHeadwear, drawPhoto, drawPreview,
-  drawMovingPlatforms, drawPickups, drawProjectiles, drawSwimmingPlayer, drawWallJumpPuff,
+  drawMovingPlatforms, drawPickups, drawProjectiles, drawRunnerSprite, drawSwimmingPlayer, drawWallJumpPuff,
   paintTerrain, paintTerrainShadow } from "./scene.js";
 
 const WORLD_WIDTH = 320;
@@ -356,12 +356,8 @@ function drawExit() {
 }
 
 function drawPlayer() {
-  if (state.terrain.biome === "underwater") {
-    drawSwimmingPlayer(context, state.player, state.effectSeconds);
-    return;
-  }
-  const { x, y, facing } = state.player;
   if (state.player.climbing) {
+    const { x, y } = state.player;
     const stride = Math.sin(state.player.climbPhase) * 1.5;
     context.fillStyle = "#344b52";
     context.fillRect(x + 1, y + 5 + stride, 1.5, 2.5);
@@ -377,34 +373,11 @@ function drawPlayer() {
     drawHeadwear(context, state.player, state.terrain.biome);
     return;
   }
-  context.save();
-  context.translate(x, y);
-  context.scale(state.player.width / 8, state.player.height / 12);
-  if (facing < 0) {
-    context.translate(8, 0);
-    context.scale(-1, 1);
+  if (state.terrain.biome === "underwater") {
+    drawSwimmingPlayer(context, state.player, state.effectSeconds);
+    return;
   }
-  const px = 0;
-  context.fillStyle = "#23353a";
-  context.fillRect(px + 1, 10, 6, 2);
-  context.fillStyle = "#16262d";
-  context.fillRect(px + 1, 10, 3, 2);
-  context.fillStyle = "#e9bd91";
-  context.fillRect(px + 2, 1, 5, 4);
-  context.fillStyle = "#173b42";
-  context.fillRect(px + 1, 0, 6, 3);
-  context.fillRect(px, 2, 2, 2);
-  context.fillStyle = "#247f7b";
-  context.fillRect(px + 1, 4, 6, 5);
-  context.fillStyle = "#f5a15f";
-  context.fillRect(px + 1, 5, 7, 2);
-  context.fillStyle = "#d6e8c3";
-  context.fillRect(px + 6, 2, 1, 1);
-  context.fillStyle = "#344b52";
-  context.fillRect(px + 2, 8, 2, 3);
-  context.fillRect(px + 5, 8, 2, 3);
-  context.restore();
-  drawHeadwear(context, state.player, state.terrain.biome);
+  drawRunnerSprite(context, state.player, state.terrain.biome);
 }
 
 function drawDrill() {
@@ -442,7 +415,7 @@ function drawScene() {
   drawMovingPlatforms(context, state.movingPlatforms);
   drawEnemies(context, state.enemies, state.terrain.biome);
   drawPickups(context, state.pickups, state.effectSeconds);
-  drawCheckpoints(context, state.checkpoints);
+  drawCheckpoints(context, state.checkpoints, view.scale);
   drawExit();
   drawPlayer();
   if (state.combatEnabled) drawGun(context, state.player);
@@ -589,7 +562,7 @@ function gameFrame(timestamp) {
   if (state.startedAt === null && movedByPlayer) {
     state.startedAt = timestamp;
   }
-  if (movedByPlayer && (window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0)) {
+  if (movedByPlayer && window.matchMedia("(pointer: coarse)").matches) {
     state.mobileCameraFollowing = true;
   }
   if (state.startedAt !== null) {

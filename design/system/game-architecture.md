@@ -25,22 +25,22 @@ storage, and cryptographic level identifiers.
 |---|---|---|
 | Setup UI | Two-player name validation, image upload/capture, three labeled playable thumbnail choices | REQ-SYS-01, REQ-SYS-05/15, REQ-LVL-04/12/17 |
 | Terrain generator | Normalize contrast, preserve diagonal contours and local edge directions, provisionally close/fill photo shapes, and suppress tiny fragments | REQ-SYS-03, REQ-LVL-01/03/05/08/09/11 |
-| Route planner and option assembly | Build bounded photo-edge connectors, reserve a contiguous no-drill corridor, place optional pickups and moving platforms outside required clearance, and verify final physics/enemy replay | REQ-LVL-01/07/08/09/10/11/12/15/16/18/19 |
-| Game loop and renderer | Draw filtered photo, high-contrast uniform-fill biome terrain, pickups, moving platforms, flying patrols, biome character poses, fixed gate, timer, wall-jump bursts, and prominent controls | REQ-SYS-02/03/04/10/16, REQ-CHR-01/02/04/05, REQ-MOV-05, REQ-LVL-02/06/07/10/14/15/18/19/20 |
-| Movement simulation | Immediate fixed-height floor/wall jumps and one double jump, press-to-drop climbing, tolerant surface contact and press buffering, temporary speed effects, moving-platform collision, air movement, and directional tunnel drilling | REQ-MOV-01 through REQ-MOV-10, REQ-CHR-02, REQ-LVL-18/19 |
-| Run lifecycle | Validate safe non-border spawns and non-walking placements, reset the complete run on enemy or bottom contact, and restore pickups, platforms, terrain, timer, and enemies | REQ-SYS-04/08/09/10/14, REQ-LVL-07/15/18/19 |
+| Route planner and option assembly | Prioritize strongest photo edges within safe route constraints, mark non-drillable terrain, place mandatory checkpoints, optional pickups/platforms, and avoidance/combat patrol modes, then verify final physics/enemy replay | REQ-LVL-01/07/08/09/10/11/12/15/16/18/19/22/23/24 |
+| Game loop and renderer | Draw filtered photo, distinct terrain, checkpoints and gate state, pickups, moving platforms, living patrols, combat gun/projectiles, biome poses, timer, wall-jump bursts, mobile camera, fullscreen control, and prominent instructions | REQ-SYS-02/03/04/10/16/17/18/19, REQ-CHR-01/02/04/05, REQ-MOV-05/11, REQ-LVL-02/06/07/10/14/15/18/19/20/22/23/24 |
+| Movement simulation | Immediate fixed-height floor/wall jumps and one double jump, press-to-drop climbing, airborne drill-climbing, capped downward drilling, stomp combat, temporary speed effects, moving-platform collision, and directional tunnel drilling | REQ-MOV-01 through REQ-MOV-11, REQ-CHR-02, REQ-LVL-18/19 |
+| Run lifecycle | Validate safe non-border spawns and non-walking checkpoint routes, reset terrain, checkpoints, pickups, platforms, timer, projectiles, and patrols, and distinguish defeated enemies from living contact | REQ-SYS-04/08/09/10/14, REQ-LVL-07/15/18/19/22/23, REQ-MOV-11 |
 | Player session controller | Retain two player names and one selected generated option across sequential rounds, then attribute each completed score to the selected player | REQ-SYS-05/06/15, REQ-LVL-12/17 |
-| Enemy simulation | Generate clear protected flight areas, follow seeded waypoint loops, and detect two-axis swept contact | REQ-LVL-15/21, REQ-SYS-10/14 |
-| Local leaderboard | Persist the top ten with stable ties and identify the exact current attempt, including an unsaved unranked footer | REQ-SYS-06 |
+| Enemy simulation | Generate three avoidance patrols or four to eight combat patrols in clear protected flight areas, follow seeded waypoint loops, and detect stomp/projectile/living contact | REQ-LVL-15/21, REQ-SYS-10/14, REQ-MOV-11 |
+| Local leaderboard | Persist signed top-ten times in cookies with stable ties, identify the exact current attempt, and select placement-aware completion feedback | REQ-SYS-06/17 |
 | Page identity | Declare a local pixel-art player-character favicon available before game setup | REQ-CHR-03 |
 
 ## Data flow
 
 The setup UI validates both player names and accepts an uploaded or captured image.
 The image is decoded, scaled into the terrain generator's pixel grid, and fingerprinted from its original bytes.
-The generator initializes a fixed-seed random engine at the beginning of each batch and returns three deterministic biome/layout options with pixel collision masks, pickups, moving platforms, scenery, and patrols.
+The generator initializes a fixed-seed random engine at the beginning of each batch and returns three deterministic biome/layout options with drillability masks, route checkpoints, pickups, moving platforms, scenery, and patrol mode.
 After selection, both players retain the same option for sequential rounds, while run reset restores its initial state.
-Once the selected player reaches the exit, the elapsed time is saved under a digest of the image fingerprint and exact option, and the local top ten is displayed.
+Once the selected player reaches the unlocked exit, the signed elapsed time is saved in a browser cookie under a digest of the image fingerprint and exact option, and the local top ten is displayed.
 
 No image or score is sent to a server.
 

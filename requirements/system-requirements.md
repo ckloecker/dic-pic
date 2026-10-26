@@ -33,12 +33,13 @@ The player name shall be letters and spaces only, with a maximum length of 32 ch
 
 After successfully reaching the exit, the player shall see their time.
 Along the time, a leaderboard with the top 10 lowest times for this level shall be shown with the respective player name.
-Leaderboard entries shall be stored in the browser and shall not be shared
-with other devices or browsers.
+Leaderboard entries shall be stored in browser cookies and shall not be shared with other devices or browsers.
+The game shall disclose that leaderboard data is stored in cookies.
 The exact just-completed attempt shall have a clearly outlined row labeled "Your run".
 If that attempt does not enter the top ten, it shall appear beneath the ranked entries with no rank, without persisting an eleventh score.
 Identical names and times shall not cause another attempt to be highlighted.
 Existing attempts shall precede new attempts with equal times.
+Leaderboard times shall preserve mushroom time reductions, including negative values.
 
 ## REQ-SYS-08: Restart Run
 
@@ -60,15 +61,15 @@ Status: Approved.
 
 Contact with any flying patrol enemy shall immediately reset the entire run as specified by REQ-SYS-14.
 The reset shall restore the original terrain, selected starting position, initial enemy patrol positions, fresh movement state, and zero timer, and shall clear held controls.
-Enemy contact shall take priority over simultaneous finish contact and shall not record a score.
+Contact with a living enemy shall take priority over simultaneous finish contact and shall not record a score.
 Manual reset shall continue to restore terrain, enemy starting positions, controls, and the timer under REQ-SYS-08.
 
 ## REQ-SYS-14: Run Reset on Failure
 
 Status: Approved.
 
-Enemy contact or reaching the image bottom after falling shall immediately reset the entire run.
-The reset shall restore the original undrilled terrain, the selected starting position, initial enemy positions, fresh movement and pickup state, and a zero timer.
+Contact with a living enemy or reaching the image bottom after falling shall immediately reset the entire run.
+The reset shall restore the original undrilled terrain, the selected starting position, initial enemy positions, fresh movement, pickup, checkpoint, and projectile state, and a zero timer.
 Held controls shall be cleared, and the failed run shall not be recorded.
 The player character shall not be initially positioned against any image border.
 The player may touch other image borders during play.
@@ -79,7 +80,7 @@ Status: Approved.
 
 The setup shall collect valid names for two players.
 After each completed round, the game shall allow selection of which of the two players plays the next round.
-Both players in the session shall play the same exact generated level option, including terrain, biome, start, finish, moving platforms, pickups, and enemies.
+Both players in the session shall play the same exact generated level option, including terrain, biome, start, finish, checkpoints, moving platforms, pickups, enemy mode, and patrols.
 Starting the next round shall reset the selected option to its original state and start its timer at zero.
 Each completed round shall be attributed to the name of the selected player.
 
@@ -89,6 +90,7 @@ Status: Approved.
 
 The gameplay controls and instructions shall be visually prominent and easy to find.
 Their visual grouping and text shall remain readable and usable on desktop and narrow/mobile viewports.
+Instructions shall describe every functional level element below the controls explanation.
 
 ## REQ-SYS-11: Static Root Entry Point
 
@@ -122,3 +124,19 @@ Other branches shall not trigger this deployment.
 The deployment shall inject the triggering source branch and full commit SHA into the published entry page.
 The published artifact shall contain only the game entry page and runtime assets, without repository credentials or development files.
 Missing or invalid deployment metadata shall fail the build rather than publish an unidentified version.
+
+## REQ-SYS-17: Completion Feedback
+
+After a completed run, the game shall show a varied, humorous completion message rather than always showing "Nice run".
+The message shall reflect the run's leaderboard placement when a ranked placement is available.
+
+## REQ-SYS-18: Full-Screen Gameplay
+
+The game shall provide an accessible control to enter and leave browser full-screen mode for the gameplay frame.
+The control shall report full-screen API failures visibly and shall remain usable by keyboard and touch.
+
+## REQ-SYS-19: Mobile Follow Camera
+
+On touch-first devices, gameplay shall initially show the complete level while the player has not moved and the race timer has not started.
+After player movement starts the timer, the camera shall follow the player at 1.5x zoom.
+The camera shall remain inside the image bounds and shall not change player physics, timer behavior, or level coordinates.

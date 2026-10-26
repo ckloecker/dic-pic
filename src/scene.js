@@ -1,4 +1,5 @@
 import { BIOMES } from "./level.js";
+import { createPlayer } from "./physics.js";
 import { TERRAIN_OPACITY } from "./terrain.js";
 
 export function drawPhoto(context, image, width, height) {
@@ -262,11 +263,11 @@ export function paintTerrain(context, terrain) {
   context.restore();
 }
 
-export function drawCheckpoints(context, checkpoints) {
+export function drawCheckpoints(context, checkpoints, zoom = 1) {
   context.save();
   for (const checkpoint of checkpoints) {
     context.shadowColor = "#7cf5ff";
-    context.shadowBlur = 8;
+    context.shadowBlur = 8 * zoom;
     context.globalAlpha = checkpoint.reached ? 0.4 : 1;
     context.fillStyle = "#173945";
     context.fillRect(checkpoint.x - 1, checkpoint.y - 1, checkpoint.width + 2, checkpoint.height + 2);
@@ -320,6 +321,37 @@ export function drawHeadwear(context, player, biome) {
   }
 }
 
+export function drawRunnerSprite(context, player, biome) {
+  const { x, y, facing } = player;
+  context.save();
+  context.translate(x, y);
+  context.scale(player.width / 8, player.height / 12);
+  if (facing < 0) {
+    context.translate(8, 0);
+    context.scale(-1, 1);
+  }
+  context.fillStyle = "#23353a";
+  context.fillRect(1, 10, 6, 2);
+  context.fillStyle = "#16262d";
+  context.fillRect(1, 10, 3, 2);
+  context.fillStyle = "#e9bd91";
+  context.fillRect(2, 1, 5, 4);
+  context.fillStyle = "#173b42";
+  context.fillRect(1, 0, 6, 3);
+  context.fillRect(0, 2, 2, 2);
+  context.fillStyle = "#247f7b";
+  context.fillRect(1, 4, 6, 5);
+  context.fillStyle = "#f5a15f";
+  context.fillRect(1, 5, 7, 2);
+  context.fillStyle = "#d6e8c3";
+  context.fillRect(6, 2, 1, 1);
+  context.fillStyle = "#344b52";
+  context.fillRect(2, 8, 2, 3);
+  context.fillRect(5, 8, 2, 3);
+  context.restore();
+  drawHeadwear(context, player, biome);
+}
+
 export function drawSwimmingPlayer(context, player, seconds = 0) {
   const { x, y, width, height, facing = 1 } = player;
   const kick = Math.round(Math.sin(seconds * Math.PI / 2));
@@ -349,25 +381,26 @@ export function drawSwimmingPlayer(context, player, seconds = 0) {
 
 export function drawPreview(context, image, option) {
   drawPhoto(context, image, option.width, option.height);
-  const layer = document.createElement("canvas");
-  layer.width = option.width;
-  layer.height = option.height;
-  const layerContext = layer.getContext("2d");
-  drawBiomeEffects(layerContext, option.width, option.height, option.biome);
-  context.drawImage(layer, 0, 0);
-  paintTerrain(layerContext, option);
-  paintTerrainShadow(layerContext, option);
-  context.drawImage(layer, 0, 0);
+  const effectsLayer = document.createElement("canvas");
+  effectsLayer.width = option.width;
+  effectsLayer.height = option.height;
+  const effectsContext = effectsLayer.getContext("2d");
+  drawBiomeEffects(effectsContext, option.width, option.height, option.biome);
+  context.drawImage(effectsLayer, 0, 0);
+  const terrainLayer = document.createElement("canvas");
+  terrainLayer.width = option.width;
+  terrainLayer.height = option.height;
+  const terrainContext = terrainLayer.getContext("2d");
+  paintTerrain(terrainContext, option);
+  paintTerrainShadow(terrainContext, option);
+  context.drawImage(terrainLayer, 0, 0);
   drawMovingPlatforms(context, option.movingPlatforms || []);
   drawEnemies(context, option.enemies || [], option.biome);
   drawPickups(context, option.pickups || []);
-  drawCheckpoints(context, option.checkpoints || []);
+  drawCheckpoints(context, option.checkpoints || [], 1 / 3);
   drawGate(context, option.flag, !(option.checkpoints || []).length);
-  const player = { ...option.spawn, width: 6 };
-  context.fillStyle = "#247f7b";
-  context.fillRect(player.x + 1, player.y + 3, 4, 4);
-  context.fillStyle = "#344b52";
-  context.fillRect(player.x + 1, player.y + 7, 2, 2);
-  context.fillRect(player.x + 4, player.y + 7, 1, 2);
-  drawHeadwear(context, player, option.biome);
+  const player = createPlayer(option.spawn.x, option.spawn.y);
+  if (option.biome === "underwater") drawSwimmingPlayer(context, player);
+  else drawRunnerSprite(context, player, option.biome);
+  if (option.combatEnabled) drawGun(context, player);
 }

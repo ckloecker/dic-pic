@@ -128,7 +128,7 @@ The finite test sample is evidence of improved acceptance, not a universal guara
 
 ## Approved 👍 issue implementation revision
 
-The user approved implementation of open issues with at least one 👍 and directed that issue-specific `@AI` comments be followed.
+The user approved implementation of open issues with at least one 👍 and directed that issue-specific `[AI]` comments be followed.
 The user directly excluded #6, so it is not in scope despite GitHub reporting one 👍 reaction at the time of inspection.
 The in-scope issues are #3, #5, #9, #10, #11, #14, #15, and #16.
 No conflicting eligible issues were found, so no issue was selected for closure as a duplicate.
@@ -378,6 +378,22 @@ The narrow-frame check used a 390-pixel iframe with a 375-pixel content viewport
 All three biome thumbnails and the full jungle scene were visually inspected.
 Physical Android/iOS, camera permissions, and simultaneous real touch input remain unverified.
 
+### Upvoted GitHub issue implementation traceability
+
+Issue [#4](https://github.com/ckloecker/dic-pic/issues/4) maps to REQ-LVL-22, design [game-components](../design/detailed/game-components.md), implementation [level.js](../src/level.js), [physics.js](../src/physics.js), and [scene.js](../src/scene.js), and verification in [unit-tests.js](../tests/unit/unit-tests.js).
+Issue [#18](https://github.com/ckloecker/dic-pic/issues/18) maps to REQ-LVL-24, design [game-components](../design/detailed/game-components.md), implementation [level.js](../src/level.js), and verification in [unit-tests.js](../tests/unit/unit-tests.js).
+Issue [#19](https://github.com/ckloecker/dic-pic/issues/19) maps to REQ-LVL-23, design [game-components](../design/detailed/game-components.md), implementation [level.js](../src/level.js), [run.js](../src/run.js), [scene.js](../src/scene.js), and [app.js](../src/app.js), and verification in [unit-tests.js](../tests/unit/unit-tests.js).
+Issue [#20](https://github.com/ckloecker/dic-pic/issues/20) maps to REQ-SYS-17, design [game-components](../design/detailed/game-components.md), implementation [leaderboard.js](../src/leaderboard.js) and [app.js](../src/app.js), and verification in [unit-tests.js](../tests/unit/unit-tests.js).
+Issue [#21](https://github.com/ckloecker/dic-pic/issues/21) maps to REQ-LVL-18 and REQ-SYS-06, design [game-components](../design/detailed/game-components.md), implementation [run.js](../src/run.js), [leaderboard.js](../src/leaderboard.js), [app.js](../src/app.js), and [index.html](../index.html), and verification in [unit-tests.js](../tests/unit/unit-tests.js) and [browser-tests.js](../tests/system/browser-tests.js).
+Issue [#22](https://github.com/ckloecker/dic-pic/issues/22) maps to REQ-MOV-03, design [game-components](../design/detailed/game-components.md), implementation [physics.js](../src/physics.js), and verification in [unit-tests.js](../tests/unit/unit-tests.js).
+Issue [#23](https://github.com/ckloecker/dic-pic/issues/23) maps to REQ-LVL-18 and REQ-MOV-10, design [game-components](../design/detailed/game-components.md), implementation [physics.js](../src/physics.js), and verification in [unit-tests.js](../tests/unit/unit-tests.js).
+Issue [#24](https://github.com/ckloecker/dic-pic/issues/24) maps to REQ-MOV-03, design [game-components](../design/detailed/game-components.md), implementation [physics.js](../src/physics.js), and verification in [unit-tests.js](../tests/unit/unit-tests.js).
+Issue [#26](https://github.com/ckloecker/dic-pic/issues/26) maps to REQ-MOV-11, design [game-components](../design/detailed/game-components.md), implementation [enemies.js](../src/enemies.js), [scene.js](../src/scene.js), [app.js](../src/app.js), and [index.html](../index.html), and verification in [unit-tests.js](../tests/unit/unit-tests.js) and [browser-tests.js](../tests/system/browser-tests.js).
+Issue [#28](https://github.com/ckloecker/dic-pic/issues/28) maps to REQ-SYS-06, design [game-architecture](../design/system/game-architecture.md), implementation [leaderboard.js](../src/leaderboard.js) and [index.html](../index.html), and verification in [unit-tests.js](../tests/unit/unit-tests.js) and [browser-tests.js](../tests/system/browser-tests.js).
+Issue [#29](https://github.com/ckloecker/dic-pic/issues/29) maps to REQ-SYS-18, design [game-architecture](../design/system/game-architecture.md), implementation [app.js](../src/app.js), [index.html](../index.html), and [styles.css](../src/styles.css), and verification in [browser-tests.js](../tests/system/browser-tests.js).
+Issue [#32](https://github.com/ckloecker/dic-pic/issues/32) maps to REQ-SYS-19, design [game-architecture](../design/system/game-architecture.md), implementation [app.js](../src/app.js) and [scene.js](../src/scene.js), and verification in [unit-tests.js](../tests/unit/unit-tests.js) and [browser-tests.js](../tests/system/browser-tests.js).
+Issue [#6](https://github.com/ckloecker/dic-pic/issues/6) was excluded at the user's direction because adding an MCP server conflicts with the client-only architecture.
+The issue comment marker in [AGENTS.md](../AGENTS.md) was corrected to `[AI]` as requested.
 ### Substantial layouts, full-region filling, and opaque outlines
 
 The user approved replacing the global 80% open-space cap with substantial-shape selection and tiny-fragment suppression, allowing large complete enclosed photo regions.
