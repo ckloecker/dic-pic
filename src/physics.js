@@ -335,6 +335,9 @@ export function stepPlayer(player, input, terrain, dt) {
 
   player.x = Math.max(0, Math.min(terrain.width - player.width, player.x));
   player.vy += GRAVITY * elapsed;
+  if (player.drilling && player.drillY > 0) {
+    player.vy = Math.min(player.vy, CLIMB_SPEED * speedMultiplier);
+  }
   const verticalDistance = player.vy * elapsed;
   const previousY = player.y;
   if (!moveAxis(player, verticalDistance, "y", terrain)) {
