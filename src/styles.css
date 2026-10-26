@@ -482,6 +482,62 @@ button,
   pointer-events: none;
 }
 
+.fullscreen-button {
+  position: absolute;
+  z-index: 1;
+  top: 10px;
+  right: 10px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid #f4f2e9;
+  border-radius: 4px;
+  color: #f4f2e9;
+  background: rgb(21 36 45 / 90%);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.fullscreen-button:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 2px;
+}
+
+.game-frame:fullscreen {
+  display: grid;
+  width: 100vw;
+  height: 100vh;
+  place-items: center;
+  padding: 32px 12px;
+  border: 0;
+  background: var(--ink);
+}
+
+.game-frame:fullscreen #game-canvas {
+  width: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.game-screen.fullscreen-fallback {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: auto;
+  padding: 12px;
+  background: var(--ink);
+}
+
+.game-screen.fullscreen-fallback .game-frame {
+  width: min(100%, calc((100vh - 210px) * 16 / 9));
+  align-self: center;
+}
+
 .caption-dot {
   width: 6px;
   height: 6px;

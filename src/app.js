@@ -13,6 +13,9 @@ const WORLD_WIDTH = 320;
 const WORLD_HEIGHT = 180;
 const canvas = document.querySelector("#game-canvas");
 const context = canvas.getContext("2d");
+const gameFrameElement = document.querySelector(".game-frame");
+const fullscreenButton = document.querySelector("#fullscreen-button");
+const fullscreenMessage = document.querySelector("#fullscreen-message");
 const setupScreen = document.querySelector("#setup-screen");
 const gameScreen = document.querySelector("#game-screen");
 const completePanel = document.querySelector("#complete-panel");
@@ -69,6 +72,48 @@ function setMessage(element, text, isError = false) {
   element.textContent = text;
   element.classList.toggle("error", isError);
 }
+
+function isFullscreen() {
+  return document.fullscreenElement === gameFrameElement
+    || document.webkitFullscreenElement === gameFrameElement
+    || gameScreen.classList.contains("fullscreen-fallback");
+}
+
+function updateFullscreenButton() {
+  const active = isFullscreen();
+  fullscreenButton.textContent = active ? "EXIT FULL SCREEN" : "FULL SCREEN";
+  fullscreenButton.setAttribute("aria-label", active ? "Exit full screen" : "Enter full screen");
+}
+
+async function toggleFullscreen() {
+  setMessage(fullscreenMessage, "");
+  try {
+    if (isFullscreen()) {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen;
+      if (document.fullscreenElement || document.webkitFullscreenElement) {
+        if (!exit) throw new Error("This browser cannot exit full-screen mode.");
+        await exit.call(document);
+      } else {
+        gameScreen.classList.remove("fullscreen-fallback");
+        updateFullscreenButton();
+      }
+    } else {
+      const request = gameFrameElement.requestFullscreen || gameFrameElement.webkitRequestFullscreen;
+      if (request) {
+        await request.call(gameFrameElement);
+      } else {
+        gameScreen.classList.add("fullscreen-fallback");
+        updateFullscreenButton();
+      }
+    }
+  } catch (error) {
+    setMessage(fullscreenMessage, `Unable to change full-screen mode: ${error.message}`, true);
+  }
+}
+
+fullscreenButton.addEventListener("click", toggleFullscreen);
+document.addEventListener("fullscreenchange", updateFullscreenButton);
+document.addEventListener("webkitfullscreenchange", updateFullscreenButton);
 
 function updateNameValidity() {
   const validFirst = isValidPlayerName(nameInput.value);
