@@ -1,6 +1,49 @@
 const KEY_PREFIX = "dic-pic:leaderboard:";
 const MAX_ENTRIES = 10;
 
+function cookieKey(key) {
+  if (typeof key !== "string" || key.length === 0) {
+    throw new TypeError("A leaderboard cookie key is required.");
+  }
+  return key.replace(/[^A-Za-z0-9_-]/g, "_");
+}
+
+export function createCookieStorage(document = globalThis.document) {
+  if (!document || typeof document.cookie !== "string") {
+    throw new TypeError("Cookie storage is unavailable in this browser.");
+  }
+  return {
+    getItem(key) {
+      const name = cookieKey(key);
+      for (const item of document.cookie.split(";")) {
+        const separator = item.indexOf("=");
+        if (separator < 0 || item.slice(0, separator).trim() !== name) continue;
+        try {
+          return decodeURIComponent(item.slice(separator + 1).trim());
+        } catch (error) {
+          throw new Error(`Saved leaderboard cookie could not be decoded: ${error.message}`);
+        }
+      }
+      return null;
+    },
+    setItem(key, value) {
+      if (typeof value !== "string") throw new TypeError("Leaderboard cookie values must be strings.");
+      const name = cookieKey(key);
+      document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; SameSite=Lax; Max-Age=31536000`;
+      if (this.getItem(key) !== value) {
+        throw new Error("The browser could not persist leaderboard data in a cookie.");
+      }
+    },
+    removeItem(key) {
+      const name = cookieKey(key);
+      document.cookie = `${name}=; Path=/; SameSite=Lax; Max-Age=0`;
+      if (this.getItem(key) !== null) {
+        throw new Error("The browser could not remove the leaderboard cookie.");
+      }
+    },
+  };
+}
+
 export function isValidPlayerName(name) {
   return typeof name === "string"
     && name.length >= 1
@@ -38,13 +81,13 @@ function readScores(levelId, storage) {
   return scores;
 }
 
-export function getLeaderboard(levelId, storage = globalThis.localStorage) {
+export function getLeaderboard(levelId, storage = createCookieStorage()) {
   return readScores(levelId, storage)
     .sort((first, second) => first.timeMs - second.timeMs)
     .slice(0, MAX_ENTRIES);
 }
 
-export function submitScore(levelId, entry, storage = globalThis.localStorage) {
+export function submitScore(levelId, entry, storage = createCookieStorage()) {
   const name = typeof entry?.name === "string" ? entry.name.trim() : "";
   const timeMs = entry?.timeMs;
   if (!isValidPlayerName(name)) {
