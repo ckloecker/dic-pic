@@ -242,6 +242,10 @@ export function stepPlayer(player, input, terrain, dt) {
     || drillTunnel(player, terrain, NORMAL_SPEED * elapsed + 1, true));
   if (player.drilling) drillTunnel(player, terrain);
   const contact = surfaceContact(player, terrain);
+  if (player.drilling && !player.climbing && contact.floorDistance === null) {
+    player.climbing = true;
+    player.vy = 0;
+  }
   if (player.climbing && vertical >= 0 && contact.floorDistance === 0) {
     player.climbing = false;
   }
