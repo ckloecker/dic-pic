@@ -73,3 +73,26 @@ export function leaderboardRows(scores, current) {
   if (current && !rows.some((row) => row.current)) rows.push({ ...current, rank: null, current: true });
   return rows;
 }
+
+export function completionFeedback(rank, entryCount = MAX_ENTRIES, random = Math.random) {
+  if (rank !== null && (!Number.isInteger(rank) || rank < 1 || rank > entryCount)) {
+    throw new RangeError("Leaderboard placement must be a valid rank or null.");
+  }
+  if (typeof random !== "function") throw new TypeError("A feedback selector is required.");
+  const phrases = rank === 1
+    ? ["Top of the board. The pixels are legally required to respect you.",
+      "First place. Your photo is now nervous."]
+    : rank !== null && rank <= 3
+      ? ["Podium secured. Your pixels are making tiny victory noises.",
+        "Top three. The gate would like an autograph."]
+      : rank !== null
+        ? [`Number ${rank}. The mushrooms have requested a rematch.`,
+          `Rank ${rank}: suspiciously competent for a person made of pixels.`]
+        : ["Unranked, but the gate has no idea how leaderboards work.",
+          "No leaderboard slot. The pixels still saw what you did."];
+  const selection = random();
+  if (!Number.isFinite(selection) || selection < 0 || selection >= 1) {
+    throw new RangeError("Feedback selector must return a value from zero up to one.");
+  }
+  return phrases[Math.floor(selection * phrases.length)];
+}

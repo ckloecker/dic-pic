@@ -2,7 +2,7 @@ import { cancelJumpInput, DRILL_REACH, stepPlayer } from "./physics.js";
 import { applyRunEffects, collectCheckpoints, collectPickups, createRun, reachedFlag, resetRun, stepMovingPlatforms,
   stepRunEffects, stepWallJumpPuff } from "./run.js";
 import { enemyContact, stepEnemies } from "./enemies.js";
-import { getLeaderboard, isValidPlayerName, leaderboardRows, submitScore } from "./leaderboard.js";
+import { completionFeedback, getLeaderboard, isValidPlayerName, leaderboardRows, submitScore } from "./leaderboard.js";
 import { NoUsableEdgeError } from "./terrain.js";
 import { BIOMES, LAYOUTS, createSuggestions, levelIdentity } from "./level.js";
 import { drawBiomeEffects, drawCheckpoints, drawEnemies, drawGate, drawHeadwear, drawPhoto, drawPreview,
@@ -473,9 +473,11 @@ function finishLevel() {
   try {
     const scores = submitScore(state.levelId, current);
     showLeaderboard(scores, current);
-    setMessage(scoreMessage, "Saved in this browser.");
+    const rank = scores.findIndex((score) => score.id === current.id) + 1;
+    setMessage(scoreMessage, `Saved in this browser. ${completionFeedback(rank || null, scores.length)}`);
   } catch (error) {
-    setMessage(scoreMessage, `Your time is shown, but it could not be saved: ${error.message}`, true);
+    setMessage(scoreMessage,
+      `Your time is shown, but it could not be saved: ${error.message} ${completionFeedback(null)}`, true);
     try {
       showLeaderboard(getLeaderboard(state.levelId), current);
     } catch (readError) {
