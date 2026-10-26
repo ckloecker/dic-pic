@@ -196,6 +196,7 @@ function drillTunnel(player, terrain, lookAhead = 0, probe = false) {
         const index = y * terrain.width + x;
         if (terrain.solid[index] === 1) {
           if (probe) return true;
+          if (terrain.undrillable?.[index]) continue;
           terrain.solid[index] = 0;
           changed = true;
         }

@@ -204,6 +204,7 @@ export function paintTerrain(context, terrain) {
       if (part === 8) color = x % 2 ? [47, 139, 111] : [100, 182, 133];
       if (part === 9) color = [252, 182, 163];
       if (part === 10) color = terrain.biome === "desert" ? [198, 147, 104] : [168, 184, 165];
+      if (terrain.undrillable?.[cell]) color = (x + y) % 2 ? [255, 173, 83] : [31, 45, 56];
       pixels.data.set([...color, exposed ? 255 : Math.round(TERRAIN_OPACITY * 255)], cell * 4);
     }
   }

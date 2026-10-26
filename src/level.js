@@ -238,6 +238,46 @@ function addMovingPlatforms(terrain, random) {
   terrain.movingPlatforms = platforms;
 }
 
+function addUndrillableTerrain(terrain, random) {
+  const { width, height, solid, photoSolid, route } = terrain;
+  const size = { width: 4, height: 2 };
+  const candidates = [];
+  for (let y = 1; y <= height - size.height - 1; y += 1) {
+    for (let x = 1; x <= width - size.width - 1; x += 1) {
+      let clear = true;
+      for (let row = y; row < y + size.height && clear; row += 1) {
+        for (let column = x; column < x + size.width; column += 1) {
+          const cell = row * width + column;
+          if (!solid[cell] || !photoSolid[cell] || route.clearance[cell]) {
+            clear = false;
+            break;
+          }
+        }
+      }
+      if (clear) candidates.push({ x, y, ...size });
+    }
+  }
+  if (!candidates.length) {
+    throw new RouteGenerationError("no safe stretch of photo terrain can be marked non-drillable");
+  }
+
+  const undrillable = new Uint8Array(solid.length);
+  const requested = Math.min(candidates.length, 1 + Math.floor(random() * 3));
+  const placed = [];
+  for (const candidate of shuffle(candidates, random)) {
+    if (placed.length >= requested) break;
+    if (placed.some((other) => candidate.x < other.x + other.width
+      && candidate.x + candidate.width > other.x
+      && candidate.y < other.y + other.height
+      && candidate.y + candidate.height > other.y)) continue;
+    for (let row = candidate.y; row < candidate.y + candidate.height; row += 1) {
+      undrillable.fill(1, row * width + candidate.x, row * width + candidate.x + candidate.width);
+    }
+    placed.push(candidate);
+  }
+  terrain.undrillable = undrillable;
+}
+
 export function createSuggestions(rgba, width, height, random = createRandom()) {
   const biomes = shuffle(Object.keys(BIOMES), random);
   const layouts = shuffle(Object.keys(LAYOUTS), random);
@@ -253,6 +293,7 @@ export function createSuggestions(rgba, width, height, random = createRandom()) 
         addElements(terrain, random);
         addPickups(terrain, random);
         addMovingPlatforms(terrain, random);
+        addUndrillableTerrain(terrain, random);
         if (!terrain.elements.length) {
           throw new RouteGenerationError("no room for collidable biome scenery outside the main corridor");
         }
@@ -281,7 +322,8 @@ export function levelIdentity(level) {
   return JSON.stringify({
     revision: 9, width: level.width, height: level.height,
     biome: level.biome, layout: level.layout, spawn: level.spawn, flag: level.flag,
-    solid: Array.from(level.solid), details: Array.from(level.details), accents: level.accents,
+    solid: Array.from(level.solid), undrillable: Array.from(level.undrillable || []),
+    details: Array.from(level.details), accents: level.accents,
     pickups: level.pickups,
     movingPlatforms: level.movingPlatforms,
     enemies: level.enemies,
