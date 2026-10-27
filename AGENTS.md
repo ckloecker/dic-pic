@@ -23,8 +23,13 @@
   for their issue.
 - When eligible issues conflict, implement only the issue with the higher 👍
   count and close the conflicting issue with fewer 👍 reactions as a duplicate.
-- Keep implementation changes for each issue in its own commit, and include
-  that issue number in the commit message.
+- Create exactly one implementation commit per issue; never combine separate
+  issue fixes in one commit.
+- Include a GitHub-recognized closing reference such as `Fixes #123` in each
+  issue commit message, and verify the exact message with
+  `git show -s --format=%B HEAD`.
+- A closing reference closes an issue only after its commit reaches the
+  repository's default branch; do not report closure before the push or merge.
 - Cross-cutting requirements, design, tests, and traceability may use a separate
   non-closing commit that references every affected issue.
 - Close each resolved issue through its corresponding commit message using a
