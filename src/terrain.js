@@ -3,8 +3,11 @@ import { closeAndFill } from "./morphology.js";
 export const TERRAIN_OPACITY = 0.8;
 
 export function strongestTerrainEdges(terrain) {
+  const preferred = (feature) => terrain.layout === "vertical" ? feature.vertical
+    : terrain.layout === "horizontal" ? !feature.vertical : false;
   const selected = [...terrain.features]
-    .sort((first, second) => second.strength - first.strength)
+    .sort((first, second) => Number(preferred(second)) - Number(preferred(first))
+      || second.strength - first.strength)
     .slice(0, 12);
   const photoSolid = new Uint8Array(terrain.solid.length);
   const edgeDirections = new Uint8Array(terrain.solid.length);

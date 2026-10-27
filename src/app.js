@@ -6,7 +6,7 @@ import { completionFeedback, getLeaderboard, isValidPlayerName, leaderboardRows,
 import { NoUsableEdgeError } from "./terrain.js";
 import { BIOMES, LAYOUTS, createSuggestions, levelIdentity } from "./level.js";
 import { cameraView, drawBiomeEffects, drawCheckpoints, drawEnemies, drawGate, drawGun, drawHeadwear, drawPhoto, drawPreview,
-  drawMovingPlatforms, drawPickups, drawProjectiles, drawRunnerSprite, drawSwimmingPlayer, drawWallJumpPuff,
+  drawMovingPlatforms, drawMushroomLabels, drawPickups, drawProjectiles, drawRunnerSprite, drawSwimmingPlayer, drawWallJumpPuff,
   paintTerrain, paintTerrainShadow } from "./scene.js";
 
 const WORLD_WIDTH = 320;
@@ -32,6 +32,7 @@ const photoName = document.querySelector("#photo-name");
 const suggestions = document.querySelector("#suggestions");
 const choices = document.querySelector("#level-choices");
 const timerValue = document.querySelector("#timer");
+const mushroomFeedback = document.querySelector("#mushroom-feedback");
 const scoreMessage = document.querySelector("#score-message");
 const feedbackPanel = document.querySelector("#feedback-panel");
 const feedbackSeverity = document.querySelector("#feedback-severity");
@@ -53,6 +54,7 @@ const state = {
   flag: null,
   startedAt: null,
   elapsedMs: 0,
+  mushroomFeedbackSeconds: 0,
   effectSeconds: 0,
   running: false,
   jumpPressed: false,
@@ -71,6 +73,16 @@ context.imageSmoothingEnabled = false;
 function setMessage(element, text, isError = false) {
   element.textContent = text;
   element.classList.toggle("error", isError);
+}
+
+function clearMushroomFeedback() {
+  state.mushroomFeedbackSeconds = 0;
+  mushroomFeedback.textContent = "";
+}
+
+function showMushroomFeedback(timeReductionMs) {
+  mushroomFeedback.textContent = `-${(timeReductionMs / 1000).toFixed(2)} SEC`;
+  state.mushroomFeedbackSeconds = 1.5;
 }
 
 function isFullscreen() {
@@ -226,6 +238,7 @@ function setUpGame() {
   const terrain = state.originalTerrain;
   if (!terrain) throw new Error("Choose a level preview before playing.");
   const run = createRun(terrain);
+  clearMushroomFeedback();
   stopAnimation();
   clearControls();
   state.originalTerrain = terrain;
@@ -422,6 +435,7 @@ function drawScene() {
   drawProjectiles(context, state.projectiles);
   drawDrill();
   drawWallJumpPuff(context, state.wallPuff, WORLD_WIDTH);
+  drawMushroomLabels(context, state.mushroomLabels, WORLD_WIDTH, WORLD_HEIGHT);
 }
 
 function getInput() {
@@ -484,6 +498,7 @@ function finishLevel() {
     return;
   }
   stopAnimation();
+  clearMushroomFeedback();
   clearControls();
   timerValue.textContent = elapsedLabel(state.elapsedMs);
   document.querySelector("#winner-name").textContent = state.playerName;
@@ -523,6 +538,10 @@ function gameFrame(timestamp) {
   const frameDelta = state.previousFrame === 0 ? 1 / 60 : (timestamp - state.previousFrame) / 1000;
   const dt = Math.max(0, Math.min(frameDelta, 0.05));
   state.previousFrame = timestamp;
+  if (state.mushroomFeedbackSeconds > 0) {
+    state.mushroomFeedbackSeconds = Math.max(0, state.mushroomFeedbackSeconds - dt);
+    if (state.mushroomFeedbackSeconds === 0) clearMushroomFeedback();
+  }
   state.effectSeconds += dt;
   stepRunEffects(state, dt);
   const beforeX = state.player.x;
@@ -549,6 +568,7 @@ function gameFrame(timestamp) {
   stepPlayer(state.player, input, state.terrain, dt);
   stepWallJumpPuff(state, dt);
   collectPickups(state);
+  if (state.lastMushroomPenaltyMs > 0) showMushroomFeedback(state.lastMushroomPenaltyMs);
   collectCheckpoints(state);
   state.jumpPressed = false;
   state.jumpReleased = false;
@@ -580,6 +600,7 @@ function gameFrame(timestamp) {
   const hitBottom = state.player.y + state.player.height >= WORLD_HEIGHT - 1e-9;
   if (hitEnemy || hitBottom) {
     resetRun(state);
+    clearMushroomFeedback();
     clearControls();
     state.effectSeconds = 0;
     state.terrainLayerVersion = -1;

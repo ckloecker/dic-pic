@@ -1,6 +1,6 @@
 import { createPlayer, stepPlayer } from "./physics.js";
 import { enemyContact, stepEnemies } from "./enemies.js";
-import { reachedFlag, walkingReachable, walkingReachesFlag } from "./run.js";
+import { collectCheckpoints, reachedFlag, walkingReachable, walkingReachesFlag } from "./run.js";
 import { openSpaceRatio } from "./terrain.js";
 
 export class RouteGenerationError extends Error {
@@ -69,7 +69,9 @@ function routeGraph(terrain, distance, directions, repair) {
       nodes.push(node);
       byPosition.set(`${x},${y}`, node);
       if (distance[cell] <= 12 && terrain.photoSolid[(y + 9) * terrain.width + x + 3]) anchors.push(node);
-      else if (repair && x % 24 === 4 && y % 24 === 12) anchors.push(node);
+      else if (repair && ((x % 24 === 4 && y % 24 === 12)
+        || x === 4 || x + 4 > terrain.width - 10
+        || y === 12 || y + 4 > terrain.height - 18)) anchors.push(node);
     }
   }
   for (const node of nodes) {
@@ -81,24 +83,58 @@ function routeGraph(terrain, distance, directions, repair) {
   return { nodes, anchors };
 }
 
+function precedesRouteNode(left, right) {
+  return left.score < right.score || (left.score === right.score && left.sequence < right.sequence);
+}
+
+function pushRouteNode(open, entry) {
+  let index = open.length;
+  open.push(entry);
+  while (index > 0) {
+    const parent = Math.floor((index - 1) / 2);
+    if (!precedesRouteNode(entry, open[parent])) break;
+    open[index] = open[parent];
+    index = parent;
+  }
+  open[index] = entry;
+}
+
+function popRouteNode(open) {
+  const first = open[0];
+  const last = open.pop();
+  if (open.length > 0) {
+    let index = 0;
+    while (true) {
+      const left = index * 2 + 1;
+      const right = left + 1;
+      if (left >= open.length) break;
+      const child = right < open.length && precedesRouteNode(open[right], open[left]) ? right : left;
+      if (!precedesRouteNode(open[child], last)) break;
+      open[index] = open[child];
+      index = child;
+    }
+    open[index] = last;
+  }
+  return first;
+}
+
 function pathBetween(start, goal, graph, terrain, used, distance) {
   const cost = new Float64Array(graph.nodes.length).fill(Infinity);
   const previous = new Int32Array(graph.nodes.length).fill(-1);
-  const open = new Set([start.id]);
+  const open = [];
+  let sequence = 0;
   cost[start.id] = 0;
-  while (open.size) {
-    let id = -1, best = Infinity;
-    for (const candidate of open) {
-      const node = graph.nodes[candidate];
-      const score = cost[candidate] + (Math.abs(node.x - goal.x) + Math.abs(node.y - goal.y)) / 4;
-      if (score < best) { best = score; id = candidate; }
-    }
+  const heuristic = (node) => (Math.abs(node.x - goal.x) + Math.abs(node.y - goal.y)) / 4;
+  pushRouteNode(open, { id: start.id, cost: 0, score: heuristic(start), sequence: sequence++ });
+  while (open.length) {
+    const current = popRouteNode(open);
+    const id = current.id;
+    if (current.cost !== cost[id]) continue;
     if (id === goal.id) {
       const path = [];
       for (let cursor = id; cursor >= 0; cursor = previous[cursor]) path.push(graph.nodes[cursor]);
       return path.reverse();
     }
-    open.delete(id);
     const node = graph.nodes[id];
     for (const next of node.links) {
       if (used.has(next.id) && next.id !== start.id) continue;
@@ -111,7 +147,7 @@ function pathBetween(start, goal, graph, terrain, used, distance) {
       if (candidate >= cost[next.id]) continue;
       cost[next.id] = candidate;
       previous[next.id] = id;
-      open.add(next.id);
+      pushRouteNode(open, { id: next.id, cost: candidate, score: candidate + heuristic(next), sequence: sequence++ });
     }
   }
   return null;
@@ -185,31 +221,42 @@ export function planReferenceRoute(terrain, random = Math.random, repair = false
   }
   const failures = {};
   const reject = (reason) => { failures[reason] = (failures[reason] || 0) + 1; };
+  const firstEdge = Math.floor(random() * 4);
+  let best = null;
+  let bestEdgeRank = Infinity;
+  let bestMeetsQualityTargets = false;
   for (let attempt = 0; attempt < 32; attempt += 1) {
-    const edge = ["left","top","bottom","right"][Math.floor(random()*4)];
-    const edgeDistance = node => edge === "left" ? node.x : edge === "right" ? terrain.width-node.x
-      : edge === "top" ? node.y : terrain.height-node.y;
-    const start = graph.anchors[Math.floor(random() * graph.anchors.length)];
+    const edgeRank = Math.floor(attempt / 8);
+    const edge = ["left","top","bottom","right"][(firstEdge + edgeRank) % 4];
+    const nearFinishEdge = node => edge === "left" ? node.x <= terrain.width * 0.1
+      : edge === "right" ? node.x + 9 >= terrain.width * 0.9
+      : edge === "top" ? node.y - 9 <= terrain.height * 0.1
+      : node.y + 9 >= terrain.height * 0.9;
+    const starts = graph.anchors.filter(node => edge === "left" ? node.x + 6 >= terrain.width * 0.9
+      : edge === "right" ? node.x <= terrain.width * 0.1
+      : edge === "top" ? node.y + 9 >= terrain.height * 0.9
+      : node.y <= terrain.height * 0.1);
+    if (!starts.length) { reject("no opposing-edge start"); continue; }
+    const start = starts[Math.floor(random() * starts.length)];
     const points = [start], used = new Set([start.id]), sections = [];
     let current = start;
     for (let section = 0; section < 5; section += 1) {
       const candidates = graph.anchors.filter((node) => {
         const separation = Math.abs(node.x - current.x) + Math.abs(node.y - current.y);
-        return separation >= 80 && separation <= 160 && !used.has(node.id)
-          && (section < 4 || Math.hypot(node.x - start.x, node.y - start.y) >= Math.hypot(terrain.width,terrain.height)*0.4+12)
+        return separation >= 80 && (section === 4 || separation <= 180) && !used.has(node.id)
+          && (section < 4 || nearFinishEdge(node))
           && points.every((point) => Math.hypot(point.x - node.x, point.y - node.y) >= 16);
       });
-      if(section===4 && candidates.length){
-        const nearest=Math.min(...candidates.map(edgeDistance));
-        for(let index=candidates.length-1;index>=0;index-=1){
-          if(edgeDistance(candidates[index])>nearest+4)candidates.splice(index,1);
-        }
-      }
       if (!candidates.length) break;
       let path = null;
-      for (let trial = 0; trial < Math.min(8, candidates.length); trial += 1) {
+      const sampledCandidates = [];
+      for (let trial = 0; trial < Math.min(4, candidates.length); trial += 1) {
         const index = Math.floor(random() * candidates.length);
-        const candidate = candidates.splice(index, 1)[0];
+        sampledCandidates.push(candidates.splice(index, 1)[0]);
+      }
+      const estimatedDuration = node => Math.abs(node.x - current.x) + 4 * Math.abs(node.y - current.y);
+      sampledCandidates.sort((left, right) => estimatedDuration(right) - estimatedDuration(left));
+      for (const candidate of sampledCandidates) {
         path = pathBetween(current, candidate, graph, terrain, used, distance);
         if (path) break;
       }
@@ -219,7 +266,8 @@ export function planReferenceRoute(terrain, random = Math.random, repair = false
         to: { x: path.at(-1).x, y: path.at(-1).y } });
       current = path.at(-1);
     }
-    if (sections.length < (attempt<8 ? 4 : 2)) { reject("too few connected sections"); continue; }
+    if (sections.length < 2) { reject("too few connected sections"); continue; }
+    if (!nearFinishEdge(current)) { reject("finish outside opposing edge band"); continue; }
     const clearance = reserve(terrain, points);
     const solid = terrain.photoSolid.map((cell, index) => clearance[index] ? 0 : cell);
     for(const connector of terrain.connectors || []){
@@ -286,16 +334,26 @@ export function planReferenceRoute(terrain, random = Math.random, repair = false
     }
     if (walkingReachesFlag(candidate, walkingReachable(candidate, spawn), flag)) { reject("walking-only finish"); continue; }
     const simulation = simulatePath(candidate, points);
-    if (simulation.invalid || (attempt<8 && (simulation.seconds < 20 || simulation.seconds > 40))
+    if (simulation.invalid
       || simulation.walking < 0.5 || simulation.climbing < 0.5 || !reachedFlag({ player: simulation.player, flag })) {
       reject(simulation.invalid ? simulation.reason
         : `reference duration ${simulation.seconds.toFixed(1)}s, walking ${simulation.walking.toFixed(1)}s`); continue;
     }
-    return { ...candidate, edge, route: { sections, actions: simulation.actions, seconds: simulation.seconds,
+    const planned = { ...candidate, edge, route: { sections, actions: simulation.actions, seconds: simulation.seconds,
       clearance, protected: protect(terrain,clearance), points: points.map(({x,y}) => ({x,y})) },
       platforms,
       connectors: (terrain.connectors || []).filter(connector=>connector.cells.every(cell=>solid[cell])) };
+    const meetsQualityTargets = sections.length >= 4 && sections.length <= 6
+      && simulation.seconds >= 20 && simulation.seconds <= 40;
+    if (!best || edgeRank < bestEdgeRank || (edgeRank === bestEdgeRank
+      && ((meetsQualityTargets && !bestMeetsQualityTargets)
+        || (meetsQualityTargets === bestMeetsQualityTargets && simulation.seconds > best.route.seconds)))) {
+      best = planned;
+      bestEdgeRank = edgeRank;
+      bestMeetsQualityTargets = meetsQualityTargets;
+    }
   }
+  if (best) return best;
   if(!repair) return planReferenceRoute(terrain,random,true);
   throw new RouteGenerationError(Object.entries(failures).map(([reason, count]) => `${reason}: ${count}`).join("; "));
 }
@@ -303,6 +361,17 @@ export function planReferenceRoute(terrain, random = Math.random, repair = false
 export function verifyReferenceRoute(level) {
   const start = {...level.spawn,width:6,height:9};
   const finish = {...level.flag,y:level.flag.y-level.flag.height};
+  const checkpoints = level.checkpoints || [];
+  if (checkpoints.length < 1 || checkpoints.length > 2) {
+    return { valid: false, seconds: 0, reason: "mandatory checkpoint count" };
+  }
+  const opposed = level.edge === "left" ? finish.x <= level.width * 0.1
+      && start.x + start.width >= level.width * 0.9
+    : level.edge === "right" ? finish.x + finish.width >= level.width * 0.9 && start.x <= level.width * 0.1
+    : level.edge === "top" ? finish.y <= level.height * 0.1
+      && start.y + start.height >= level.height * 0.9
+    : level.edge === "bottom" && finish.y + finish.height >= level.height * 0.9 && start.y <= level.height * 0.1;
+  if (!opposed) return { valid: false, seconds: 0, reason: "endpoints outside opposing edge bands" };
   for(const rectangle of [start,finish]){
     if(rectangle.x<0 || rectangle.y<0 || rectangle.x+rectangle.width>level.width
       || rectangle.y+rectangle.height>level.height){
@@ -327,6 +396,8 @@ export function verifyReferenceRoute(level) {
     return {valid:false,seconds:0,reason:"invalid supplemental platform"};
   }
   const player = createPlayer(level.spawn.x, level.spawn.y);
+  const checkpointRun = { player, flag: level.flag,
+    checkpoints: checkpoints.map(checkpoint => ({ ...checkpoint, reached: false })) };
   const enemies = (level.enemies || []).map((enemy) => ({ ...enemy }));
   const terrain = { ...level, solid: level.solid.slice() };
   let seconds = 0, section = 0, walking = 0, climbing = 0;
@@ -338,6 +409,7 @@ export function verifyReferenceRoute(level) {
     }
     const previous = { ...player };
     stepPlayer(player, action.input, terrain, action.dt);
+    collectCheckpoints(checkpointRun);
     const releasingUp = previous.upHeld && !action.input.moveY
       && level.route.actions[index + 1]?.input.moveY < 0;
     if (Math.hypot(player.x - previous.x, player.y - previous.y) < 1e-9
@@ -358,6 +430,6 @@ export function verifyReferenceRoute(level) {
   const openness = openSpaceRatio(level);
   return { valid: seconds > 0 && Math.abs(seconds-level.route.seconds)<1e-8
     && walking>=0.5 && climbing>=0.5 && section>=level.route.sections.length-1 && level.route.sections.length >= 2
-    && reachedFlag({ player, flag: level.flag })
+    && reachedFlag(checkpointRun)
     && !walkingReachesFlag(level,walkingReachable(level,level.spawn),level.flag), seconds, openness };
 }

@@ -1,5 +1,6 @@
 const NORMAL_SPEED = 80;
 const CLIMB_SPEED = NORMAL_SPEED / 4;
+const EXCAVATION_SPEED = CLIMB_SPEED / 2;
 export const GRAVITY = 420;
 const JUMP_VELOCITY = -180;
 const PLAYER_WIDTH = 6;
@@ -82,12 +83,18 @@ function overlapsSolid(player, terrain) {
   const bottom = Math.ceil(player.y + player.height - 1e-9) - 1;
   for (let y = top; y <= bottom; y += 1) {
     for (let x = left; x <= right; x += 1) {
-      if (isSolid(terrain, x, y)) {
+      if (x >= 0 && x < terrain.width && y >= 0 && y < terrain.height
+        && terrain.solid[y * terrain.width + x] === 1) {
         return true;
       }
     }
   }
-  return false;
+  return (terrain.movingPlatforms || []).some(platform => (
+    player.x < platform.x + platform.width - 1e-9
+      && player.x + player.width > platform.x + 1e-9
+      && player.y < platform.y + platform.height - 1e-9
+      && player.y + player.height > platform.y + 1e-9
+  ));
 }
 
 function surfaceContact(player, terrain) {
@@ -176,6 +183,13 @@ function moveAxis(player, distance, axis, terrain) {
     }
   }
   return true;
+}
+
+export function platformCarryDistance(player, distance, terrain) {
+  const probe = { ...player, grounded: false, drilling: false };
+  const target = Math.max(0, Math.min(terrain.width - player.width, player.x + distance));
+  moveAxis(probe, target - player.x, "x", terrain);
+  return probe.x - player.x;
 }
 
 function drillTunnel(player, terrain, lookAhead = 0, probe = false) {
@@ -293,8 +307,9 @@ export function stepPlayer(player, input, terrain, dt) {
 
   if (player.climbing) {
     const magnitude = Math.max(1, Math.hypot(direction, vertical));
-    player.vx = direction * movementSpeed(CLIMB_SPEED) / magnitude;
-    player.vy = vertical * movementSpeed(CLIMB_SPEED) / magnitude;
+    const speed = movementSpeed(player.excavating ? EXCAVATION_SPEED : CLIMB_SPEED);
+    player.vx = direction * speed / magnitude;
+    player.vy = vertical * speed / magnitude;
     const animationDistance = Math.hypot(player.vx, player.vy) * elapsed;
     const beforeX = player.x;
     const beforeY = player.y;
@@ -328,7 +343,7 @@ export function stepPlayer(player, input, terrain, dt) {
     player.facing = direction;
   }
 
-  const speed = movementSpeed(player.excavating ? CLIMB_SPEED : NORMAL_SPEED);
+  const speed = movementSpeed(player.excavating ? EXCAVATION_SPEED : NORMAL_SPEED);
   const horizontalDistance = (wallLaunch || direction) * speed * elapsed;
   player.vx = (wallLaunch || direction) * speed;
   if (wallLaunch) player.facing = wallLaunch;
@@ -339,7 +354,7 @@ export function stepPlayer(player, input, terrain, dt) {
   player.x = Math.max(0, Math.min(terrain.width - player.width, player.x));
   player.vy += GRAVITY * elapsed;
   if (player.drilling && player.drillY > 0) {
-    player.vy = Math.min(player.vy, movementSpeed(CLIMB_SPEED));
+    player.vy = Math.min(player.vy, movementSpeed(player.excavating ? EXCAVATION_SPEED : CLIMB_SPEED));
   }
   const verticalDistance = player.vy * elapsed;
   const previousY = player.y;

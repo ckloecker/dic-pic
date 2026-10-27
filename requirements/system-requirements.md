@@ -33,6 +33,7 @@ The player name shall be letters and spaces only, with a maximum length of 32 ch
 
 After successfully reaching the exit, the player shall see their time.
 Along the time, a leaderboard with the top 10 lowest times for this level shall be shown with the respective player name.
+Each leaderboard shall be specific to the SHA-256 hash of the original input image and the exact selected suggestion, including its layout and generated geometry.
 Leaderboard entries shall be stored in browser cookies and shall not be shared with other devices or browsers.
 The game shall disclose that leaderboard data is stored in cookies.
 The exact just-completed attempt shall have a clearly outlined row labeled "Your run".
@@ -133,6 +134,8 @@ The message shall reflect the run's leaderboard placement when a ranked placemen
 ## REQ-SYS-18: Full-Screen Gameplay
 
 The game shall provide an accessible control to enter and leave browser full-screen mode for the gameplay frame.
+Full-screen mode shall center gameplay and use the largest aspect-preserving canvas that fits the viewport.
+When the viewport can accommodate the in-page canvas, full-screen mode shall not make the canvas smaller.
 The control shall report full-screen API failures visibly and shall remain usable by keyboard and touch.
 
 ## REQ-SYS-19: Mobile Follow Camera

@@ -26,7 +26,7 @@ Validate the actual physics and enemy simulation without drilling or idle paddin
 Prefer 55–70% open cells without rejecting sparse or dense sources solely for occupancy.
 Connect useful detected surfaces and add missing horizontal supports without manufacturing vertical walls.
 Keep the free climbing and jumping controls; reference-route timing does not forbid shortcuts.
-REQ-MOV-03 limits active excavation to twenty cells per second horizontally, retaining eighty in open space and preserving climbing, gravity, fixed-height jumping, and the double jump.
+REQ-MOV-03 limits active excavation to ten cells per second in every controlled direction, retaining eighty for open walking and twenty for open climbing while preserving gravity, fixed-height jumping, and the double jump.
 REQ-SYS-06 uses per-attempt identity for highlighting rather than matching name/time, stable equal-time ordering, and a transient unranked footer outside the stored top ten.
 Research basis: [constructive generation and generator evaluation](https://www.pcgbook.com/) and [Spelunky's connected solution-path construction](https://tinysubversions.com/spelunkyGen/).
 
@@ -56,7 +56,9 @@ Connector cells are ordinary visible collision terrain, not new photo-edge evide
 First build a four-cell waypoint graph within twenty-four cells of a real traced edge.
 Use A* with original occupancy, local edge direction, and distance-to-real-edge costs to prefer photo-aligned non-retracing sections.
 If natural anchors or connected paths are insufficient, extend the graph through open background and add candidate supported waypoints.
-Sample a preferred finish edge and prioritize its nearest eligible final anchors while retaining the distant-start constraint.
+Sample a preferred finish edge and require supported endpoint footprints in opposing outer ten-percent bands.
+Repair anchors include the graph's perimeter so a lack of natural edge support does not force endpoints into the image middle.
+Try eight candidates per edge in cyclic order from the sampled edge, preferring the first edge with a valid route before ranking its candidates by quality and duration.
 Reserve twelve-by-eighteen clearance along the route and clear that corridor from provisional photo filling.
 Remove deepest optional interior filling toward 65% open space without inventing filler to meet a ground percentage.
 Keep original foot support at spawn and finish and remove an entire connector if its cells or either anchor lose support.
@@ -65,14 +67,18 @@ Each shelf records only its newly added collision cells, leaving photo-edge evid
 Reject walking-only finishes using the conservative walking graph both before and after scenery placement.
 Execute walking and background-climbing inputs using `stepPlayer`, recording the actual timestep and input sequence until gate contact.
 Require at least half a second of each movement mode and at least two connected sections without idle padding.
-The first eight candidate attempts prioritize four or more sections and twenty-to-forty-second durations, then allow valid routes outside those quality targets.
+Four-to-six sections and twenty-to-forty-second durations remain preferences rather than rejection conditions.
+Within the first viable sampled edge, evaluate every valid candidate in the bounded search, preferring candidates in both quality ranges and selecting the longest verified duration within the preferred set.
+If none meet both quality ranges, select the longest valid candidate rather than rejecting the level.
 The reference route uses walking and climbing; fixed-height jumps and double jumps remain available for player-selected shortcuts rather than being required by the recorded route.
 Dilate reserved clearance by three cells to protect floor/wall contact probes from later scenery.
 After scenery and patrol placement, replay the stored actions against the final mask and actual enemy simulation.
-Reject drilling, enemy contact, blocked clearance, unsafe endpoints, invalid platforms/connectors, invalid timesteps, mismatched replay duration, missing sections, and premature finish.
+Reject drilling, enemy contact, blocked clearance, unsafe endpoints or opposing bands, invalid checkpoint counts, invalid platforms/connectors, invalid timesteps, mismatched replay duration, missing sections, unvisited mandatory checkpoints, and premature finish.
 Openness and duration are measured but their former fixed ranges do not determine final validity.
 Try at most thirty-two candidates in each natural/repair graph stage and four assemblies per option.
-Later assemblies retain the twelve strongest layout-weighted traces as ordinary four-cell-thick photo surfaces to suppress clutter before route repair.
+The first three assemblies retain twelve photo traces as ordinary four-cell-thick surfaces, ranking usable layout-matching traces before the opposite orientation and ordering each group by strength.
+Balanced layouts rank every trace by strength, and missing preferred-orientation traces fall back to the available real photo edges without inventing walls.
+The fourth assembly retains the original photo-derived mask as a final safety fallback.
 Final safety failure raises `RouteGenerationError` rather than silently returning an unsafe option.
 Exact-option identity revision 8 includes supplemental platform cells, pickups, and moving-platform metadata along with existing geometry and patrol definitions.
 
@@ -84,9 +90,16 @@ REQ-LVL-17 requires a fresh random number engine initialized with the same fixed
 Biome/layout shuffles, route attempts and repairs, endpoint selection, scenery placement, pickup placement, platform placement, and initial enemy generation must consume that reproducible sequence rather than time-based or session-dependent randomness.
 Repeated generation of the same image must yield identical ordered options and initial previews, even after generating another image or starting a new browser session.
 Photo analysis and provisional closing/filling precede route planning; route clearance and optional fill removal precede biome scenery.
-Strongest photo-edge strength takes precedence over preferred layout orientation, subject to safe endpoints and the verified no-drill route.
+Horizontal and vertical layout preference takes precedence over raw photo-edge strength, subject to safe endpoints and the verified no-drill route.
+Regression tests check final collision geometry for orientation separation after route repair rather than relying only on different raw detection masks.
 Each option marks some terrain as visibly non-drillable while preserving a drillable path to the exit and keeping the gate and validated route unobstructed.
-Each option places zero to two glowing checkpoints on its validated route; the gate stays visibly closed until all checkpoints are touched.
+Each option randomly chooses one or two glowing mandatory checkpoints on its validated route; the gate stays visibly closed until all checkpoints are touched.
+The shared checkpoint renderer skips reached markers entirely, including their glow, while run state retains their reached flags for completion and reset.
+The locked gate retains its checkered banner and shows a red crossbar spanning the opening behind a dark-outlined yellow padlock with a keyhole.
+A bright red pixel-aligned X overlays the full width and height of the checkered banner while locked, without drawing outside the gate footprint.
+Both the barrier and padlock disappear when every checkpoint is reached, without changing collision or completion bounds.
+Checkpoint selection maximizes the normalized bounding-box area of the start, checkpoints, and finish, breaking ties by the minimum total direct travel distance between those visits across both checkpoint orders.
+Visits retain at least fifteen cells of consecutive separation and route order.
 Checkpoint progress, non-drillable cells, enemy mode, and combat permissions are retained in the exact selected option and restored on reset.
 Exterior flood fill distinguishes open background from enclosed photo-derived regions.
 Jungle trees use 27-to-45-cell silhouettes with trunks, roots, layered canopies, climbing plants, and hanging vines.
@@ -96,10 +109,11 @@ Placement requires terrain support, clear space outside the protected route, sep
 Part-coded cells provide bark, canopy, plant, rock, and bone textures without drawing solid artwork outside the collision mask.
 Thin grass/leaf accents are cosmetic and disappear when their terrain anchor is drilled.
 Biome element cells share the terrain mask and are therefore drillable with normal collision.
-The shared scene renderer draws identical terrain colors, elements, gates, and biome headwear for thumbnails and live play.
+The shared scene renderer draws identical terrain colors, elements, gates, checkpoints, and biome headwear for thumbnails and live play, with checkpoint glow scaled consistently.
 Headwear stays within the original collision footprint in standing and climbing poses.
 Options retain their original mask, spawn, gate, biome, and layout.
-A SHA-256 digest of photo identity and serialized exact option geometry, pickups, and moving platforms identifies leaderboard scores.
+A SHA-256 digest of the original input image bytes combined with serialized exact option geometry, pickups, and moving platforms identifies leaderboard scores.
+The selected biome and layout are part of the option identity so neither different images nor different suggestions share persistent scores.
 Reset clones the selected option rather than regenerating or resampling randomness.
 Each option contains one to three speed pickups and one to three time-penalty mushrooms outside the required route clearance.
 Pickup placement checks the full eight-by-eight-cell artwork and collection footprint against terrain, image bounds, and protected route cells.
@@ -110,6 +124,10 @@ It also contains two collidable twelve-by-three-cell platforms at eighteen terra
 Platform path bounds extend into adjacent cells only after those cells become clear, including when drilling removes blocking terrain.
 Speed pickups double movement in all locomotion modes for five seconds, never stack, and refresh on recollection.
 Each mushroom subtracts two seconds from run time, including allowing negative final times.
+On collection, the run records one world-position label per mushroom and reports the total time reduction for that frame to a screen-reader status inside the fullscreen game frame.
+The renderer draws outlined "-2s" text centered on each collected mushroom for 1.5 seconds, fading during the final 0.75 seconds.
+Labels are drawn after scene actors using the same camera transform, including in fullscreen, and are clamped within image bounds.
+Run effects age and remove labels independently of later collection passes, and reset clears them.
 Run reset restores pickup availability and initial moving-platform positions.
 Thumbnails and gameplay draw the same pickups and initial platform positions.
 Both draw moving platforms before enemies and pickups so decorative auras composite consistently.
@@ -194,16 +212,18 @@ Jump press while climbing clears buffered input, detaches immediately, and resto
 A consumed-jump latch prevents the same press from launching on landing or on release.
 Another Up edge is required to reattach.
 Climbing respects mask collisions, the ceiling, and the solid image bottom.
-Moving platform collision uses a separate dynamic mask so its cells remain distinct from photo terrain and drilling.
-The run loop carries a supported rider with platform movement and updates each platform's clear path bounds when drilling opens additional cells.
+Moving platform overlap uses exact rectangles rather than raster-expanded cells, keeping fractional edge contact distinct from penetration and keeping platforms separate from drillable photo terrain.
+The run loop carries a supported rider, stops a platform before its movement intersects the player, resumes it in the same direction when the path clears, and updates clear path bounds when drilling opens additional cells.
+Before each platform travel segment, `platformCarryDistance` probes the rider's bounded horizontal collision sweep without drilling or automatic step-up, limiting both rider and platform travel before any wall, other platform, or image boundary.
 The drill direction is normalized from directional input, defaulting to horizontal facing.
 A rectangular cutter extends 10 cells from the player center along that direction.
 Its transverse half-width covers the projected player footprint plus half a cell, producing a passable tunnel rather than a surrounding excavation.
 For horizontal drilling, cells wholly below the player's feet shall remain solid so walking drill travel does not remove the supporting floor.
 The cutter runs before collision checks at each half-cell movement substep and while stationary.
 Probe the current cutter and its next-frame reach before excavation so rasterization cannot alternate normal and slow speeds at high frame rates.
-Active excavation limits horizontal normal-mode movement to twenty cells per second, while an empty cutter retains eighty.
-Downward active excavation limits vertical movement to twenty cells per second instead of allowing gravity to accelerate drill descent.
+Active excavation uses a separate ten-cell-per-second limit for horizontal normal-mode movement and normalized climbing movement, while an empty cutter retains eighty for walking and twenty for climbing.
+Downward active excavation limits vertical movement to ten cells per second instead of allowing gravity to accelerate drill descent.
+The speed-pickup multiplier applies to the selected base speed without changing the existing twofold boost.
 Drilling while airborne switches the player to background-climbing movement with gravity suspended while the drill remains active.
 Drilling ignores marked non-drillable terrain cells, and terrain rendering distinguishes those cells from drillable material.
 Excavation increments terrain version only when cells change and does not change double-jump availability.

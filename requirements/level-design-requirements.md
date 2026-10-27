@@ -47,10 +47,13 @@ Only interior filling shall be 20% transparent (80% opaque), keeping the origina
 
 The exit shall be a conspicuous two-pole gate with a checkered finish banner, approximately twice the character's width and height.
 The complete gate artwork and completion area shall remain within the image bounds.
-Its initial position shall prioritize safe support nearest a randomly selected level edge, not always the right edge, subject to the non-walking-route rule.
-The player shall start at a safe distant position, usually opposite the gate, so the route is not trivial.
+Its initial position shall use safe support within the outer ten percent of a randomly selected level edge, not always the right edge, subject to the non-walking-route rule.
+The player shall start at a safe position within the outer ten percent of the opposing edge.
+Edge proximity shall be measured from the nearest side of each endpoint's collision footprint, while keeping both complete footprints inside the image.
 Placement shall reject start/finish pairs reachable by walking alone, including automatic small steps, slopes, and gravity-driven falls along the solid picture bottom.
 Generation shall try alternative safe placements and edges and repair terrain with supplemental platforms before reporting an inability to construct a safe non-walking route.
+Within the first sampled edge that admits safe opposing-edge endpoints, generation shall prefer routes that meet the four-to-six-section and twenty-to-forty-second quality targets, selecting the longest verified no-drill route within that preferred set.
+If no candidate meets those quality targets, generation shall select the longest verified route among the otherwise valid candidates without rejecting routes solely for missing the targets.
 The gate shall remain fixed for the run, even if its supporting terrain is drilled away.
 No undrillable terrain shall be added to support it.
 
@@ -96,6 +99,7 @@ Status: Approved.
 
 Each generated option shall randomly favor horizontal, vertical, or balanced photo-edge geometry using local detected edge directions rather than whole-object bounding boxes.
 Horizontal layouts shall prioritize horizontal/sloped traversal edges, vertical layouts shall prioritize vertical-ish traversal edges, and balanced layouts shall consider both.
+Layout preference may outrank raw edge strength to make horizontal and vertical suggestions clearly distinct when the image provides usable edges in both orientations.
 Mixed-orientation photos shall produce measurably different collision geometry, not merely different feature processing order.
 Small gaps in detected photo contours shall be bridged using morphological closing before enclosed-region filling and platform splitting.
 Enclosed photo-derived regions may be filled only as compatible with route clearance and breathing room.
@@ -161,6 +165,7 @@ Status: Approved.
 Generation shall plan a contiguous traversal corridor aligned to the strongest detected photo edges before finalizing filling, scenery, checkpoints, and enemies.
 Every offered option shall include a reference route verified with the actual movement and enemy simulation without drilling and shall visit every generated checkpoint before reaching the exit.
 Four to six traversal sections and twenty to forty seconds are quality targets rather than rejection conditions.
+The planner shall compare its bounded valid candidates and select the longest verified no-drill route among candidates meeting both quality targets, falling back to the longest otherwise valid route if none meet them.
 The route shall provide varied traversal and breathing room rather than a straight walk or continuous digging.
 Idle waiting shall not be used to inflate the reference duration.
 The corridor shall normally provide at least twelve cells of width and eighteen cells of height, with larger clearance for jump arcs.
@@ -196,6 +201,8 @@ Touching a speed pickup shall double the character's movement speed in every loc
 Touching a mushroom pickup shall subtract two seconds from the player's elapsed time, and repeated mushrooms may produce negative times.
 Speed effects shall not stack, and collecting another speed pickup while the effect is active shall refresh its five-second duration.
 Each collected mushroom shall apply its own two-second time subtraction.
+Each mushroom collection shall visibly announce the amount subtracted in a transient, screen-reader-readable gameplay status message.
+The visual "-2s" label shall appear at the collected mushroom's position and fade away, including during fullscreen play.
 Pickups shall be visible, collectible, and outside the required no-drill route clearance.
 Pickup artwork and collection bounds shall measure eight by eight terrain cells, twice the former width and height.
 Speed pickups shall be recognizable bright-yellow lightning bolts, and mushrooms shall be vivid magenta/red with contrasting spots, stems, and dark outlines.
@@ -211,14 +218,19 @@ Non-drillable terrain shall not support or protect the finish gate or obstruct t
 
 ## REQ-LVL-23: Required Checkpoints
 
-Each generated level option shall contain zero to two reproducibly placed intermediate checkpoints on the validated route.
+Each generated level option shall contain one or two reproducibly placed intermediate checkpoints on the validated route, with the count chosen randomly.
+Placement shall maximize geographic spread of mandatory visits across the image rather than randomly clustering checkpoints near the start, finish, or one another.
+Among equally spread placements, generation shall prefer the longer minimum direct travel distance through all mandatory visits, allowing checkpoints to be collected in either order.
 Every checkpoint shall be clearly visible with a glow and must be touched before the exit opens.
-The closed exit shall have a clear visual indicator, and touching all checkpoints shall visibly open it.
+Collected checkpoints shall disappear completely, including their glow, while retaining collection progress until reset.
+The closed exit shall show a conspicuous red barrier across its opening and a contrasting padlock, and touching all checkpoints shall remove both indicators to visibly open it.
+While locked, the exit shall also show a bright red X spanning the black-and-white finish banner, drawn over the checks and removed immediately when the exit opens.
 Reset shall restore all checkpoint markers and close the exit.
 
 ## REQ-LVL-24: Strongest-Edge Priority
 
-Terrain selection shall prioritize the strongest visible photo edges over weaker edges that better fit a preferred layout orientation.
+Terrain selection shall prioritize usable photo edges matching the selected horizontal or vertical layout, ranking matching edges by strength before filling remaining slots from the other orientation.
+Balanced layouts shall rank all usable photo edges by strength without an orientation preference.
 Strongest-edge selection shall remain subject to the safe-start, no-drill completion, clear-route, and in-bounds requirements in REQ-LVL-07/16.
 
 ## REQ-LVL-19: Optional Moving Platforms
@@ -229,6 +241,8 @@ Each generated level option shall contain two visible, collidable moving platfor
 Platforms shall move horizontally at eighteen terrain cells per second within bounded obstacle-free paths.
 Platforms shall remain optional shortcuts and shall not be required by the verified no-drill route.
 When the player drills away terrain blocking a platform path, that platform's movement bounds shall extend into the newly cleared space.
+When a platform's horizontal movement would intersect the player, it shall stop before contact without pushing the player, and resume in its current direction when the path is clear.
+Fractional platform contact shall not embed or trap the player, and carrying a rider shall stop before the rider intersects terrain, another platform, or an image boundary.
 Platform motion shall begin with the race timer.
 Previews shall show each platform at its initial position, and reset shall restore the initial positions.
 

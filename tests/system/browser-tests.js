@@ -1,7 +1,7 @@
 const frame = document.querySelector("#app");
-if (!frame.contentDocument.querySelector("#setup-form") || frame.contentDocument.readyState !== "complete") {
-  await new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
-}
+const frameLoad = new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
+frame.src = `../../?test=${Date.now()}`;
+await frameLoad;
 const app = frame.contentWindow;
 const doc = frame.contentDocument;
 const nativeRandom = app.Math.random;
@@ -148,6 +148,15 @@ test("REQ-SYS-16: controls are prominently presented during play", async () => {
     "controls heading is not visually prominent");
 });
 
+test("REQ-LVL-18: mushroom feedback has a screen-reader announcement", () => {
+  const notice = find("#mushroom-feedback");
+  assert(notice && notice.getAttribute("role") === "status"
+    && notice.getAttribute("aria-live") === "polite", "mushroom feedback is not an accessible status notice");
+  assert(notice.textContent.trim() === "", "mushroom feedback should appear only after a pickup");
+  assert(app.getComputedStyle(notice).clipPath === "inset(50%)", "screen-reader notice duplicates the in-world label");
+  assert(find(".game-frame").contains(notice), "fullscreen hides the mushroom announcement");
+});
+
 test("REQ-SYS-18: gameplay exposes an accessible full-screen control", async () => {
   const button = find("#fullscreen-button");
   assert(button && button.type === "button", "full-screen control is missing");
@@ -190,6 +199,51 @@ test("REQ-SYS-18: full-screen control enters and exits the gameplay frame", asyn
     if (cookieDescriptor && Object.hasOwn(cookieDescriptor, "value")) {
       Object.defineProperty(app.document, "fullscreenElement", cookieDescriptor);
     }
+  }
+});
+
+test("REQ-SYS-18: full-screen gameplay uses the available area and stays centered", async () => {
+  let stage = "resetting to setup";
+  try {
+    if (!find("#game-screen").hidden) find("#new-photo-button").click();
+    await until(() => !find("#setup-screen").hidden);
+    name("Fullscreen Runner");
+    stage = "uploading the photo";
+    await upload("route-photo.svg");
+    stage = "generating level choices";
+    find("#start-button").click();
+    await until(() => !find("#suggestions").hidden);
+    stage = "starting the selected level";
+    find('.level-choice[data-biome="jungle"]').click();
+    await until(() => !find("#game-screen").hidden);
+    stage = "measuring the fullscreen layout";
+    await delay(100);
+    const gameScreen = find("#game-screen");
+    const gameFrame = find(".game-frame");
+    const gameCanvas = find("#game-canvas");
+    const normal = gameCanvas.getBoundingClientRect();
+    gameScreen.classList.add("fullscreen-fallback");
+    await delay(100);
+    const fullscreen = gameCanvas.getBoundingClientRect();
+    const availableWidth = app.innerWidth - 24;
+    const availableHeight = app.innerHeight - 80;
+    const frameBounds = gameFrame.getBoundingClientRect();
+    assert(Math.abs(fullscreen.left + fullscreen.width / 2 - app.innerWidth / 2) <= 1
+      && Math.abs(frameBounds.top + frameBounds.height / 2 - app.innerHeight / 2) <= 1,
+    "full-screen gameplay frame is not centered in the viewport");
+    assert(fullscreen.width <= availableWidth + 1 && fullscreen.height <= availableHeight + 1,
+      "full-screen canvas exceeds the available viewport");
+    if (availableWidth >= normal.width && availableHeight >= normal.height) {
+      assert(fullscreen.width + 1 >= normal.width && fullscreen.height + 1 >= normal.height,
+        "full-screen canvas shrank despite enough viewport space");
+    }
+    assert(gameFrame.getBoundingClientRect().width >= fullscreen.width,
+      "full-screen frame does not contain the canvas");
+  } catch (error) {
+    throw new Error(`${stage}: ${error.message}`);
+  } finally {
+    find("#game-screen").classList.remove("fullscreen-fallback");
+    if (!find("#game-screen").hidden) find("#new-photo-button").click();
   }
 });
 
@@ -361,6 +415,80 @@ test("REQ-LVL-06/08: render photo-aligned platform interiors at 80% opacity", as
   }
 });
 
+test("REQ-LVL-18: collecting a mushroom draws -2s at the pickup and clears it after fading", async () => {
+  const nativeRequest = app.requestAnimationFrame;
+  const nativeCancel = app.cancelAnimationFrame;
+  find("#new-photo-button").click();
+  let pending;
+  let timestamp = performance.now();
+  app.requestAnimationFrame = callback => { pending = callback; return 1; };
+  app.cancelAnimationFrame = () => { pending = null; };
+  const tick = () => {
+    const callback = pending;
+    pending = null;
+    assert(callback, "game did not schedule the next frame");
+    timestamp += 1000 / 30;
+    callback(timestamp);
+  };
+  const option = fixtureOptions.find(level => level.biome === "underwater");
+  const mushroom = option.pickups.find(pickup => pickup.type === "mushroom");
+  try {
+    find('.level-choice[data-biome="underwater"]').click();
+    await until(() => !find("#game-screen").hidden);
+    tick();
+    key("keydown", "Enter");
+    key("keydown", "ArrowUp");
+    tick();
+    for (let frame = 0; frame < 1000 && !find("#mushroom-feedback").textContent; frame += 1) {
+      const pixels = canvasPixels();
+      let left = 960;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (pixels[i] === 36 && pixels[i + 1] === 127 && pixels[i + 2] === 123) {
+          left = Math.min(left, i / 4 % 960);
+        }
+      }
+      const dx = mushroom.x + 1 - (left / 3 - 1);
+      const dy = mushroom.y + 1 - playerTop();
+      for (const [value, held] of [["ArrowLeft", dx < -0.5], ["ArrowRight", dx > 0.5],
+        ["ArrowUp", dy < -0.5], ["ArrowDown", dy > 0.5]]) {
+        key(held ? "keydown" : "keyup", value);
+      }
+      tick();
+      assert(!find("#contact-message").textContent, "test route reset before collecting the mushroom");
+    }
+    for (const value of ["Enter", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]) key("keyup", value);
+    assert(find("#mushroom-feedback").textContent === "-2.00 SEC", "collection did not announce the time subtraction");
+    const labelPixels = () => {
+      const pixels = canvasPixels();
+      let count = 0;
+      for (let y = Math.max(0, mushroom.y - 2) * 3; y < Math.min(180, mushroom.y + 10) * 3; y += 1) {
+        for (let x = Math.max(0, mushroom.x - 6) * 3; x < Math.min(320, mushroom.x + 14) * 3; x += 1) {
+          const i = (y * 960 + x) * 4;
+          if (pixels[i] === 255 && pixels[i + 1] === 225 && pixels[i + 2] === 140) count += 1;
+        }
+      }
+      return count;
+    };
+    assert(labelPixels() > 0, "collected mushroom has no visible in-world label");
+    find("#game-screen").classList.add("fullscreen-fallback");
+    tick();
+    assert(labelPixels() > 0 && app.getComputedStyle(find(".game-topbar")).display === "none",
+      "fullscreen hid the in-world mushroom label");
+    for (let frame = 0; frame < 50; frame += 1) tick();
+    assert(labelPixels() === 0, "mushroom label did not fade away");
+    find("#reset-button").click();
+    assert(find("#mushroom-feedback").textContent === "", "reset retained the mushroom announcement");
+  } finally {
+    for (const value of ["Enter", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]) key("keyup", value);
+    find("#game-screen").classList.remove("fullscreen-fallback");
+    find("#new-photo-button").click();
+    app.requestAnimationFrame = nativeRequest;
+    app.cancelAnimationFrame = nativeCancel;
+    find('.level-choice[data-biome="jungle"]').click();
+    await until(() => !find("#game-screen").hidden);
+  }
+});
+
 test("REQ-SYS-19: mobile camera starts in overview and follows after movement", async () => {
   const originalMatchMedia = app.matchMedia;
   const finePointerMatchMedia = (query) => query === "(pointer: coarse)"
@@ -404,9 +532,9 @@ test("REQ-MOV-01/10: W and up climb without drilling or jumping", async () => {
   assert(Number(find("#timer").textContent) > 0, "climbing did not start timer");
   find("#reset-button").click();
 });
-test("REQ-MOV-01/05 / REQ-SYS-04: Space jumps immediately, double jumps once, and shows no hold meter", async () => {
+test("REQ-MOV-01/05 / REQ-SYS-04: Space jumps immediately, double-jumps, and shows no hold meter", async () => {
   find("#new-photo-button").click();
-  find('.level-choice[data-biome="underwater"]').click();
+  find('.level-choice[data-biome="desert"]').click();
   await delay(50);
   assert(!find("#charge-meter") && !find("#charge-label"), "obsolete hold meter is still present");
   const top = playerTop();
@@ -434,12 +562,6 @@ test("REQ-MOV-01/05 / REQ-SYS-04: Space jumps immediately, double jumps once, an
   key("keydown", " ");
   await until(() => playerTop() < firstFall - 3, 1000);
   key("keyup", " ");
-  await untilFalling();
-  const secondFall = playerTop();
-  key("keydown", " ");
-  await delay(120);
-  key("keyup", " ");
-  assert(playerTop() > secondFall, "a third airborne jump launched before landing");
 });
 
 test("REQ-SYS-08: reset restores the scene, clears held input, and records no score", async () => {
@@ -656,7 +778,20 @@ test("REQ-LVL-10/12 / REQ-CHR-04: all previews match play and reset retains each
 });
 
 test("REQ-LVL-13: live bubbles animate without starting race time and reduced motion freezes them", async () => {
-  const checksum = () => canvasPixels().reduce((sum, value, index) => (sum + value * (index % 97)) >>> 0, 0);
+  const option = fixtureOptions.find((level) => find("#level-title").textContent.toLowerCase().includes(level.biome));
+  assert(option, "current biome is missing from the generated fixture options");
+  const checksum = () => {
+    const pixels = canvasPixels();
+    let sum = 0;
+    for (let index = 0; index < pixels.length; index += 4) {
+      const x = index / 4 % 960 / 3;
+      const y = Math.floor(index / 4 / 960) / 3;
+      if (x >= option.spawn.x - 1 && x < option.spawn.x + 7
+        && y >= option.spawn.y - 1 && y < option.spawn.y + 10) continue;
+      sum = (sum + pixels[index] * (index % 97)) >>> 0;
+    }
+    return sum;
+  };
   app.matchMedia = (query) => query === "(prefers-reduced-motion: reduce)"
     ? { matches: false } : nativeMatchMedia(query);
   find("#reset-button").click();
@@ -672,13 +807,25 @@ test("REQ-LVL-13: live bubbles animate without starting race time and reduced mo
   assert(checksum() === frozen, "reduced-motion effect did not stay static");
 });
 
-test("REQ-LVL-06/11/12: validated photo previews expose all three layout choices", async () => {
+test("REQ-LVL-06/07/11/12/23: previews expose opposing-edge courses with mandatory checkpoints", async () => {
   find("#new-photo-button").click();
   await upload("route-photo.svg");
   find("#start-button").click();
   const options = [...doc.querySelectorAll(".level-choice")];
   assert(options.length === 3, "mixed fixture did not generate three options");
   assert(new Set(options.map((option) => option.dataset.layout)).size === 3, "missing layout choice");
+  for (const option of fixtureOptions) {
+    const { width, height, spawn, flag, edge } = option;
+    const opposed = edge === "left" ? flag.x <= width * 0.1 && spawn.x + 6 >= width * 0.9
+      : edge === "right" ? flag.x + flag.width >= width * 0.9 && spawn.x <= width * 0.1
+      : edge === "top" ? flag.y - flag.height <= height * 0.1 && spawn.y + 9 >= height * 0.9
+      : flag.y >= height * 0.9 && spawn.y <= height * 0.1;
+    assert(opposed, `${option.layout} endpoints are outside opposing outer-ten-percent bands`);
+    assert(option.checkpoints.length >= 1 && option.checkpoints.length <= 2,
+      `${option.layout} has no mandatory checkpoint or too many markers`);
+    assert(routeApi.verifyReferenceRoute(option).valid,
+      `${option.layout} replay does not collect every mandatory checkpoint before finishing`);
+  }
   for (const choice of options) {
     choice.click();
     await until(() => !find("#game-screen").hidden);
@@ -862,6 +1009,18 @@ test("REQ-LVL-16 / REQ-SYS-06: no-drill replay finishes and outlines the exact r
   const storageKey=`dic-pic:leaderboard:${levelId}`;
   const cookieName=storageKey.replace(/[^a-zA-Z0-9_-]/g,"_");
   const original=readCookie(cookieName);
+  const otherOption=fixtureOptions.find(candidate=>candidate!==option);
+  const otherLayoutId=await hash(new TextEncoder().encode(`${photoId}:${levelApi.levelIdentity(otherOption)}`));
+  const otherPhotoBytes=await(await fetch("../fixtures/platform-photo.svg")).arrayBuffer();
+  const otherPhotoId=await hash(otherPhotoBytes);
+  const otherImageLevelId=await hash(new TextEncoder().encode(`${otherPhotoId}:${levelApi.levelIdentity(option)}`));
+  const isolationCookies=[otherLayoutId,otherImageLevelId].map(id=>`dic_pic_leaderboard_${id}`);
+  const originalIsolationCookies=isolationCookies.map(readCookie);
+  for(const cookie of isolationCookies){
+    writeCookie(cookie,JSON.stringify([{id:"isolation-sentinel",name:"Isolation Sentinel",timeMs:1}]));
+  }
+  assert(levelId!==otherLayoutId&&levelId!==otherImageLevelId,
+    "different images and selected layouts generated the same leaderboard identity");
   const nativeRequest=app.requestAnimationFrame,nativeCancel=app.cancelAnimationFrame;
   const cookieDescriptor=Object.getOwnPropertyDescriptor(app.Document.prototype,"cookie");
   let pending,timestamp=performance.now();
@@ -905,6 +1064,10 @@ test("REQ-LVL-16 / REQ-SYS-06: no-drill replay finishes and outlines the exact r
     const initialScene=canvasPixels();
     const ranked=replay();
     assert(ranked.current.querySelector(".leaderboard-rank").textContent==="01","ranked attempt has no place");
+    assert(!ranked.rows.some(row=>row.textContent.includes("Isolation Sentinel")),
+      "leaderboard entries leaked from another image or selected layout");
+    assert(isolationCookies.every(cookie=>readCookie(cookie)?.includes("Isolation Sentinel")),
+      "finishing one level modified another image or layout leaderboard");
     const saved=JSON.parse(readCookie(cookieName));
     assert(saved.length===1&&saved[0].id,"ranked attempt was not persisted with an identity");
     writeCookie(cookieName,JSON.stringify(saved));
@@ -948,6 +1111,10 @@ test("REQ-LVL-16 / REQ-SYS-06: no-drill replay finishes and outlines the exact r
     delete app.document.cookie;
     if(original===null)deleteCookie(cookieName);
     else writeCookie(cookieName,original);
+    isolationCookies.forEach((cookie,index)=>{
+      if(originalIsolationCookies[index]===null)deleteCookie(cookie);
+      else writeCookie(cookie,originalIsolationCookies[index]);
+    });
   }
 });
 

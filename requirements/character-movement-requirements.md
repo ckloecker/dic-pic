@@ -42,13 +42,13 @@ The horizontal cut shall preserve the first supporting row below the character's
 Repeated left/right excavation shall not deepen its own floor.
 Background-climbing horizontal excavation shall retain its vertical position when no vertical direction is pressed.
 Excavated terrain shall remain removed for the current run, including terrain supporting the finish gate.
-While the drill is actively excavating intact terrain, normal horizontal movement shall be limited to background-climbing speed, twenty terrain cells per second.
+While the drill is actively excavating intact terrain, movement shall be limited to ten terrain cells per second in every controlled direction, with normalized diagonals and the existing speed-pickup multiplier.
 Holding the drill in already-open space shall retain normal eighty-cell-per-second horizontal movement.
-Background climbing shall remain twenty cells per second with normalized diagonals, including while drilling.
+Background climbing shall remain twenty cells per second with normalized diagonals when not actively excavating, including while holding the drill in open space.
 Excavation shall not change double-jump availability or vertical jump velocity, and shall not enable hovering outside background climbing.
 Movement limits shall hold across supported frame durations and repeated resets without duplicate animation loops.
 Drilling while airborne shall switch the player into background-climbing movement while the drill remains active.
-Downward drilling shall limit vertical travel to twenty terrain cells per second while actively excavating.
+Downward drilling shall limit vertical travel to ten terrain cells per second while actively excavating.
 
 ## REQ-MOV-04: Air Movement
 

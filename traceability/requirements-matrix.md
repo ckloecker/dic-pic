@@ -1,5 +1,62 @@
 # Requirements traceability
 
+## Red X over the locked finish banner
+
+The user explicitly requested a red cross across the black-and-white flag while locked because the barrier and padlock were insufficiently clear.
+[REQ-LVL-23](../requirements/level-design-requirements.md#req-lvl-23-required-checkpoints), the [architecture](../design/system/game-architecture.md), and the [component design](../design/detailed/game-components.md) now require a bright red X over the full checkered banner.
+The shared [gate renderer](../src/scene.js) draws two pixel-aligned, two-cell-thick diagonals over the banner only while locked, preserving gate bounds, existing lock indicators, and completion behavior.
+The new [unit regression](../tests/unit/unit-tests.js) first failed as expected with **123/124 checks passing**, specifically because the locked banner lacked both red diagonals.
+After implementation, **124/124 unit checks passed**, verifying every column of both diagonals at preview and gameplay scales and complete removal on opening.
+[ST-37](../tests/system/system-tests.md) and the checkpoint [AT-40](../tests/acceptance/test-cases.md) include locked, unlocked, and reset banner verification.
+The broader browser suite was not rerun for this isolated renderer addition; its previously recorded preview/live comparison failure remains unresolved.
+
+## Collected checkpoint visibility and explicit exit lock
+
+The user approved completely hiding collected checkpoints and making the locked exit more obvious.
+[REQ-LVL-23](../requirements/level-design-requirements.md#req-lvl-23-required-checkpoints) now requires removal of both the marker and glow, plus a conspicuous red barrier and contrasting padlock on the closed gate.
+The [architecture](../design/system/game-architecture.md) and [component design](../design/detailed/game-components.md) allocate these visuals to the shared [scene renderer](../src/scene.js), used by both previews and live gameplay.
+Reached flags remain in run state, preserving completion checks and reset behavior without deleting checkpoint definitions.
+The red crossbar spans the opening and a dark-outlined yellow padlock includes a shackle and keyhole, while retaining the existing checkered banner and gate bounds.
+Both lock indicators are absent when the exit opens.
+Before implementation, the [unit suite](../tests/unit/unit-tests.js) passed **121/123 checks**, with the new regressions failing specifically on residual checkpoint pixels/glow and the missing spanning barrier.
+After implementation, **123/123 unit checks passed**, including pixel assertions at preview and gameplay scales, complete disappearance, preserved progress, reset restoration, contrasting lock colors/keyhole, and an unobstructed open gate.
+The cache-disabled real-time Chromium browser suite passed **28/29 checks**, including route completion, checkpoints, and reset.
+The sole failure remains the identical pre-existing jungle preview/live comparison mismatch of 680 cells, not a new checkpoint or gate regression.
+[ST-37](../tests/system/system-tests.md) and the checkpoint [AT-40](../tests/acceptance/test-cases.md) document integrated collection, lock, and reset verification.
+
+## Opposing-edge endpoints and mandatory geographic coverage
+
+The user approved endpoint footprints in opposing outer ten-percent bands and a reproducibly random count of one or two mandatory checkpoints.
+[REQ-LVL-07/23](../requirements/level-design-requirements.md) retain varied safe finish edges, supported in-bounds footprints, and the original checkered gate.
+The [architecture](../design/system/game-architecture.md) and [route/option design](../design/detailed/game-components.md) allocate opposing-edge anchors to the [route planner](../src/route.js) and exhaustive checkpoint placement to the [option assembler](../src/level.js).
+The planner tries eight candidates per edge, starting from a sampled edge, and ranks quality and duration within the first viable edge rather than allowing route duration to consistently override edge variation.
+Perimeter repair anchors prevent a shortage of natural edge support from silently moving endpoints into the image middle.
+Checkpoint selection maximizes the bounding-box area of mandatory visits and then the minimum direct travel distance across both possible checkpoint orders.
+This does not remove free climbing or drilling shortcuts, require every photo feature to be visited, or claim to compute the globally longest possible player path.
+Final replay uses the existing checkpoint collector and rejects missing or excessive markers, incorrect endpoint bands, and unvisited mandatory checkpoints.
+Before implementation, the [unit regression](../tests/unit/unit-tests.js) failed because required visits left half the fixture image skippable.
+A later mutation regression reproduced acceptance of missing mandatory checkpoints before the final verifier was tightened.
+Final automated unit verification passed **121/121 checks**, including exhaustive comparisons against all eligible checkpoint placements, opposing bands, both movement modes, eight digging directions, and deterministic generation/reset.
+The seeded variation regression now requires varied safe finish edges rather than all four edges on one particular photo, because the opposing-edge rule can make a downward finish reachable by walking and falling alone.
+All three suggestions from the supplied classroom attachment passed actual final no-drill physics/enemy replay with their mandatory checkpoints.
+The image was read locally without being copied into the repository.
+[ST-16/37](../tests/system/system-tests.md) and [AT-23/40/48](../tests/acceptance/test-cases.md) record integrated verification procedures.
+The browser suite passed **28/29 checks** with the existing preview/live pixel-comparison failure still present.
+The new opposing-edge/checkpoint browser assertions and full application completion replay passed.
+Changes remain local and uncommitted; no deployment or GitHub issue closure is claimed.
+
+## Half-speed active excavation
+
+The user approved reducing only active cutting through intact terrain from twenty to ten cells per second in every controlled direction.
+[REQ-MOV-03/10](../requirements/character-movement-requirements.md), the [architecture](../design/system/game-architecture.md), and the [movement design](../design/detailed/game-components.md) link the change to [physics](../src/physics.js).
+Open walking remains eighty cells per second, open climbing remains twenty, and normalized diagonals, the twofold lightning multiplier, gravity, jumping, and double jumping remain unchanged.
+Before implementation, the [unit checks](../tests/unit/unit-tests.js) reproduced excessive continuous excavation speed and the old twenty-cell climbing excavation speed.
+The final suite passed **121/121 checks**, including exact movement at 30/60/120 Hz in all eight directions on intact and open terrain with both speed multipliers.
+The diagonal fixture reserves a clear starting cavity and sufficient floor clearance so collision or automatic landing cannot masquerade as excavation speed.
+The fractional-height horizontal-tunnel regression now accepts exactly ten cells of progress instead of requiring more than the newly approved one-second excavation distance.
+[AT-09](../tests/acceptance/test-cases.md) and the [system procedures](../tests/system/system-tests.md) cover unchanged controls and integrated drilling.
+The browser suite passed its drilling, background-hold, reset, and completion checks, with the separate preview/live comparison failure noted above.
+
 ## Double jump and wall-jump burst revision
 
 The user approved removing hold-to-boost jumps and adding one airborne double jump at the normal height of approximately 38.6 cells.
@@ -146,9 +203,9 @@ The [detailed design](../design/detailed/game-components.md) allocates generatio
 |---|---|---|---|
 | REQ-SYS-16 | #9 | `index.html`, `src/styles.css` | ST-29, AT-34, browser control-visibility assertion. |
 | REQ-LVL-20 | #10 | `src/scene.js` | ST-30, AT-35, uniform interior RGB and contrast checks. |
-| REQ-LVL-18 | #3/#5 | `src/level.js`, `src/run.js`, `src/physics.js`, `src/app.js`, `src/scene.js` | ST-31, AT-36, pickup counts, collision, timers, refresh, reversal, and reset checks. |
+| REQ-LVL-18 | #3/#5/#21 | `src/level.js`, `src/run.js`, `src/physics.js`, `src/app.js`, `src/scene.js`, `index.html`, `src/styles.css` | ST-31, AT-36, pickup counts, collision, timers, refresh, reversal, visible mushroom time notices, and reset checks. |
 | REQ-SYS-14 | #11 | `src/run.js`, `src/app.js`, `src/physics.js` | ST-09/21, ST-31/32, AT-14/28/36/37, full-reset tests. |
-| REQ-LVL-19 | #14 | `src/level.js`, `src/run.js`, `src/physics.js`, `src/scene.js` | ST-32, AT-37, safe paths, rider collision, path extension, and reset tests. |
+| REQ-LVL-19 | #14 | `src/level.js`, `src/run.js`, `src/physics.js`, `src/scene.js` | ST-32, AT-37, safe paths, rider collision, player-blocked pause/resume, path extension, and reset tests. |
 | REQ-SYS-15, REQ-LVL-17 | #15 | `index.html`, `src/app.js`, `src/level.js`, `src/leaderboard.js` | ST-33, AT-33/38, deterministic-generation and sequential-score tests. |
 | REQ-CHR-05 | #16 | `src/app.js`, `src/scene.js` | ST-34, AT-39, fixed-footprint visual animation test. |
 
@@ -245,11 +302,11 @@ Physical mobile, camera, and simultaneous touch verification remain outstanding.
 | REQ-LVL-09 | [Eight-neighbor contours and removal of fixed cuts](../src/terrain.js), [photo-derived route geometry](../src/route.js) | Unit diagonal shoulder retention, no periodic rectangular cuts, real-edge wall jumps, and no invented non-photo filler/walls; ST-11/22, AT-17. |
 | REQ-LVL-10 | [Biome definitions and collidable silhouettes](../src/level.js), [scenery rendering](../src/scene.js) | Seeded tests verify large trees, vines, cacti, bones, coral, kelp, drilling, and safe placement; browser preview/live/reset checks; ST-15/17, AT-22/24. |
 | REQ-LVL-11 | [Local edge-direction evidence](../src/terrain.js), [evidence-weighted route search](../src/route.js), [closing and region filling](../src/morphology.js) | Unit raw mixed-region ratios > 2, direction metadata, diagonal connectivity, single-orientation fallback, and final horizontal/vertical photo routes; ST-16/18/22, AT-17/22/25. |
-| REQ-LVL-12 | [Suggestion generation and identity](../src/level.js), [choice UI and SHA-256 keys](../src/app.js), [thumbnail controls](../index.html) | Unit exactly three distinct reproducible options and immutable original geometry; browser verifies pre-play choice gating, preview/live geometry, selected biome, and exact scene restoration; ST-15/AT-23. |
+| REQ-LVL-12 | [Suggestion generation and identity](../src/level.js), [choice UI and SHA-256 keys](../src/app.js), [shared preview/game rendering](../src/scene.js), [thumbnail controls](../index.html) | Unit exactly three distinct reproducible options and immutable original geometry; browser verifies pre-play choice gating, preview/live geometry, selected biome, and exact scene restoration; ST-15/AT-23. |
 | REQ-LVL-13 | [Biome effects](../src/scene.js), [layer order and reduced motion](../src/app.js) | Unit checks distinct effects, time-varying motion, and static reduced-motion output; ST-17/AT-24. |
 | REQ-LVL-14 | [Shared filtered photo and terrain halo](../src/scene.js), [live rendering](../src/app.js) | Unit measured darkening/desaturation, context restoration, halo pixels, and unchanged collision; browser interior compositing and preview/live comparisons; ST-20/AT-27. |
 | REQ-LVL-15 | [Clear patrol generation, reflected movement, and swept contact](../src/enemies.js), [biome artwork](../src/scene.js), [option identity](../src/level.js) | Unit two bounded clear patrols, protected margins, repeated/large timesteps, reversal contact, distinct artwork, score identity, and reset; browser idle/live/reset checks; ST-21/AT-28. |
-| REQ-LVL-16 | [Photo-guided planning, horizontal support repair and replay](../src/route.js), [strongest-edge retry and protected scenery](../src/level.js), [route-safe patrols](../src/enemies.js) | Unit diverse photo acceptance, actual no-drill physics/enemy replay, clear safe endpoints, non-walking completion, idle-padding rejection, longer bridges and resettable supplemental supports; browser actual completion and sparse-photo previews/reset; ST-22/23/24/25, AT-29/30. |
+| REQ-LVL-16 | [Photo-guided planning and bounded longest-route selection](../src/route.js), [strongest-edge retry and protected scenery](../src/level.js), [route-safe patrols](../src/enemies.js) | Unit seeded route-duration selection, diverse photo acceptance, actual no-drill physics/enemy replay, clear safe endpoints, non-walking completion, idle-padding rejection, longer bridges and resettable supplemental supports; browser actual completion and sparse-photo previews/reset; ST-22/23/24/25/42, AT-29/30/48. |
 | REQ-CHR-01 | [Character renderer](../src/app.js) | ST-06: original character visually inspected. |
 | REQ-CHR-03 | [SVG player icon](../src/favicon.svg), [favicon declaration](../index.html); [detailed favicon design](../design/detailed/game-components.md#favicon-srcfaviconsvg-indexhtml) | Browser test loads and decodes the icon before setup and compares every 16-by-16 RGBA pixel with the player artwork; ST-14/AT-21. |
 | REQ-CHR-02 | [Player dimensions](../src/physics.js), [scaled renderer](../src/app.js), [flag anchoring](../src/run.js) | Unit verifies 6-by-9 collision dimensions and normal speed; browser sprite bounds and bar-following checks; ST-11/AT-19. |
@@ -394,6 +451,39 @@ Issue [#29](https://github.com/ckloecker/dic-pic/issues/29) maps to REQ-SYS-18, 
 Issue [#32](https://github.com/ckloecker/dic-pic/issues/32) maps to REQ-SYS-19, design [game-architecture](../design/system/game-architecture.md), implementation [app.js](../src/app.js) and [scene.js](../src/scene.js), and verification in [unit-tests.js](../tests/unit/unit-tests.js) and [browser-tests.js](../tests/system/browser-tests.js).
 Issue [#6](https://github.com/ckloecker/dic-pic/issues/6) was excluded at the user's direction because adding an MCP server conflicts with the client-only architecture.
 The issue comment marker in [AGENTS.md](../AGENTS.md) was corrected to `[AI]` as requested.
+
+### Full-screen sizing and leaderboard isolation
+
+REQ-SYS-18 maps fullscreen sizing and centering to [styles.css](../src/styles.css), with browser verification in [browser-tests.js](../tests/system/browser-tests.js), [system-tests.md](../tests/system/system-tests.md), and [test-cases.md](../tests/acceptance/test-cases.md).
+REQ-SYS-06 maps persistent leaderboard isolation to the SHA-256 input-image digest and exact selected option identity in [app.js](../src/app.js) and [level.js](../src/level.js), with browser verification in [browser-tests.js](../tests/system/browser-tests.js).
+The leaderboard identity already combined the original image bytes with serialized option geometry, including its selected layout; the updated system test now verifies that other images and suggestions remain isolated.
+
+### Fractional platform contact and pickup-position time labels
+
+The user's platform-trap report and pickup-position "-2s" request refine REQ-LVL-19 and REQ-LVL-18 in [level requirements](../requirements/level-design-requirements.md).
+The [detailed design](../design/detailed/game-components.md) and [architecture](../design/system/game-architecture.md) allocate exact moving-platform rectangle overlap and collision-limited carrying to [physics](../src/physics.js) and [run lifecycle](../src/run.js).
+The [unit regressions](../tests/unit/unit-tests.js) reproduced fractional-contact escape failure, unsafe rider carrying, and absent per-mushroom labels before implementation.
+They now cover both approach directions, upward/downward escape, carrying toward walls, other platforms and image borders, label positions, separate simultaneous labels, fade opacity, expiry, and reset.
+Collection records labels in [run lifecycle](../src/run.js), [scene rendering](../src/scene.js) draws them at world positions, and [the app](../src/app.js) renders them above actors using the active camera transform.
+The [entry page](../index.html) and [styles](../src/styles.css) retain a clipped screen-reader announcement within the fullscreen game frame.
+[Browser verification](../tests/system/browser-tests.js) collects a real mushroom, checks label pixels at its position in normal and fullscreen-fallback play, and verifies expiry and reset.
+ST-31/32 in [system procedures](../tests/system/system-tests.md) and AT-36/37 in [acceptance procedures](../tests/acceptance/test-cases.md) cover the corresponding behaviors.
+On 2026-10-27, isolated Chromium passed 119/119 unit checks and 28/29 real-time browser checks, including actual mushroom collection, fullscreen visibility, fading, and reset.
+The remaining preview/live checkpoint-glow comparison failed identically with the new label renderer and collection test disabled in an in-memory comparison; it is not counted as passing.
+
+### Layout priority for classroom-like photos
+
+The user approved REQ-LVL-11/24 allowing layout preference to outrank raw edge strength, and explicitly withdrew the portal replacement request; the existing finish gate remains unchanged.
+The [requirements](../requirements/level-design-requirements.md), [detailed design](../design/detailed/game-components.md), and [architecture](../design/system/game-architecture.md) now rank matching real photo traces first, sort by strength within each group, and retain the balanced and single-orientation fallbacks.
+The normal suggestion path already called [strongestTerrainEdges](../src/terrain.js), but its strength-only ordering discarded layout preference before [option assembly](../src/level.js).
+The [unit regressions](../tests/unit/unit-tests.js) cover opposite-orientation strength competition and final collision-mask direction retention on a synthetic desk-like scene with strong horizontal surfaces and weaker uprights.
+With the original comparator served in memory, both new expectations fail, including final layout separation after route repair; with the corrected comparator, 120/120 unit checks pass.
+The final-output fixture requires at least eighty retained photo-edge cells per directional option and a vertical-edge share at least 0.25 higher in the vertical suggestion, while replaying every offered route.
+On the user's read-only classroom image, the vertical suggestion retains 343 vertical-edge cells after final assembly versus 44 before the fix, and all three suggestions pass actual no-drill route replay.
+The image was inspected locally and was not copied into the repository.
+ST-38 in [system procedures](../tests/system/system-tests.md) and AT-41 in [acceptance procedures](../tests/acceptance/test-cases.md) verify the revised layout behavior.
+On 2026-10-27 the real-time browser suite passes 28/29 checks; the same previously recorded preview/live checkpoint-glow mismatch remains the only failure.
+
 ### Substantial layouts, full-region filling, and opaque outlines
 
 The user approved replacing the global 80% open-space cap with substantial-shape selection and tiny-fragment suppression, allowing large complete enclosed photo regions.

@@ -1,6 +1,7 @@
 import { BIOMES } from "./level.js";
 import { createPlayer } from "./physics.js";
 import { TERRAIN_OPACITY } from "./terrain.js";
+import { MUSHROOM_LABEL_SECONDS } from "./run.js";
 
 export function drawPhoto(context, image, width, height) {
   context.save();
@@ -128,6 +129,25 @@ export function drawPickups(context, pickups, seconds = 0) {
         context.fillRect(x + column, y + row, 1, 1);
       }
     }
+  }
+  context.restore();
+}
+
+export function drawMushroomLabels(context, labels, width, height) {
+  context.save();
+  context.font = "bold 6px monospace";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.lineWidth = 2;
+  context.strokeStyle = "#14212b";
+  context.fillStyle = "#ffe18c";
+  const halfWidth = context.measureText("-2s").width / 2 + 1;
+  for (const label of labels) {
+    context.globalAlpha = Math.max(0, Math.min(1, (MUSHROOM_LABEL_SECONDS - label.seconds) / 0.75));
+    const x = Math.max(halfWidth, Math.min(width - halfWidth, label.x));
+    const y = Math.max(4, Math.min(height - 4, label.y));
+    context.strokeText("-2s", x, y);
+    context.fillText("-2s", x, y);
   }
   context.restore();
 }
@@ -266,9 +286,10 @@ export function paintTerrain(context, terrain) {
 export function drawCheckpoints(context, checkpoints, zoom = 1) {
   context.save();
   for (const checkpoint of checkpoints) {
+    if (checkpoint.reached) continue;
     context.shadowColor = "#7cf5ff";
     context.shadowBlur = 8 * zoom;
-    context.globalAlpha = checkpoint.reached ? 0.4 : 1;
+    context.globalAlpha = 1;
     context.fillStyle = "#173945";
     context.fillRect(checkpoint.x - 1, checkpoint.y - 1, checkpoint.width + 2, checkpoint.height + 2);
     context.fillStyle = "#7cf5ff";
@@ -296,11 +317,29 @@ export function drawGate(context, flag, open = true) {
     }
   }
   if (!open) {
+    const center = x + Math.floor(width / 2);
+    context.fillStyle = "#14212b";
+    context.fillRect(x + 2, top + 9, width - 4, 5);
     context.fillStyle = "#bd3c4b";
-    context.fillRect(x + 4, top + 10, width - 8, 6);
-    context.strokeStyle = "#ffe18c";
-    context.lineWidth = 1;
-    context.strokeRect(x + 5, top + 8, width - 10, 4);
+    context.fillRect(x + 3, top + 10, width - 6, 3);
+    context.fillStyle = "#14212b";
+    context.fillRect(center - 2, top + 7, 4, 5);
+    context.fillStyle = "#ffe18c";
+    context.fillRect(center - 1, top + 8, 2, 4);
+    context.fillStyle = "#14212b";
+    context.fillRect(center - 1, top + 9, 2, 2);
+    context.fillRect(center - 3, top + 11, 6, 6);
+    context.fillStyle = "#ffe18c";
+    context.fillRect(center - 2, top + 12, 4, 4);
+    context.fillStyle = "#14212b";
+    context.fillRect(center - 1, top + 13, 2, 1);
+    context.fillRect(center - 1, top + 14, 1, 1);
+    context.fillStyle = "#ff3344";
+    for (let column = 0; column < width; column += 1) {
+      const row = Math.round(column * 6 / (width - 1));
+      context.fillRect(x + column, top + row, 1, 2);
+      context.fillRect(x + column, top + 6 - row, 1, 2);
+    }
   }
 }
 
@@ -397,7 +436,7 @@ export function drawPreview(context, image, option) {
   drawMovingPlatforms(context, option.movingPlatforms || []);
   drawEnemies(context, option.enemies || [], option.biome);
   drawPickups(context, option.pickups || []);
-  drawCheckpoints(context, option.checkpoints || [], 1 / 3);
+  drawCheckpoints(context, option.checkpoints || [], 1);
   drawGate(context, option.flag, !(option.checkpoints || []).length);
   const player = createPlayer(option.spawn.x, option.spawn.y);
   if (option.biome === "underwater") drawSwimmingPlayer(context, player);

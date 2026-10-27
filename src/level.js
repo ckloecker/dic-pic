@@ -105,7 +105,8 @@ function addElements(terrain, random) {
     const desiredHeight = kind === "tree" ? 27 + Math.floor(random() * 19)
       : kind === "rock" ? 8 + Math.floor(random() * 6)
         : kind === "bones" ? 6 : 15 + Math.floor(random() * 12);
-    const heights = kind === "tree" ? [desiredHeight, 27] : [desiredHeight];
+    const heights = kind === "tree" ? [desiredHeight, 27]
+      : kind === "vine" ? [desiredHeight, 15] : [desiredHeight];
     for (const size of heights) {
       const shape = sceneryShape(kind, size);
       const candidates = [];
@@ -280,24 +281,44 @@ function addUndrillableTerrain(terrain, random) {
 
 function addCheckpoints(terrain, random) {
   const points = terrain.route.points;
-  const count = Math.min(Math.floor(random() * 3), Math.max(0, points.length - 6));
-  const candidates = shuffle(points.slice(3, -3).map((point, index) => ({
-    index: index + 3,
+  const count = 1 + Math.floor(random() * 2);
+  const candidates = points.slice(3, -3).map(point => ({
     x: Math.round(point.x + 1),
     y: Math.round(point.y + 1),
     width: 5,
     height: 6,
-  })), random);
-  const checkpoints = [];
-  for (const candidate of candidates) {
-    if (checkpoints.length >= count) break;
-    if (checkpoints.some((checkpoint) => Math.hypot(
-      candidate.x - checkpoint.x, candidate.y - checkpoint.y,
-    ) < 15)) continue;
-    checkpoints.push(candidate);
+  }));
+  let checkpoints = null, bestCoverage = -1, bestDistance = -1;
+  const finish = { x: terrain.flag.x, y: terrain.flag.y - terrain.flag.height };
+  const separation = (first, second) => Math.hypot(first.x - second.x, first.y - second.y);
+  const consider = selected => {
+    const visits = [terrain.spawn, ...selected, finish];
+    let distance = 0;
+    for (let index = 1; index < visits.length; index += 1) {
+      const length = separation(visits[index], visits[index - 1]);
+      if (length < 15) return;
+      distance += length;
+    }
+    if (selected.length === 2) distance = Math.min(distance,
+      separation(terrain.spawn, selected[1]) + separation(selected[1], selected[0])
+        + separation(selected[0], finish));
+    const spanX = Math.max(...visits.map(point => point.x)) - Math.min(...visits.map(point => point.x));
+    const spanY = Math.max(...visits.map(point => point.y)) - Math.min(...visits.map(point => point.y));
+    const coverage = spanX * spanY / (terrain.width * terrain.height);
+    if (coverage > bestCoverage || (coverage === bestCoverage && distance > bestDistance)) {
+      checkpoints = selected;
+      bestCoverage = coverage;
+      bestDistance = distance;
+    }
+  };
+  for (let first = 0; first < candidates.length; first += 1) {
+    if (count === 1) consider([candidates[first]]);
+    else for (let second = first + 1; second < candidates.length; second += 1) {
+      consider([candidates[first], candidates[second]]);
+    }
   }
-  checkpoints.sort((first, second) => first.index - second.index);
-  terrain.checkpoints = checkpoints.map(({ index, ...checkpoint }) => checkpoint);
+  if (!checkpoints) throw new RouteGenerationError("no geographically separated mandatory checkpoints");
+  terrain.checkpoints = checkpoints;
 }
 
 export function createSuggestions(rgba, width, height, random = createRandom()) {

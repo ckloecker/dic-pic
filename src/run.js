@@ -1,4 +1,6 @@
-import { createPlayer, stepPlayer } from "./physics.js";
+import { createPlayer, platformCarryDistance, stepPlayer } from "./physics.js";
+
+export const MUSHROOM_LABEL_SECONDS = 1.5;
 
 function walkingSpace(terrain) {
   const { width, height, solid } = terrain;
@@ -181,6 +183,8 @@ export function createRun(original) {
     checkpoints: (original.checkpoints || []).map((checkpoint) => ({ ...checkpoint, reached: false })),
     movingPlatforms: (original.movingPlatforms || []).map((platform) => ({ ...platform })),
     effects: { speedSeconds: 0 },
+    lastMushroomPenaltyMs: 0,
+    mushroomLabels: [],
     wallPuff: null,
     startedAt: null,
     elapsedMs: 0,
@@ -199,6 +203,7 @@ export function resetRun(run) {
 
 export function collectPickups(run) {
   let collected = false;
+  run.lastMushroomPenaltyMs = 0;
   const collectedTypes = new Set();
   const remaining = [];
   for (const pickup of run.pickups) {
@@ -213,6 +218,8 @@ export function collectPickups(run) {
     if (pickup.type === "mushroom") {
       run.elapsedMs -= 2000;
       run.elapsedOffsetMs -= 2000;
+      run.lastMushroomPenaltyMs += 2000;
+      run.mushroomLabels.push({ x: pickup.x + pickup.width / 2, y: pickup.y + pickup.height / 2, seconds: 0 });
       collected = true;
       continue;
     }
@@ -253,6 +260,8 @@ export function stepRunEffects(run, dt) {
   }
   run.effects.speedSeconds = Math.max(0, run.effects.speedSeconds - dt);
   run.shootCooldownSeconds = Math.max(0, run.shootCooldownSeconds - dt);
+  for (const label of run.mushroomLabels) label.seconds += dt;
+  run.mushroomLabels = run.mushroomLabels.filter(label => label.seconds < MUSHROOM_LABEL_SECONDS);
 }
 
 export const WALL_PUFF_SECONDS = 0.3;
@@ -286,17 +295,28 @@ function clearPlatformPath(run, platform, x) {
   return true;
 }
 
+function platformTravelBeforePlayer(platform, player, direction, requested) {
+  const overlapsVertically = player.y < platform.y + platform.height
+    && player.y + player.height > platform.y;
+  if (!overlapsVertically) return requested;
+  if (direction > 0) {
+    if (player.x + player.width <= platform.x) return requested;
+    return Math.min(requested, Math.max(0, player.x - platform.x - platform.width));
+  }
+  if (player.x >= platform.x + platform.width) return requested;
+  return Math.min(requested, Math.max(0, platform.x - player.x - player.width));
+}
+
 export function stepMovingPlatforms(run, dt) {
   if (!Number.isFinite(dt) || dt < 0) {
     throw new RangeError("Platform frame duration must be a non-negative number.");
   }
   const player = run.player;
   for (const platform of run.movingPlatforms) {
-    const previousX = platform.x;
     const supported = player.grounded
       && Math.abs(player.y + player.height - platform.y) < 1e-6
-      && player.x + player.width > previousX
-      && player.x < previousX + platform.width;
+      && player.x + player.width > platform.x
+      && player.x < platform.x + platform.width;
     if (platform.direction > 0 && platform.expandRight !== false
       && clearPlatformPath(run, platform, platform.right + 1)) {
       platform.right += 1;
@@ -312,12 +332,17 @@ export function stepMovingPlatforms(run, dt) {
         platform.direction *= -1;
         continue;
       }
-      const travel = Math.min(remaining, distance);
+      const requested = Math.min(remaining, distance);
+      const travel = supported
+        ? Math.abs(platformCarryDistance(player, platform.direction * requested, run.terrain))
+        : platformTravelBeforePlayer(platform, player, platform.direction, requested);
+      if (travel <= 1e-9) break;
       platform.x += platform.direction * travel;
+      if (supported) player.x += platform.direction * travel;
       remaining -= travel;
+      if (travel < requested - 1e-9) break;
       if (travel >= distance - 1e-9) platform.direction *= -1;
     }
-    if (supported) player.x += platform.x - previousX;
   }
 }
 

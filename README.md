@@ -91,8 +91,8 @@ The live GitHub form must include the branch and commit fields from the latest t
 - Hold **Return/Enter** to cut a narrow tunnel in the pressed direction.
   Without directional input, drill toward the character's facing direction.
   Drill upward while climbing or downward while standing.
-  Excavating intact ground limits horizontal travel to **20 cells/second**, the same speed as climbing.
-  Walking or drilling through open space stays at **80 cells/second**.
+  Excavating intact ground limits controlled movement in every direction to **10 cells/second**, half ordinary climbing speed.
+  Walking through open space stays at **80 cells/second**, while open background climbing stays at **20 cells/second**, including when holding drill.
   Horizontal excavation preserves the floor even with floating-point foot-position rounding.
   Gravity, jumps, and the double jump remain active.
 - On touch devices use the directional pad, press/hold **JUMP**, and hold
@@ -107,10 +107,11 @@ The live GitHub form must include the branch and commit fields from the latest t
   Terrain, timer, held controls, pickups, platforms, and enemy motion all return to their initial state.
   Seeded flying paths vary in both axes and repeat exactly after reset.
 - Speed pickups double movement speed for five seconds.
-  Mushrooms reverse horizontal and vertical controls, including directional drilling, for five seconds.
+  Each mushroom subtracts two seconds from the run time; collected mushrooms do not reverse controls.
+  A "-2s" label appears where each mushroom was collected and fades away, including in fullscreen.
   Look for large bright-yellow lightning bolts and magenta spotted mushrooms with soft colored auras.
   Touch the item itself to collect it; its aura does not collect or block you.
-  Recollecting the same type refreshes its timer without stacking effects.
+  Recollecting a speed pickup refreshes its timer without stacking effects.
 - Two moving platforms provide optional shortcuts outside the required route.
   Drilling away blocking terrain can extend their horizontal travel.
 
@@ -129,6 +130,12 @@ Visible, collidable, drillable bridges may connect separated photo edges.
 Where natural supports are missing, the generator can add longer bridges and horizontal stepping platforms, including freestanding platforms.
 No freestanding vertical walls are invented.
 A photo without vertical edges may not supply walls for wall jumping.
+Start and finish occupy opposing outer-ten-percent edge bands, with varied safe finish directions rather than always finishing on the right.
+Every course requires one or two glowing checkpoints selected to spread mandatory visits across the image.
+The gate stays closed until every checkpoint is touched, so simply taking a shortcut straight to the finish does not complete the run.
+Collected checkpoints disappear completely, including their glow.
+A red barrier and yellow padlock mark the locked exit; both disappear after the last checkpoint is collected.
+A bright red X also covers the black-and-white finish banner while the exit is locked and disappears when it opens.
 
 Each batch offers jungle, desert, and underwater biomes with shuffled horizontal, vertical, and balanced layouts.
 Every batch starts with the same random seed, so uploading the same image reproduces the same three suggestions in the same order.
@@ -139,6 +146,7 @@ Substantial scenery follows its visible drillable collision silhouette; thin gra
 Desert sunshine and shimmering rays, underwater bubbles and light shafts, and jungle dappled light and leaf motes animate behind gameplay.
 The photo and checkered finish remain visible, and the reduced-motion preference freezes the effects without changing physics or race timing.
 Horizontal and vertical layouts prioritize locally detected horizontal/sloped or vertical-ish edges, while balanced layouts consider both.
+For horizontal and vertical suggestions, layout-matching edges take priority over stronger edges in the opposite direction; edge strength ranks candidates within each group.
 Photos with only one usable orientation do not gain invented walls.
 One-cell morphological closing bridges tiny contour gaps before provisional enclosed-region filling.
 Eight-neighbor grouping preserves diagonal contours such as shoulders instead of discarding their fragments.
