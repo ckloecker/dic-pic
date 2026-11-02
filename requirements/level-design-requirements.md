@@ -212,7 +212,10 @@ Run reset shall restore collected pickups and clear active effects.
 
 ## REQ-LVL-22: Non-Drillable Terrain
 
-Generated levels shall contain clearly visible stretches of non-drillable ground that look distinct from drillable terrain.
+Where safe photo-derived solid terrain exists outside the protected route and exit, generated levels shall mark a clearly visible non-drillable stretch that looks distinct from drillable terrain.
+With a vertical finish edge, the stretch shall be at least twelve cells wide and one fifth of the level height, rounded up to whole cells.
+With a horizontal finish edge, the stretch shall be at least one fifth of the level width, rounded up to whole cells, and four cells high.
+If no qualifying photo-derived stretch exists, the option shall preserve photo-derived geometry and remain playable without adding non-drillable terrain.
 Each option shall retain a drillable path to the exit, even when that path is longer than the most direct route.
 Non-drillable terrain shall not support or protect the finish gate or obstruct the validated no-drill route.
 

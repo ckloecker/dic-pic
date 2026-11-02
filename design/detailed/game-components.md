@@ -92,7 +92,9 @@ Repeated generation of the same image must yield identical ordered options and i
 Photo analysis and provisional closing/filling precede route planning; route clearance and optional fill removal precede biome scenery.
 Horizontal and vertical layout preference takes precedence over raw photo-edge strength, subject to safe endpoints and the verified no-drill route.
 Regression tests check final collision geometry for orientation separation after route repair rather than relying only on different raw detection masks.
-Each option marks some terrain as visibly non-drillable while preserving a drillable path to the exit and keeping the gate and validated route unobstructed.
+Each option with a safe photo-derived stretch marks it visibly non-drillable while preserving a drillable path to the exit and keeping the gate and validated route unobstructed.
+For a vertical finish edge, a marked stretch is at least twelve cells wide and one fifth of the level height; for a horizontal finish edge, it is at least one fifth of the level width and four cells high.
+If photo terrain has no safe stretch of the required size, the option remains playable without adding non-photo terrain.
 Each option randomly chooses one or two glowing mandatory checkpoints on its validated route; the gate stays visibly closed until all checkpoints are touched.
 The shared checkpoint renderer skips reached markers entirely, including their glow, while run state retains their reached flags for completion and reset.
 The locked gate retains its checkered banner and shows a red crossbar spanning the opening behind a dark-outlined yellow padlock with a keyhole.
@@ -242,13 +244,14 @@ The browser game maps D/A, arrow keys, Space, and held Return to this input
 shape.
 W/up enters background climbing; W/S and up/down arrows control vertical climbing and drill aim.
 Space launches immediately and a second press in the air double jumps; W/up does not jump.
-Touch controls provide four directions, a jump button,
-a dedicated held drill button, and a combat-only shoot button.
+Touch-first gameplay overlays a virtual joystick at the screen's lower left, a hold-to-drill button, and jump and combat-only shoot buttons at the lower right.
+The joystick maps its pointer position around the center to the existing horizontal movement, vertical climbing, and drill-aim inputs.
+Both control groups remain anchored to the viewport, including when the gameplay frame is fullscreen.
 An active speed pickup multiplies climbing and other player-controlled movement by two.
 Three-enemy options omit shooting controls; four-to-eight-enemy options show a cartoonish gun and expose X and touch SHOOT.
 REQ-SYS-19 keeps the full level in view on touch-first devices until player movement starts the timer, then follows the player at 1.5x zoom.
 The mobile camera clamps its viewport to the level bounds and does not modify world coordinates or physics.
-REQ-SYS-18 adds an accessible button that toggles browser full-screen mode for the gameplay frame.
+REQ-SYS-18 adds an accessible button that toggles browser full-screen mode for the gameplay frame and exits full-screen before presenting completion actions.
 Full-screen API failures are surfaced through the status UI.
 REQ-SYS-16 places descriptions of functional pickups, enemies, checkpoints, and terrain below the controls explanation.
 

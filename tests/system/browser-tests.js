@@ -4,6 +4,26 @@ frame.src = `../../?test=${Date.now()}`;
 await frameLoad;
 const app = frame.contentWindow;
 const doc = frame.contentDocument;
+if (app.document.hidden) {
+  const frames = new Map();
+  let nextFrame = 0;
+  app.requestAnimationFrame = callback => {
+    const id = ++nextFrame;
+    const timeout = app.setTimeout(() => {
+      frames.delete(id);
+      callback(app.performance.now());
+    }, 16);
+    frames.set(id, timeout);
+    return id;
+  };
+  app.cancelAnimationFrame = id => {
+    const timeout = frames.get(id);
+    if (timeout !== undefined) {
+      app.clearTimeout(timeout);
+      frames.delete(id);
+    }
+  };
+}
 const nativeRandom = app.Math.random;
 const nativeMatchMedia = app.matchMedia.bind(app);
 app.matchMedia = (query) => query === "(prefers-reduced-motion: reduce)"
@@ -59,6 +79,16 @@ function playerTop() {
     for (let x = 0; x < 960; x += 1) {
       const index = (y * 960 + x) * 4;
       if (pixels[index] === 36 && pixels[index + 1] === 127 && pixels[index + 2] === 123) return y / 3 - 3;
+    }
+  }
+  throw new Error("Player was not rendered.");
+}
+function playerLeft() {
+  const pixels = canvasPixels();
+  for (let x = 0; x < 960; x += 1) {
+    for (let y = 0; y < 540; y += 1) {
+      const index = (y * 960 + x) * 4;
+      if (pixels[index] === 36 && pixels[index + 1] === 127 && pixels[index + 2] === 123) return x / 3 - 1;
     }
   }
   throw new Error("Player was not rendered.");
@@ -496,24 +526,225 @@ test("REQ-SYS-19: mobile camera starts in overview and follows after movement", 
   const cameraMatchMedia = (query) => query === "(pointer: coarse)"
     ? { matches: true } : originalMatchMedia(query);
   const transform = () => find("#game-canvas").getContext("2d").getTransform();
+  let stage = "preparing the game state";
   try {
-    find("#reset-button").click();
+    if (find("#game-screen").hidden) {
+      if (find("#suggestions").hidden) {
+        name("Mobile Runner");
+        await upload("route-photo.svg");
+        find("#start-button").click();
+        await until(() => !find("#suggestions").hidden);
+      }
+      find('.level-choice[data-biome="jungle"]').click();
+      await until(() => !find("#game-screen").hidden);
+    }
+    const movementKeys = ["d", "a", "w", "s", " "];
+    stage = "checking fine-pointer movement";
     app.matchMedia = finePointerMatchMedia;
-    key("keydown", "d");
-    await delay(50);
-    key("keyup", "d");
+    let movedWithFinePointer = false;
+    for (const movementKey of movementKeys) {
+      find("#reset-button").click();
+      key("keydown", movementKey);
+      try {
+        await until(() => Number(find("#timer").textContent) > 0, 1500);
+        movedWithFinePointer = true;
+      } catch (error) {
+        if (error.message !== "Timed out waiting for application state.") throw error;
+      } finally {
+        key("keyup", movementKey);
+      }
+      if (movedWithFinePointer) break;
+    }
+    assert(movedWithFinePointer, "could not move the runner with a fine pointer");
     assert(transform().a === 3, "fine-pointer device followed just because touch input is available");
 
     app.matchMedia = cameraMatchMedia;
     find("#reset-button").click();
     assert(transform().a === 3 && transform().e === 0, "mobile camera did not start in overview");
-    key("keydown", "d");
-    await until(() => transform().a === 4.5);
-    key("keyup", "d");
+    stage = "waiting for mobile camera follow";
+    let followed = false;
+    for (const movementKey of movementKeys) {
+      find("#reset-button").click();
+      key("keydown", movementKey);
+      try {
+        await until(() => transform().a === 4.5, 1500);
+        followed = true;
+      } catch (error) {
+        if (error.message !== "Timed out waiting for application state.") throw error;
+      } finally {
+        key("keyup", movementKey);
+      }
+      if (followed) break;
+    }
+    assert(followed, "mobile camera did not follow after movement");
     find("#reset-button").click();
     assert(transform().a === 3 && transform().e === 0, "run reset did not restore the overview");
+  } catch (error) {
+    throw new Error(`${stage}: ${error.message}`);
   } finally {
+    key("keyup", "d");
+    key("keyup", "a");
     app.matchMedia = originalMatchMedia;
+  }
+});
+
+test("REQ-SYS-18: finishing a full-screen run exits before showing completion actions", async () => {
+  const option = fixtureOptions.find(candidate => candidate.biome === "jungle");
+  const frame = find(".game-frame");
+  const nativeRequest = frame.requestFullscreen;
+  const nativeExit = app.document.exitFullscreen;
+  const nativeAnimation = app.requestAnimationFrame;
+  const nativeCancel = app.cancelAnimationFrame;
+  const descriptor = Object.getOwnPropertyDescriptor(app.document, "fullscreenElement")
+    || Object.getOwnPropertyDescriptor(app.Document.prototype, "fullscreenElement");
+  let fullscreenElement = null;
+  let stage = "preparing the game state";
+  let pending;
+  let timestamp = 100000;
+  Object.defineProperty(app.document, "fullscreenElement", {
+    configurable: true,
+    get: () => fullscreenElement,
+  });
+  app.document.exitFullscreen = async () => {
+    fullscreenElement = null;
+    app.document.dispatchEvent(new app.Event("fullscreenchange"));
+  };
+  app.requestAnimationFrame = callback => { pending = callback; return 1; };
+  app.cancelAnimationFrame = () => { pending = null; };
+  const tick = dt => {
+    const callback = pending;
+    pending = null;
+    assert(callback, "fullscreen replay lost its animation frame");
+    timestamp += dt * 1000;
+    callback(timestamp);
+  };
+  try {
+    if (!find("#complete-panel").hidden) find("#again-button").click();
+    else if (!find("#game-screen").hidden) find("#new-photo-button").click();
+    stage = "starting the selected level";
+    find('.level-choice[data-biome="jungle"]').click();
+    await until(() => !find("#game-screen").hidden);
+    frame.requestFullscreen = async () => {
+      fullscreenElement = frame;
+      app.document.dispatchEvent(new app.Event("fullscreenchange"));
+    };
+    await frame.requestFullscreen();
+    stage = "replaying the route";
+    tick(1 / 60);
+    let previous = {};
+    for (const action of option.route.actions) {
+      for (const [value, held] of [["ArrowLeft", action.input.move < 0], ["ArrowRight", action.input.move > 0],
+        ["ArrowUp", action.input.moveY < 0], ["ArrowDown", action.input.moveY > 0]]) {
+        if (Boolean(previous[value]) !== held) key(held ? "keydown" : "keyup", value);
+        previous[value] = held;
+      }
+      tick(action.dt);
+      await Promise.resolve();
+      if (!find("#complete-panel").hidden) break;
+    }
+    for (const value of ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]) key("keyup", value);
+    stage = "waiting for completion actions";
+    await until(() => !find("#complete-panel").hidden);
+    assert(fullscreenElement === null, "completion left the game frame fullscreen");
+    find("#replay-button").click();
+    assert(!find("#game-screen").hidden && find("#complete-panel").hidden,
+      "completion reset did not return to active gameplay");
+  } catch (error) {
+    throw new Error(`${stage}: ${error.message}`);
+  } finally {
+    if (nativeRequest) frame.requestFullscreen = nativeRequest;
+    else delete frame.requestFullscreen;
+    if (nativeExit) app.document.exitFullscreen = nativeExit;
+    else delete app.document.exitFullscreen;
+    delete app.document.fullscreenElement;
+    if (descriptor && Object.hasOwn(descriptor, "value")) {
+      Object.defineProperty(app.document, "fullscreenElement", descriptor);
+    }
+    app.requestAnimationFrame = nativeAnimation;
+    app.cancelAnimationFrame = nativeCancel;
+    if (!find("#game-screen").hidden) find("#new-photo-button").click();
+  }
+});
+
+test("REQ-SYS-20: mobile controls stay viewport-anchored and provide a virtual joystick", async () => {
+  const originalMatchMedia = app.matchMedia;
+  const joystick = find("#virtual-joystick");
+  const knob = find("#virtual-joystick-knob");
+  const controls = find(".touch-controls");
+  const drill = find("#drill-button");
+  const shoot = find("#shoot-button");
+  const originalDisplay = controls.style.display;
+  let stage = "preparing the game state";
+  assert(joystick && knob && controls && drill && shoot, "mobile joystick or action controls are missing");
+  const originalCapture = joystick.setPointerCapture;
+  try {
+    if (find("#game-screen").hidden) {
+      if (find("#suggestions").hidden) {
+        name("Mobile Runner");
+        await upload("route-photo.svg");
+        find("#start-button").click();
+        await until(() => !find("#suggestions").hidden);
+      }
+      find('.level-choice[data-biome="jungle"]').click();
+      await until(() => !find("#game-screen").hidden);
+    }
+    controls.style.display = "flex";
+    assert(joystick.getAttribute("aria-label") === "Move, climb, or aim drill",
+      "virtual joystick is missing its accessible direction label");
+    assert(app.getComputedStyle(controls).position === "fixed",
+      "mobile controls are not anchored to the viewport");
+    const left = joystick.getBoundingClientRect();
+    const right = drill.getBoundingClientRect();
+    assert(left.left < app.innerWidth / 2 && right.right > app.innerWidth / 2,
+      "joystick and action controls are not on their assigned screen sides");
+    assert(controls.contains(drill) && controls.contains(shoot),
+      "drill or shoot action is separated from the right-side mobile controls");
+    assert(find(".game-frame").contains(controls),
+      "mobile controls are outside the full-screen gameplay frame");
+    const bounds = joystick.getBoundingClientRect();
+    joystick.setPointerCapture = () => {};
+    app.matchMedia = query => query === "(pointer: coarse)"
+      ? { matches: true } : originalMatchMedia(query);
+    stage = "waiting for virtual joystick movement";
+    let moved = false;
+    const directions = [[1, 0], [-1, 0], [0, -1], [0, 1]];
+    for (const [directionX, directionY] of directions) {
+      find("#reset-button").click();
+      const stickX = bounds.left + bounds.width * (directionX > 0 ? 0.8 : directionX < 0 ? 0.2 : 0.5);
+      const stickY = bounds.top + bounds.height * (directionY > 0 ? 0.8 : directionY < 0 ? 0.2 : 0.5);
+      joystick.dispatchEvent(new app.PointerEvent("pointerdown", {
+        bubbles: true,
+        cancelable: true,
+        clientX: stickX,
+        clientY: stickY,
+        pointerId: 77,
+        pointerType: "touch",
+      }));
+      try {
+        await until(() => Number(find("#timer").textContent) > 0, 1500);
+        moved = true;
+      } catch (error) {
+        if (error.message !== "Timed out waiting for application state.") throw error;
+      } finally {
+        joystick.dispatchEvent(new app.PointerEvent("pointerup", {
+          bubbles: true,
+          cancelable: true,
+          clientX: stickX,
+          clientY: stickY,
+          pointerId: 77,
+          pointerType: "touch",
+        }));
+      }
+      if (moved) break;
+    }
+    assert(moved, "virtual joystick did not change the player's position in either horizontal direction");
+  } catch (error) {
+    throw new Error(`${stage}: ${error.message}`);
+  } finally {
+    joystick.setPointerCapture = originalCapture;
+    controls.style.display = originalDisplay;
+    app.matchMedia = originalMatchMedia;
+    find("#reset-button").click();
   }
 });
 
@@ -549,7 +780,7 @@ test("REQ-MOV-01/05 / REQ-SYS-04: Space jumps immediately, double-jumps, and sho
   };
   key("keydown", " ");
   await until(() => playerTop() < top - 3);
-  assert(Number(find("#timer").textContent) > 0, "jump did not start race time");
+  await until(() => Number(find("#timer").textContent) > 0);
   const pixels = canvasPixels();
   let bar = false;
   for (let i = 0; i < pixels.length; i += 4) {
@@ -691,7 +922,7 @@ test("REQ-CHR-02 / REQ-MOV-05: smaller sprite jumps without a charge bar", async
   find("#reset-button").click();
 });
 
-test("REQ-MOV-03 / REQ-SYS-08: repeated resets retain exactly one native animation loop", async () => {
+test("REQ-MOV-03 / REQ-SYS-08: repeated resets retain exactly one animation loop", async () => {
   const nativeRequest=app.requestAnimationFrame,nativeCancel=app.cancelAnimationFrame;
   const pending=new Set(),timestamps=new Set();
   let duplicate=false;

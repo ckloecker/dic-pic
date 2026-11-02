@@ -137,9 +137,16 @@ The game shall provide an accessible control to enter and leave browser full-scr
 Full-screen mode shall center gameplay and use the largest aspect-preserving canvas that fits the viewport.
 When the viewport can accommodate the in-page canvas, full-screen mode shall not make the canvas smaller.
 The control shall report full-screen API failures visibly and shall remain usable by keyboard and touch.
+When a run finishes in full-screen mode, the game shall exit full-screen before showing completion actions.
 
 ## REQ-SYS-19: Mobile Follow Camera
 
 On touch-first devices, gameplay shall initially show the complete level while the player has not moved and the race timer has not started.
 After player movement starts the timer, the camera shall follow the player at 1.5x zoom.
 The camera shall remain inside the image bounds and shall not change player physics, timer behavior, or level coordinates.
+
+## REQ-SYS-20: Fixed Mobile Controls
+
+On touch-first devices, gameplay shall provide a virtual joystick on the left side of the screen for movement, climbing, and drill direction.
+Drill, jump, and combat shooting buttons shall remain on the right side of the screen.
+The controls shall stay in consistent screen-relative positions during gameplay and full-screen mode.

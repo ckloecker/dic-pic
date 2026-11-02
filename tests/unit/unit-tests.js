@@ -445,7 +445,7 @@ test("REQ-LVL-16: bridges connect detected supported surfaces beyond eighteen ce
   }
 });
 
-test("REQ-LVL-18: generated levels have one to three pickups of each type outside the safe route", () => {
+test("REQ-LVL-18/22: generated levels mark sufficiently large safe photo terrain non-drillable", () => {
   const width = 320, height = 180;
   const pixels = new Uint8ClampedArray(width * height * 4);
   for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
@@ -455,8 +455,32 @@ test("REQ-LVL-18: generated levels have one to three pickups of each type outsid
   let seed = 123;
   const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
   for (const option of levelApi.createSuggestions(pixels, width, height, random)) {
-    assert(option.undrillable instanceof Uint8Array
-      && option.undrillable.some(Boolean), "generated level has no visibly protected terrain");
+    assert(option.undrillable instanceof Uint8Array, "generated level has no non-drillable mask");
+    const verticalEdge = option.edge === "left" || option.edge === "right";
+    const minimumWidth = verticalEdge ? 12 : Math.ceil(width / 5);
+    const minimumHeight = verticalEdge ? Math.ceil(height / 5) : 4;
+    const containsStretch = mask => {
+      for (let y = 0; y <= height - minimumHeight; y += 1) {
+        for (let x = 0; x <= width - minimumWidth; x += 1) {
+          const stretch = Array.from({ length: minimumHeight }, (_, row) =>
+            mask.slice((y + row) * width + x, (y + row) * width + x + minimumWidth)
+              .every(Boolean)).every(Boolean);
+          if (stretch) return true;
+        }
+      }
+      return false;
+    };
+    const safePhotoTerrain = new Uint8Array(option.solid.length);
+    safePhotoTerrain.forEach((_, index) => {
+      safePhotoTerrain[index] = option.solid[index] && option.photoSolid[index] && !option.route.clearance[index];
+    });
+    const hasSafePhotoStretch = containsStretch(safePhotoTerrain);
+    assert(!hasSafePhotoStretch || containsStretch(option.undrillable),
+      `safe photo terrain has no non-drillable stretch at least ${minimumWidth} by ${minimumHeight} cells`);
+    assert(hasSafePhotoStretch || !option.undrillable.some(Boolean),
+      "non-drillable terrain was added without a safe photo-derived stretch");
+    assert(option.undrillable.every((cell, index) => !cell || (option.solid[index] && option.photoSolid[index])),
+      "non-drillable terrain invented non-photo geometry");
     assert(option.undrillable.every((cell, index) => !cell || !option.route.clearance[index]),
       "non-drillable terrain obstructed the required route");
     assert(Array.isArray(option.checkpoints) && option.checkpoints.length <= 2,
