@@ -63,6 +63,7 @@ const state = {
   jumpReleased: false,
   shootPressed: false,
   mobileCameraFollowing: false,
+  completionPending: false,
   frameHandle: null,
   previousFrame: 0,
   terrainLayer: null,
@@ -126,8 +127,17 @@ async function toggleFullscreen() {
 }
 
 fullscreenButton.addEventListener("click", toggleFullscreen);
-document.addEventListener("fullscreenchange", updateFullscreenButton);
-document.addEventListener("webkitfullscreenchange", updateFullscreenButton);
+
+function handleFullscreenChange() {
+  updateFullscreenButton();
+  if (state.completionPending && !isFullscreen()) {
+    state.completionPending = false;
+    showCompletionPanel();
+  }
+}
+
+document.addEventListener("fullscreenchange", handleFullscreenChange);
+document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
 
 function updateNameValidity() {
   const validFirst = isValidPlayerName(nameInput.value);
@@ -248,6 +258,7 @@ function setUpGame() {
   state.previousFrame = 0;
   state.effectSeconds = 0;
   state.mobileCameraFollowing = false;
+  state.completionPending = false;
   state.terrainLayer = document.createElement("canvas");
   state.terrainLayer.width = WORLD_WIDTH;
   state.terrainLayer.height = WORLD_HEIGHT;
@@ -495,24 +506,7 @@ function showLeaderboard(scores, current) {
   });
 }
 
-function finishLevel() {
-  if (!state.running) {
-    return;
-  }
-  stopAnimation();
-  clearMushroomFeedback();
-  clearControls();
-  timerValue.textContent = elapsedLabel(state.elapsedMs);
-  document.querySelector("#winner-name").textContent = state.playerName;
-  document.querySelector("#final-time").textContent = `${elapsedLabel(state.elapsedMs)} seconds`;
-  const nextPlayer = document.querySelector("#next-player");
-  nextPlayer.replaceChildren(...state.playerNames.map((name, index) => {
-    const option = document.createElement("option");
-    option.value = String(index);
-    option.textContent = name;
-    return option;
-  }));
-  nextPlayer.value = String((state.playerIndex + 1) % state.playerNames.length);
+function showCompletionPanel() {
   gameScreen.hidden = true;
   completePanel.hidden = false;
   const current = { id: crypto.randomUUID(), name: state.playerName, timeMs: state.elapsedMs };
@@ -531,6 +525,42 @@ function finishLevel() {
       setMessage(scoreMessage, `Leaderboard unavailable: ${readError.message}`, true);
     }
   }
+}
+
+async function finishLevel() {
+  if (!state.running) {
+    return;
+  }
+  stopAnimation();
+  clearMushroomFeedback();
+  clearControls();
+  timerValue.textContent = elapsedLabel(state.elapsedMs);
+  document.querySelector("#winner-name").textContent = state.playerName;
+  document.querySelector("#final-time").textContent = `${elapsedLabel(state.elapsedMs)} seconds`;
+  const nextPlayer = document.querySelector("#next-player");
+  nextPlayer.replaceChildren(...state.playerNames.map((name, index) => {
+    const option = document.createElement("option");
+    option.value = String(index);
+    option.textContent = name;
+    return option;
+  }));
+  nextPlayer.value = String((state.playerIndex + 1) % state.playerNames.length);
+  if (gameScreen.classList.contains("fullscreen-fallback")) {
+    gameScreen.classList.remove("fullscreen-fallback");
+    updateFullscreenButton();
+  } else if (document.fullscreenElement === gameFrameElement
+    || document.webkitFullscreenElement === gameFrameElement) {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen;
+    try {
+      if (!exit) throw new Error("This browser cannot exit full-screen mode.");
+      await exit.call(document);
+    } catch (error) {
+      state.completionPending = true;
+      setMessage(fullscreenMessage, `Unable to leave full-screen mode: ${error.message}. Exit full screen to continue.`, true);
+      return;
+    }
+  }
+  showCompletionPanel();
 }
 
 function gameFrame(timestamp) {
@@ -643,6 +673,7 @@ function clearControls() {
 function goToSetup() {
   stopAnimation();
   clearControls();
+  state.completionPending = false;
   gameScreen.hidden = true;
   completePanel.hidden = true;
   setupScreen.hidden = false;

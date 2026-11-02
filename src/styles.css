@@ -515,6 +515,18 @@ button,
   outline-offset: 2px;
 }
 
+.fullscreen-message {
+  position: absolute;
+  z-index: 3;
+  right: 12px;
+  bottom: 52px;
+  left: 12px;
+  padding: 6px 9px;
+  color: #f4f2e9;
+  background: rgb(21 36 45 / 90%);
+  text-align: center;
+}
+
 .game-frame:fullscreen {
   display: flex;
   flex-direction: column;
