@@ -241,7 +241,10 @@ function addMovingPlatforms(terrain, random) {
 
 function addUndrillableTerrain(terrain, random) {
   const { width, height, solid, photoSolid, route } = terrain;
-  const size = { width: 4, height: 2 };
+  const verticalEdge = terrain.edge === "left" || terrain.edge === "right";
+  const size = verticalEdge
+    ? { width: 12, height: Math.ceil(height / 5) }
+    : { width: Math.ceil(width / 5), height: 4 };
   const candidates = [];
   for (let y = 1; y <= height - size.height - 1; y += 1) {
     for (let x = 1; x <= width - size.width - 1; x += 1) {
@@ -259,7 +262,8 @@ function addUndrillableTerrain(terrain, random) {
     }
   }
   if (!candidates.length) {
-    throw new RouteGenerationError("no safe stretch of photo terrain can be marked non-drillable");
+    terrain.undrillable = new Uint8Array(solid.length);
+    return;
   }
 
   const undrillable = new Uint8Array(solid.length);
