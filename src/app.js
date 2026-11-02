@@ -16,6 +16,8 @@ const context = canvas.getContext("2d");
 const gameFrameElement = document.querySelector(".game-frame");
 const fullscreenButton = document.querySelector("#fullscreen-button");
 const fullscreenMessage = document.querySelector("#fullscreen-message");
+const joystick = document.querySelector("#virtual-joystick");
+const joystickKnob = document.querySelector("#virtual-joystick-knob");
 const setupScreen = document.querySelector("#setup-screen");
 const gameScreen = document.querySelector("#game-screen");
 const completePanel = document.querySelector("#complete-panel");
@@ -625,6 +627,8 @@ function clearControls() {
   touchState.up = false;
   touchState.down = false;
   touchState.jump = false;
+  joystickPointer = null;
+  resetJoystick();
   state.jumpPressed = false;
   state.jumpReleased = false;
   state.shootPressed = false;
@@ -723,14 +727,59 @@ function bindHoldButton(button, onPress, onRelease, onCancel = onRelease) {
   button.addEventListener("lostpointercapture", cancel);
 }
 
-document.querySelectorAll("[data-move]").forEach((button) => {
-  const direction = Number(button.dataset.move);
-  const property = direction < 0 ? "left" : "right";
-  bindHoldButton(button, () => { touchState[property] = true; }, () => { touchState[property] = false; });
+let joystickPointer = null;
+
+function resetJoystick() {
+  touchState.left = false;
+  touchState.right = false;
+  touchState.up = false;
+  touchState.down = false;
+  joystickKnob.style.left = "50%";
+  joystickKnob.style.top = "50%";
+}
+
+function updateJoystick(event) {
+  const bounds = joystick.getBoundingClientRect();
+  const centerX = bounds.left + bounds.width / 2;
+  const centerY = bounds.top + bounds.height / 2;
+  const maxRadius = bounds.width * 0.28;
+  const deltaX = event.clientX - centerX;
+  const deltaY = event.clientY - centerY;
+  const distance = Math.hypot(deltaX, deltaY);
+  const scale = distance > maxRadius ? maxRadius / distance : 1;
+  const x = deltaX * scale;
+  const y = deltaY * scale;
+  const deadZone = Math.max(8, bounds.width * 0.12);
+  touchState.left = x < -deadZone;
+  touchState.right = x > deadZone;
+  touchState.up = y < -deadZone;
+  touchState.down = y > deadZone;
+  joystickKnob.style.left = `${50 + (x / bounds.width) * 100}%`;
+  joystickKnob.style.top = `${50 + (y / bounds.height) * 100}%`;
+}
+
+joystick.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  joystickPointer = event.pointerId;
+  joystick.setPointerCapture(event.pointerId);
+  updateJoystick(event);
 });
-document.querySelectorAll("[data-move-y]").forEach((button) => {
-  const property = Number(button.dataset.moveY) < 0 ? "up" : "down";
-  bindHoldButton(button, () => { touchState[property] = true; }, () => { touchState[property] = false; });
+joystick.addEventListener("pointermove", (event) => {
+  if (event.pointerId === joystickPointer) updateJoystick(event);
+});
+joystick.addEventListener("pointerup", (event) => {
+  if (event.pointerId !== joystickPointer) return;
+  event.preventDefault();
+  joystickPointer = null;
+  resetJoystick();
+});
+joystick.addEventListener("pointercancel", () => {
+  joystickPointer = null;
+  resetJoystick();
+});
+joystick.addEventListener("lostpointercapture", () => {
+  joystickPointer = null;
+  resetJoystick();
 });
 
 bindHoldButton(

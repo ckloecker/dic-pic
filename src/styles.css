@@ -631,7 +631,6 @@ kbd {
 }
 
 .touch-controls,
-.movement-pad,
 .action-pad {
   display: flex;
   align-items: center;
@@ -639,9 +638,50 @@ kbd {
 }
 
 .touch-controls {
-  grid-column: 2;
-  grid-row: 1 / span 2;
+  position: fixed;
+  z-index: 20;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: max(12px, env(safe-area-inset-left));
+  justify-content: space-between;
+  align-items: flex-end;
   touch-action: none;
+  pointer-events: none;
+}
+
+.virtual-joystick,
+.action-pad {
+  pointer-events: auto;
+}
+
+.virtual-joystick {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  border: 1px solid rgb(233 244 235 / 44%);
+  border-radius: 50%;
+  background: rgb(21 36 45 / 52%);
+  touch-action: none;
+  user-select: none;
+}
+
+.joystick-ring {
+  position: absolute;
+  inset: 20%;
+  border: 1px solid rgb(233 244 235 / 32%);
+  border-radius: 50%;
+}
+
+.joystick-knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--paper);
+  border-radius: 50%;
+  background: rgb(93 164 147 / 90%);
+  transform: translate(-50%, -50%);
 }
 
 .control-button {
@@ -890,22 +930,6 @@ kbd {
   gap: 12px;
 }
 
-.movement-pad {
-  display: grid;
-  grid-template-columns: repeat(3, 40px);
-  gap: 4px;
-}
-
-.movement-pad .control-button {
-  min-width: 40px;
-  width: 40px;
-}
-
-[data-move="-1"] { grid-column: 1; grid-row: 2; }
-[data-move="1"] { grid-column: 3; grid-row: 2; }
-[data-move-y="-1"] { grid-column: 2; grid-row: 1; }
-[data-move-y="1"] { grid-column: 2; grid-row: 2; }
-
 @media (max-width: 760px) {
   .feedback-panel {
     grid-template-columns: 1fr;
@@ -997,10 +1021,12 @@ kbd {
   }
 
   .touch-controls {
-    grid-column: 1;
-    grid-row: auto;
-    width: 100%;
-    justify-content: space-between;
+    gap: 5px;
+  }
+
+  .virtual-joystick {
+    width: 100px;
+    height: 100px;
   }
 
   .control-button {
@@ -1029,6 +1055,12 @@ kbd {
   .site-footer {
     gap: 10px;
     font-size: 7px;
+  }
+}
+
+@media (pointer: fine) {
+  .touch-controls {
+    display: none;
   }
 }
 

@@ -68,7 +68,7 @@
             <h3 id="setup-controls-title">Controls</h3>
             <p><strong>A/D or ←/→</strong> move. Press <strong>Space</strong> on a floor or wall to jump immediately; press again in the air to double jump.</p>
             <p><strong>W/↑</strong> grips and climbs the background. Hold <strong>Enter</strong> to drill toward the pressed direction.</p>
-            <p>Touch controls are available below the game on phones and tablets.</p>
+            <p>On phones and tablets, drag the lower-left joystick to move, climb, or aim; hold DRILL and tap JUMP or combat-only SHOOT on the lower right.</p>
             <h4>Level elements</h4>
             <p>Photo edges form solid ground; striped sections are non-drillable, while tunnels can be drilled elsewhere.</p>
             <p>Touch every glowing checkpoint to open the checkered exit gate.</p>
@@ -108,6 +108,18 @@
           <span id="mushroom-feedback" class="mushroom-feedback" role="status" aria-live="polite"></span>
           <div class="canvas-caption"><span class="caption-dot"></span> REACH THE CHECKERED GATE</div>
           <button id="fullscreen-button" class="fullscreen-button" type="button" aria-label="Enter full screen">FULL SCREEN</button>
+          <div class="touch-controls" aria-label="Touch controls">
+            <div id="virtual-joystick" class="virtual-joystick" role="group"
+              aria-label="Move, climb, or aim drill">
+              <span class="joystick-ring" aria-hidden="true"></span>
+              <span id="virtual-joystick-knob" class="joystick-knob" aria-hidden="true"></span>
+            </div>
+            <div class="action-pad">
+              <button id="drill-button" class="control-button drill-button" type="button" aria-label="Hold to drill">DRILL</button>
+              <button id="jump-button" class="control-button jump-button" type="button" aria-label="Press to jump, press again in the air to double jump; press while climbing to drop">JUMP</button>
+              <button id="shoot-button" class="control-button shoot-button" type="button" aria-label="Shoot one projectile" hidden>SHOOT</button>
+            </div>
+          </div>
         </div>
         <p id="fullscreen-message" class="status-message" role="status" aria-live="polite"></p>
         <p id="contact-message" class="status-message" role="status" aria-live="polite"></p>
@@ -116,6 +128,7 @@
           <div class="control-instructions">
             <span class="control-title">CONTROLS</span>
             <span>Avoid flying patrols and the bottom edge; either contact resets the run.</span>
+            <span class="touch-instructions">Touch: drag the lower-left joystick to move, climb, or aim; hold DRILL and tap JUMP or combat-only SHOOT on the lower right.</span>
             <span class="desktop-instructions"><kbd>A</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd> move <span class="control-divider">·</span> <kbd>W</kbd> / <kbd>↑</kbd> grips the background; directions climb at ¼ speed <span class="control-divider">·</span> press <kbd>Space</kbd> on floor/wall to jump immediately; press again in the air to double jump; press while climbing to drop immediately <span class="control-divider">·</span> hold <kbd>Enter</kbd> to drill a tunnel in the pressed direction, including <kbd>↓</kbd> while standing <span class="control-divider">·</span> in combat levels, press <kbd>X</kbd> to shoot</span>
           </div>
           <div class="level-element-guide" aria-label="Level element descriptions">
@@ -124,19 +137,6 @@
             <p><strong>Pickups:</strong> yellow lightning doubles movement speed for five seconds; spotted mushrooms subtract two seconds from the timer.</p>
             <p><strong>Hazards:</strong> flying patrols reset the run on contact; moving platforms carry the runner across open space.</p>
             <p><strong>Combat levels:</strong> stomp patrols from above or press <kbd>X</kbd> to shoot with the visible gun.</p>
-          </div>
-          <div class="touch-controls" aria-label="Touch controls">
-            <div class="movement-pad" aria-label="Move, climb, or aim drill">
-              <button class="control-button move-button" type="button" data-move="-1" aria-label="Move left">←</button>
-              <button class="control-button move-button" type="button" data-move="1" aria-label="Move right">→</button>
-              <button class="control-button move-button" type="button" data-move-y="-1" aria-label="Climb up or drill up">↑</button>
-              <button class="control-button move-button" type="button" data-move-y="1" aria-label="Climb down or drill down">↓</button>
-            </div>
-            <div class="action-pad">
-              <button id="drill-button" class="control-button drill-button" type="button" aria-label="Hold to drill">DRILL</button>
-              <button id="jump-button" class="control-button jump-button" type="button" aria-label="Press to jump, press again in the air to double jump; press while climbing to drop">JUMP</button>
-              <button id="shoot-button" class="control-button shoot-button" type="button" aria-label="Shoot one projectile" hidden>SHOOT</button>
-            </div>
           </div>
         </div>
       </section>
